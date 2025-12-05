@@ -14,7 +14,7 @@ Multiplatform (KMP) ecosystem. It leverages the **Kotlin Compiler PSI (Program S
 generate robust scaffolding, network layers, and UI components but also to **reverse-engineer** existing code back into
 abstract specifications.
 
-It bridges the gap between API contracts and full-stack KMP applications targeting Android, iOS, and Desktop.
+It bridges the gap between API contracts and full-stack KMP applications targeting: Android, iOS, Desktop, and web.
 
 ## Key Features
 
