@@ -4,55 +4,119 @@ import domain.SchemaProperty
 
 /**
  * Shared utilities for mapping OpenAPI types to Kotlin types and vice versa.
+ * Updated to support OAS 3.2:
+ * - Multi-Type (e.g. ["string", "null"]) mappings.
+ * - Binary Content via `contentMediaType` / `contentEncoding` (replacing `format: binary`).
  */
 object TypeMappers {
 
     /**
      * Maps an OpenAPI Schema Property to a Kotlin type string.
      * Handles basics: string, integer, number, boolean, array.
+     * Handles Dual Types (["string", "null"]) as Nullable Kotlin types.
+     * Handles Binary Data (base64 encoded strings) as ByteArray.
+     * Resolves references via [ReferenceResolver].
      */
     fun mapType(prop: SchemaProperty): String {
-        if (prop.ref != null) return prop.ref
+        if (prop.ref != null) {
+            val typeName = ReferenceResolver.resolveRefToType(prop.ref)
+            // If explicit type set is just null reference (impossible) or ref is primary
+            return typeName
+        }
 
-        return when (prop.type) {
-            "string" -> "String"
-            "integer" -> {
-                if (prop.format == "int64") "Long" else "Int"
-            }
-            "number" -> "Double"
+        // Identify primary type (ignore "null" for type selection, it handled via nullability later)
+        val primaryType = prop.types.firstOrNull { it != "null" } ?: "string"
+
+        return when (primaryType) {
+            "string" -> mapStringType(prop)
+            "integer" -> if (prop.format == "int64") "Long" else "Int"
+            "number" -> if (prop.format == "float") "Float" else "Double"
             "boolean" -> "Boolean"
             "array" -> {
                 val itemType = prop.items?.let { mapType(it) } ?: "Any"
                 "List<$itemType>"
             }
-            // Fallback for unknown types
+            else -> "Any" // Fallback for 'object' without ref or unknown types
+        }
+    }
+
+    private fun mapStringType(prop: SchemaProperty): String {
+        val fmt = prop.format
+
+        // OAS 3.1+ Content handling for binary
+        if (prop.contentEncoding == "base64" || prop.contentEncoding == "base64url") {
+            return "ByteArray"
+        }
+        // If contentMediaType implies binary (e.g. not text), map to ByteArray.
+        // We conservatively check non-null.
+        if (prop.contentMediaType != null && !prop.contentMediaType.startsWith("text/")) {
+            return "ByteArray"
+        }
+
+        return when (fmt) {
+            "date" -> "LocalDate"
+            "date-time" -> "Instant"
+            "byte" -> "ByteArray"
+            "binary" -> "ByteArray"
+            "uuid" -> "String"
             else -> "String"
         }
     }
 
     /**
      * Maps a Kotlin type string (PSI representation) back to an OpenAPI Schema Property.
-     * e.g. "List<String>" -> type: array, items: string
+     * e.g. "List<String>?" -> types: ["array", "null"], items: { types: ["string"] }
+     * e.g. "ByteArray" -> types: ["string"], contentEncoding: "base64" (OAS 3.1 style)
      */
     fun kotlinToSchemaProperty(typeString: String): SchemaProperty {
-        // Remove whitespace and nullable markers for analysis
+        val isNullable = typeString.contains("?")
         val cleanType = typeString.replace(" ", "").replace("?", "")
 
-        return when {
-            cleanType == "String" -> SchemaProperty(type = "string")
-            cleanType == "Int" -> SchemaProperty(type = "integer", format = "int32")
-            cleanType == "Long" -> SchemaProperty(type = "integer", format = "int64")
-            cleanType == "Double" -> SchemaProperty(type = "number")
-            cleanType == "Boolean" -> SchemaProperty(type = "boolean")
+        val types = mutableSetOf<String>()
+
+        // Map core type
+        var format: String? = null
+        var items: SchemaProperty? = null
+        var ref: String? = null
+        var contentEncoding: String? = null
+
+        when {
+            cleanType == "String" -> types.add("string")
+            cleanType == "Int" -> { types.add("integer"); format = "int32" }
+            cleanType == "Long" -> { types.add("integer"); format = "int64" }
+            cleanType == "Double" -> { types.add("number"); format = "double" }
+            cleanType == "Float" -> { types.add("number"); format = "float" }
+            cleanType == "Boolean" -> types.add("boolean")
+            cleanType == "LocalDate" -> { types.add("string"); format = "date" }
+            cleanType == "Instant" -> { types.add("string"); format = "date-time" }
+            cleanType == "ByteArray" -> {
+                types.add("string")
+                // OAS 3.1 Preferred: contentEncoding
+                contentEncoding = "base64"
+            }
             cleanType.startsWith("List<") -> {
+                types.add("array")
                 val innerType = cleanType.substringAfter("List<").substringBeforeLast(">")
-                SchemaProperty(type = "array", items = kotlinToSchemaProperty(innerType))
+                items = kotlinToSchemaProperty(innerType)
             }
-            // Heuristic: If it starts with Uppercase, treat as Object Reference
             cleanType.first().isUpperCase() -> {
-                SchemaProperty(type = "object", ref = cleanType)
+                types.add("object")
+                ref = cleanType
             }
-            else -> SchemaProperty(type = "string") // Conservative fallback
+            else -> types.add("string") // Default fallback
         }
+
+        // Add "null" type if Kotlin type is nullable (OAS 3.2 / JSON Schema compliance)
+        if (isNullable) {
+            types.add("null")
+        }
+
+        return SchemaProperty(
+            types = types,
+            format = format,
+            contentEncoding = contentEncoding,
+            items = items,
+            ref = ref
+        )
     }
 }

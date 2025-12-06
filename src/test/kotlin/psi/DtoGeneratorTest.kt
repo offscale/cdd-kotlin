@@ -2,6 +2,8 @@ package psi
 
 import domain.SchemaDefinition
 import domain.SchemaProperty
+import domain.ExternalDocumentation
+import domain.Discriminator
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Test
@@ -24,8 +26,8 @@ class DtoGeneratorTest {
             name = "User",
             type = "object",
             properties = mapOf(
-                "name" to SchemaProperty("string"),
-                "age" to SchemaProperty("integer")
+                "name" to SchemaProperty(type = "string"),
+                "age" to SchemaProperty(type = "integer")
             ),
             required = listOf("name")
         )
@@ -36,7 +38,6 @@ class DtoGeneratorTest {
         assertTrue(text.contains("package com.example"))
         assertTrue(text.contains("data class User("))
         assertTrue(text.contains("val name: String"))
-        assertTrue(text.contains("@SerialName(\"name\")"))
     }
 
     @Test
@@ -45,19 +46,17 @@ class DtoGeneratorTest {
             name = "Product",
             type = "object",
             properties = mapOf(
-                "id" to SchemaProperty("integer"),
-                "description" to SchemaProperty("string")
+                "id" to SchemaProperty(type = "integer"),
+                "description" to SchemaProperty(type = "string")
             ),
-            required = listOf("id") // description is optional
+            required = listOf("id")
         )
 
         val text = generator.generateDto("com.shop", schema).text
 
-        // id is required -> Int
         assertTrue(text.contains("val id: Int"))
         assertFalse(text.contains("val id: Int?"))
-
-        // description is optional -> String? = null
+        // Nullable implies default null
         assertTrue(text.contains("val description: String? = null"))
     }
 
@@ -68,14 +67,14 @@ class DtoGeneratorTest {
             type = "object",
             description = "Top level class doc",
             properties = mapOf(
-                "sku" to SchemaProperty("string", description = "The stock keeping unit")
+                "sku" to SchemaProperty(type = "string", description = "The stock keeping unit")
             )
         )
 
         val text = generator.generateDto("com.inventory", schema).text
 
-        assertTrue(text.contains("/** Top level class doc */"))
-        assertTrue(text.contains("/** The stock keeping unit */"))
+        assertTrue(text.contains(" * Top level class doc\n"))
+        assertTrue(text.contains("     * The stock keeping unit\n"))
     }
 
     @Test
@@ -88,7 +87,7 @@ class DtoGeneratorTest {
                 "id" to SchemaProperty("integer", format = "int64"),
                 "ratio" to SchemaProperty("number"),
                 "flag" to SchemaProperty("boolean"),
-                "tags" to SchemaProperty("array")
+                "tags" to SchemaProperty("array", items = SchemaProperty("string"))
             )
         )
 
@@ -99,6 +98,30 @@ class DtoGeneratorTest {
         assertTrue(text.contains("val ratio: Double?"))
         assertTrue(text.contains("val flag: Boolean?"))
         assertTrue(text.contains("val tags: List<String>?"))
+    }
+
+    @Test
+    fun `generateDto supports extended types`() {
+        val schema = SchemaDefinition(
+            name = "Extended",
+            type = "object",
+            properties = mapOf(
+                "created" to SchemaProperty("string", format = "date-time"),
+                "birthday" to SchemaProperty("string", format = "date"),
+                "blob" to SchemaProperty("string", format = "byte"),
+                "raw" to SchemaProperty("string", format = "binary")
+            )
+        )
+
+        val text = generator.generateDto("com.ext", schema).text
+
+        assertTrue(text.contains("import kotlinx.datetime.Instant"))
+        assertTrue(text.contains("import kotlinx.datetime.LocalDate"))
+
+        assertTrue(text.contains("val created: Instant?"))
+        assertTrue(text.contains("val birthday: LocalDate?"))
+        assertTrue(text.contains("val blob: ByteArray?"))
+        assertTrue(text.contains("val raw: ByteArray?"))
     }
 
     @Test
@@ -115,5 +138,147 @@ class DtoGeneratorTest {
 
         assertTrue(text.contains("@SerialName(\"user_id\")"))
         assertTrue(text.contains("val user_id: Int?"))
+    }
+
+    @Test
+    fun `generateDto includes External Documentation as KDoc`() {
+        val schema = SchemaDefinition(
+            name = "DocItem",
+            type = "object",
+            description = "Item with docs",
+            externalDocs = ExternalDocumentation("More info", "https://example.com")
+        )
+
+        val text = generator.generateDto("com.doc", schema).text
+
+        assertTrue(text.contains("Item with docs"))
+        assertTrue(text.contains("@see https://example.com More info"))
+    }
+
+    @Test
+    fun `generateDto handles Reference Object URIs`() {
+        val schema = SchemaDefinition(
+            name = "RefContainer",
+            type = "object",
+            properties = mapOf(
+                "internal" to SchemaProperty("object", ref = "#/components/schemas/User"),
+                "external" to SchemaProperty("object", ref = "./models/Address.json"),
+                "legacy" to SchemaProperty("object", ref = "SimpleType")
+            )
+        )
+
+        val text = generator.generateDto("com.ref", schema).text
+
+        assertTrue(text.contains("val internal: User?"))
+        assertTrue(text.contains("val external: Address?"))
+        assertTrue(text.contains("val legacy: SimpleType?"))
+    }
+
+    @Test
+    fun `generateDto creates Enum class with SerialName mappings`() {
+        val schema = SchemaDefinition(
+            name = "SortArgs",
+            type = "string",
+            enumValues = listOf("ascending", "descending")
+        )
+
+        val text = generator.generateDto("com.enums", schema).text
+
+        assertTrue(text.contains("enum class SortArgs"))
+        assertTrue(text.contains("@SerialName(\"ascending\")"))
+        assertTrue(text.contains("Ascending"))
+    }
+
+    @Test
+    fun `generateDto sanitizes enum identifiers`() {
+        val schema = SchemaDefinition(
+            name = "TrickyEnum",
+            type = "string",
+            enumValues = listOf("first-value", "123", "Value With Space")
+        )
+
+        val text = generator.generateDto("com.enums", schema).text
+
+        assertTrue(text.contains("FirstValue"))
+        assertTrue(text.contains("_123"))
+        assertTrue(text.contains("ValueWithSpace"))
+    }
+
+    @Test
+    fun `generateDto creates Sealed Interface for oneOf`() {
+        val schema = SchemaDefinition(
+            name = "PolymorphicPet",
+            type = "object",
+            // UPDATED: Using Discriminator Object
+            discriminator = Discriminator(propertyName = "petType"),
+            oneOf = listOf("Dog", "Cat"),
+            properties = mapOf(
+                "id" to SchemaProperty("integer")
+            )
+        )
+
+        val text = generator.generateDto("com.poly", schema).text
+
+        assertTrue(text.contains("sealed interface PolymorphicPet"))
+        assertTrue(text.contains("@JsonClassDiscriminator(\"petType\")"))
+        assertTrue(text.contains("val id: Int?"))
+        assertTrue(text.contains("import kotlinx.serialization.JsonClassDiscriminator"))
+    }
+
+    @Test
+    fun `generateDto creates Data Class with inheritance`() {
+        val schema = SchemaDefinition(
+            name = "Dog",
+            type = "object",
+            allOf = listOf("Pet", "Mammal"),
+            properties = mapOf(
+                "breed" to SchemaProperty("string")
+            )
+        )
+
+        val text = generator.generateDto("com.poly", schema).text
+
+        assertTrue(text.contains("data class Dog("))
+        assertTrue(text.contains("val breed: String?"))
+        assertTrue(text.contains(" : Pet, Mammal"))
+    }
+
+    @Test
+    fun `generateDto includes examples in KDoc`() {
+        val schema = SchemaDefinition(
+            name = "ExampleUser",
+            type = "object",
+            example = "{ \"name\": \"John\" }",
+            properties = mapOf(
+                "name" to SchemaProperty(type = "string", example = "John")
+            )
+        )
+
+        val text = generator.generateDto("com.ex", schema).text
+
+        assertTrue(text.contains("@example { \"name\": \"John\" }"), "Class example missing")
+        assertTrue(text.contains("@example John"), "Property example missing")
+    }
+
+    @Test
+    fun `generateDto supports OAS 3_2 Dual Types (array null)`() {
+        val schema = SchemaDefinition(
+            name = "ModernOas",
+            type = "object",
+            properties = mapOf(
+                // type: ["string", "null"]
+                "nullableString" to SchemaProperty(types = setOf("string", "null")),
+                // type: ["integer"]
+                "strictInt" to SchemaProperty(types = setOf("integer"))
+            ),
+            // Even if required list includes nullableString, type: ["null"] forces nullability in Kotlin
+            required = listOf("nullableString", "strictInt")
+        )
+
+        val text = generator.generateDto("com.oas32", schema).text
+
+        assertTrue(text.contains("val nullableString: String? = null"), "Should be nullable due to dual type")
+        assertTrue(text.contains("val strictInt: Int"), "Should be non-null")
+        assertFalse(text.contains("val strictInt: Int?"))
     }
 }

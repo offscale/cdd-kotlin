@@ -1,5 +1,7 @@
 package scaffold
 
+import domain.Info
+import domain.Contact
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
@@ -8,8 +10,8 @@ import java.io.File
 import java.nio.file.Path
 
 /**
- * Tests for [ScaffoldGenerator] ensuring directory structure and critical dependencies
- * are generated correctly.
+ * Tests for [ScaffoldGenerator] ensuring directory structure, critical dependencies,
+ * and metadata injection are handled correctly.
  */
 class ScaffoldGeneratorTest {
 
@@ -100,5 +102,45 @@ class ScaffoldGeneratorTest {
             "rootProject.name = \"IdempotentTest\"\ninclude(\":composeApp\")",
             File(outputDir, "settings.gradle.kts").readText()
         )
+    }
+
+    @Test
+    fun `generate populates gradle version from Info object`(@TempDir tempDir: Path) {
+        // Arrange
+        val generator = ScaffoldGenerator()
+        val outputDir = tempDir.toFile()
+        val info = Info(
+            title = "Test App",
+            version = "3.2.0-beta",
+            contact = Contact(name = "Dev", email = "dev@test.com")
+        )
+
+        // Act
+        generator.generate(outputDir, "VersionTest", "com.test.v", info)
+
+        // Assert - Root build.gradle.kts
+        val rootBuild = File(outputDir, "build.gradle.kts").readText()
+        assertTrue(rootBuild.contains("version = \"3.2.0-beta\""), "Root project version not set correctly")
+
+        // Assert - App build.gradle.kts (Android)
+        val appBuild = File(outputDir, "composeApp/build.gradle.kts").readText()
+        assertTrue(appBuild.contains("versionName = \"3.2.0-beta\""), "Android versionName not set correctly")
+    }
+
+    @Test
+    fun `generate uses default version when Info is missing`(@TempDir tempDir: Path) {
+        // Arrange
+        val generator = ScaffoldGenerator()
+        val outputDir = tempDir.toFile()
+
+        // Act
+        generator.generate(outputDir, "DefaultVersionTest", "com.test.d")
+
+        // Assert
+        val rootBuild = File(outputDir, "build.gradle.kts").readText()
+        assertTrue(rootBuild.contains("version = \"1.0-SNAPSHOT\""), "Default root version missing")
+
+        val appBuild = File(outputDir, "composeApp/build.gradle.kts").readText()
+        assertTrue(appBuild.contains("versionName = \"1.0\""), "Default Android versionName missing")
     }
 }

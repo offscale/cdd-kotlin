@@ -1,5 +1,6 @@
 package scaffold
 
+import domain.Info
 import java.io.File
 import java.io.IOException
 
@@ -14,16 +15,23 @@ class ScaffoldGenerator {
      * @param outputDirectory The root directory where the project will be created.
      * @param projectName The name of the gradle root project.
      * @param packageName The base package name (e.g. com.example.app).
+     * @param info Optional OpenAPI Info object containing version and metadata.
      * @throws IOException If file writing fails.
      */
     @Throws(IOException::class)
-    fun generate(outputDirectory: File, projectName: String, packageName: String) {
+    fun generate(
+        outputDirectory: File,
+        projectName: String,
+        packageName: String,
+        info: Info? = null
+    ) {
         if (!outputDirectory.exists()) {
             outputDirectory.mkdirs()
         }
 
         // 1. Root Gradle Files
-        writeFile(outputDirectory, "build.gradle.kts", ScaffoldTemplates.createRootBuildGradle())
+        // Pass info to templates to populate version
+        writeFile(outputDirectory, "build.gradle.kts", ScaffoldTemplates.createRootBuildGradle(info))
         writeFile(outputDirectory, "settings.gradle.kts", ScaffoldTemplates.createSettingsGradle(projectName))
         writeFile(outputDirectory, "gradle.properties", ScaffoldTemplates.createGradleProperties())
 
@@ -33,7 +41,8 @@ class ScaffoldGenerator {
 
         // 3. Compose App Module
         val appDir = File(outputDirectory, "composeApp").apply { mkdirs() }
-        writeFile(appDir, "build.gradle.kts", ScaffoldTemplates.createAppBuildGradle(packageName))
+        // Pass info to templates to populate android versionName
+        writeFile(appDir, "build.gradle.kts", ScaffoldTemplates.createAppBuildGradle(packageName, info))
 
         // 4. Source Sets
         generateSourceSets(appDir, packageName)
@@ -52,7 +61,7 @@ class ScaffoldGenerator {
 
         // androidMain
         val androidMainDir = File(srcDir, "androidMain")
-        val androidCodeDir = File(androidMainDir, "kotlin/$packagePath").apply { mkdirs() }
+        // val androidCodeDir = File(androidMainDir, "kotlin/$packagePath").apply { mkdirs() }
         // Create manifest strictly in src/androidMain
         writeFile(androidMainDir, "AndroidManifest.xml", ScaffoldTemplates.createAndroidManifest())
         // Create an empty MainActivity placeholders if needed, but App generator is enough is minimal
