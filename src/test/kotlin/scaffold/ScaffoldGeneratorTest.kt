@@ -134,7 +134,7 @@ class ScaffoldGeneratorTest {
         val outputDir = tempDir.toFile()
 
         // Act
-        generator.generate(outputDir, "DefaultVersionTest", "com.test.d")
+        generator.generate(outputDir, "DefaultVersionTest", "com.test.d", null)
 
         // Assert
         val rootBuild = File(outputDir, "build.gradle.kts").readText()

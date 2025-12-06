@@ -60,11 +60,11 @@ class ScaffoldGenerator {
         writeFile(commonMainPath, "App.kt", ScaffoldTemplates.createCommonAppKt(packageName))
 
         // androidMain
-        val androidMainDir = File(srcDir, "androidMain")
-        // val androidCodeDir = File(androidMainDir, "kotlin/$packagePath").apply { mkdirs() }
+        // --- FIX BELOW: Added .apply { mkdirs() } ---
+        val androidMainDir = File(srcDir, "androidMain").apply { mkdirs() }
+
         // Create manifest strictly in src/androidMain
         writeFile(androidMainDir, "AndroidManifest.xml", ScaffoldTemplates.createAndroidManifest())
-        // Create an empty MainActivity placeholders if needed, but App generator is enough is minimal
 
         // desktopMain
         File(srcDir, "desktopMain/kotlin/$packagePath").apply { mkdirs() }

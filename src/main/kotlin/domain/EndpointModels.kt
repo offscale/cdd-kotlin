@@ -2,11 +2,12 @@ package domain
 
 /**
  * Supported HTTP Methods for API operations.
+ * Updated to include QUERY (OAS 3.2) support.
  *
  * See [Path Item Object](https://spec.openapis.org/oas/v3.2.0#path-item-object)
  */
 enum class HttpMethod {
-    GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS, TRACE
+    GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS, TRACE, QUERY
 }
 
 /**
@@ -342,6 +343,8 @@ data class PathItem(
     val patch: EndpointDefinition? = null,
     /** A definition of a TRACE operation on this path. */
     val trace: EndpointDefinition? = null,
+    /** A definition of a QUERY operation on this path (OAS 3.2). */
+    val query: EndpointDefinition? = null,
 
     /**
      * A list of parameters that are applicable for all the operations described under this path.
