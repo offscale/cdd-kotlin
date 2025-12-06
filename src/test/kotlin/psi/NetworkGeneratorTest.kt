@@ -6,6 +6,7 @@ import domain.EndpointParameter
 import domain.ParameterLocation
 import domain.ParameterStyle
 import domain.Server
+import domain.SecurityScheme
 import domain.EndpointResponse
 import domain.ExternalDocumentation
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -204,5 +205,39 @@ class NetworkGeneratorTest {
         assertTrue(text.contains("@tag system, public"))
         assertTrue(text.contains("@response 200 String Success"))
         assertTrue(text.contains("@response 404 Unit Not Found"))
+    }
+
+    @Test
+    fun `generateApi generates Ktor Auth configuration`() {
+        val endpoints = listOf(EndpointDefinition("/secure", HttpMethod.GET, "secureOp"))
+        val schemes = mapOf(
+            "BearerAuth" to SecurityScheme(type = "http", scheme = "bearer"),
+            "BasicAuth" to SecurityScheme(type = "http", scheme = "basic"),
+            "ApiKeyAuth" to SecurityScheme(type = "apiKey", name = "X-API-KEY", `in` = "header")
+        )
+
+        val text = generator.generateApi("com.auth", "AuthApi", endpoints, emptyList(), schemes).text
+
+        // Verify Imports
+        assertTrue(text.contains("import io.ktor.client.plugins.auth.*"), "Missing Auth imports")
+        assertTrue(text.contains("import io.ktor.client.plugins.*"), "Missing Plugin imports")
+
+        // Verify Factory Method Signature
+        assertTrue(text.contains("fun createHttpClient("), "Missing createHttpClient factory")
+        assertTrue(text.contains("bearerAuth: String? = null"))
+        assertTrue(text.contains("basicAuthUser: String? = null"))
+        assertTrue(text.contains("basicAuthPass: String? = null"))
+        assertTrue(text.contains("apiKeyAuth: String? = null"))
+
+        // Verify Install Blocks
+        assertTrue(text.contains("install(Auth) {"), "Missing Auth plugin install")
+        assertTrue(text.contains("bearer {"), "Missing bearer block")
+        assertTrue(text.contains("basic {"), "Missing basic block")
+        assertTrue(text.contains("BasicAuthCredentials("), "Missing basic credentials object")
+        assertTrue(text.contains("BearerTokens(accessToken = bearerAuth"), "Missing bearer token loading")
+
+        // Verify ApiKey via DefaultRequest
+        assertTrue(text.contains("install(DefaultRequest) {"), "Missing DefaultRequest plugin")
+        assertTrue(text.contains("header(\"X-API-KEY\", apiKeyAuth)"), "Missing header injection")
     }
 }
