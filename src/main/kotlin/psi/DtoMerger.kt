@@ -55,10 +55,16 @@ class DtoMerger {
                 sb.append("\n    ")
             }
 
+            // Calculate Type and Null-defaulting based on new SchemaProperty.types (OAS 3.2)
+            val baseType = TypeMappers.mapType(prop)
+            val isExplicitlyNullable = prop.types.contains("null")
             val isRequired = schema.required.contains(name)
-            val type = TypeMappers.mapType(prop)
-            val finalType = if (isRequired) type else "$type?"
-            val defaultVal = if (!isRequired) " = null" else ""
+
+            // If explicit null type OR not in required list, it is nullable in Kotlin
+            val isNullable = isExplicitlyNullable || !isRequired
+
+            val finalType = if (isNullable) "$baseType?" else baseType
+            val defaultVal = if (isNullable) " = null" else ""
 
             sb.append("@kotlinx.serialization.SerialName(\"$name\") val $name: $finalType$defaultVal")
         }

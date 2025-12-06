@@ -3,7 +3,6 @@ package psi
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
-import org.junit.jupiter.api.BeforeAll
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DtoParserTest {
@@ -12,17 +11,17 @@ class DtoParserTest {
 
     @Test
     fun `parse extracts Data Class info correctly`() {
-        val code = """
+        val code = """ 
             package com.example
             
-            /**
-             * Represents a system user.
-             */
-            data class User(
-                /** The primary key */
-                val id: Long,
-                val username: String?
-            )
+            /** 
+             * Represents a system user. 
+             */ 
+            data class User( 
+                /** The primary key */ 
+                val id: Long, 
+                val username: String? 
+            ) 
         """.trimIndent()
 
         val results = parser.parse(code)
@@ -53,13 +52,13 @@ class DtoParserTest {
 
     @Test
     fun `parse handles SerialName annotation overrides`() {
-        val code = """
+        val code = """ 
             import kotlinx.serialization.SerialName
             
-            data class ApiConfig(
-                @SerialName("api_key")
+            data class ApiConfig( 
+                @SerialName("api_key") 
                 val key: String
-            )
+            ) 
         """.trimIndent()
 
         val schema = parser.parse(code).first()
@@ -72,11 +71,11 @@ class DtoParserTest {
 
     @Test
     fun `parse extracts Enum definitions`() {
-        val code = """
-            enum class Status {
-                ACTIVE,
+        val code = """ 
+            enum class Status { 
+                ACTIVE, 
                 INACTIVE
-            }
+            } 
         """.trimIndent()
 
         val schema = parser.parse(code).first()
@@ -86,16 +85,39 @@ class DtoParserTest {
 
         assertNotNull(schema.enumValues)
         assertTrue(schema.enumValues!!.contains("ACTIVE"))
-        assertTrue(schema.enumValues!!.contains("INACTIVE"))
+        assertTrue(schema.enumValues.contains("INACTIVE"))
+    }
+
+    @Test
+    fun `parse extracts Enum definitions with SerialName`() {
+        val code = """ 
+            import kotlinx.serialization.SerialName
+            enum class Sort { 
+                @SerialName("asc") 
+                Ascending, 
+                @SerialName("desc") 
+                Descending
+            } 
+        """.trimIndent()
+
+        val schema = parser.parse(code).first()
+
+        assertEquals("Sort", schema.name)
+        val values = schema.enumValues!!
+        assertEquals(2, values.size)
+        // Should parse the SerialName values, NOT the Kotlin identifier names
+        assertTrue(values.contains("asc"))
+        assertTrue(values.contains("desc"))
+        assertFalse(values.contains("Ascending"))
     }
 
     @Test
     fun `parse handles complex types and lists`() {
-        val code = """
-            data class Group(
-                val members: List<User>,
-                val meta: List<String>?
-            )
+        val code = """ 
+            data class Group( 
+                val members: List<User>, 
+                val meta: List<String>? 
+            ) 
         """.trimIndent()
 
         val schema = parser.parse(code).first()
@@ -116,14 +138,42 @@ class DtoParserTest {
 
     @Test
     fun `parse ignores non-data classes`() {
-        val code = """
-            class Logic {
-                fun execute() {}
-            }
-            interface API {}
+        val code = """ 
+            class Logic { 
+                fun execute() {} 
+            } 
+            interface API {} 
         """.trimIndent()
 
         val results = parser.parse(code)
         assertTrue(results.isEmpty())
+    }
+
+    @Test
+    fun `parse extracts Sealed Interface and Discriminator`() {
+        val code = """ 
+            import kotlinx.serialization.JsonClassDiscriminator
+            import kotlinx.serialization.Serializable
+
+            @Serializable
+            @JsonClassDiscriminator("type") 
+            sealed interface Shape { 
+               val area: Double
+            } 
+        """.trimIndent()
+
+        val results = parser.parse(code)
+        assertEquals(1, results.size)
+
+        val schema = results.first()
+        assertEquals("Shape", schema.name)
+
+        // UPDATED: Check for Discriminator Object properties
+        assertNotNull(schema.discriminator)
+        assertEquals("type", schema.discriminator?.propertyName)
+
+        // oneOf is technically implied empty by current parser implementation but type is object
+        assertEquals("object", schema.type)
+        assertTrue(schema.properties.containsKey("area"))
     }
 }

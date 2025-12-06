@@ -1,5 +1,7 @@
 package scaffold
 
+import domain.Info
+
 /**
  * Object containing string templates for the KMP project structure.
  * These templates define the Gradle configuration and initial Kotlin definitions.
@@ -61,8 +63,12 @@ object ScaffoldTemplates {
     /**
      * Generates the root build.gradle.kts file.
      * Sets up the plugins for the overall project context.
+     * @param info Optional Info metadata to populate version.
      */
-    fun createRootBuildGradle(): String = """
+    fun createRootBuildGradle(info: Info? = null): String {
+        val versionLine = if (info != null) "version = \"${info.version}\"" else "version = \"1.0-SNAPSHOT\""
+
+        return """
         plugins {
             // this is necessary to avoid the plugins to be loaded multiple times
             // in each subproject's classloader
@@ -73,7 +79,11 @@ object ScaffoldTemplates {
             alias(libs.plugins.kotlinMultiplatform) apply false
             alias(libs.plugins.kotlinSerialization) apply false
         }
+
+        group = "com.example"
+        $versionLine
     """.trimIndent()
+    }
 
     /**
      * Generates the gradle.properties file used for JVM arguments.
@@ -89,8 +99,12 @@ object ScaffoldTemplates {
      * Configures SourceSets for Android, iOS, and Desktop.
      * Configures Ktor and Serialization dependencies.
      * @param namespace The Android namespace (package name).
+     * @param info Optional Info metadata to populate versionName.
      */
-    fun createAppBuildGradle(namespace: String): String = """
+    fun createAppBuildGradle(namespace: String, info: Info? = null): String {
+        val versionNameStr = info?.version ?: "1.0"
+
+        return """
         plugins {
             alias(libs.plugins.kotlinMultiplatform)
             alias(libs.plugins.androidApplication)
@@ -173,7 +187,7 @@ object ScaffoldTemplates {
                 minSdk = libs.versions.android.minSdk.get().toInt()
                 targetSdk = libs.versions.android.targetSdk.get().toInt()
                 versionCode = 1
-                versionName = "1.0"
+                versionName = "$versionNameStr"
             }
             packaging {
                 resources {
@@ -191,6 +205,7 @@ object ScaffoldTemplates {
             }
         }
     """.trimIndent()
+    }
 
     /**
      * Generates a basic AndroidManifest.xml required for the Android target.
