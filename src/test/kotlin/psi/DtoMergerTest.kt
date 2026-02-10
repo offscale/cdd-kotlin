@@ -98,4 +98,98 @@ class DtoMergerTest {
         assertTrue(result.contains("val a: Boolean"))
         assertTrue(result.contains("val b: Boolean"))
     }
+
+    @Test
+    fun `mergeDto returns original when no fields are missing`() {
+        val existing = """
+            data class User(
+                val id: Int
+            )
+        """.trimIndent()
+
+        val schema = SchemaDefinition(
+            name = "User",
+            type = "object",
+            properties = mapOf(
+                "id" to SchemaProperty("integer")
+            ),
+            required = listOf("id")
+        )
+
+        val result = merger.mergeDto(existing, schema)
+
+        assertEquals(existing, result)
+    }
+
+    @Test
+    fun `mergeDto inserts into empty constructor`() {
+        val existing = """
+            data class Empty()
+        """.trimIndent()
+
+        val schema = SchemaDefinition(
+            name = "Empty",
+            type = "object",
+            properties = mapOf(
+                "name" to SchemaProperty("string")
+            )
+        )
+
+        val result = merger.mergeDto(existing, schema)
+
+        assertTrue(result.contains("data class Empty(\n    @kotlinx.serialization.SerialName(\"name\") val name: String? = null"))
+    }
+
+    @Test
+    fun `mergeDto supports explicit null types`() {
+        val existing = """
+            data class NullableContainer(
+                val id: String
+            )
+        """.trimIndent()
+
+        val schema = SchemaDefinition(
+            name = "NullableContainer",
+            type = "object",
+            properties = mapOf(
+                "id" to SchemaProperty("string"),
+                "maybe" to SchemaProperty(types = setOf("string", "null"))
+            ),
+            required = listOf("id", "maybe")
+        )
+
+        val result = merger.mergeDto(existing, schema)
+
+        assertTrue(result.contains("val maybe: String? = null"))
+    }
+
+    @Test
+    fun `mergeDto throws when class missing`() {
+        val existing = "data class Other(val id: String)"
+
+        val schema = SchemaDefinition(
+            name = "Missing",
+            type = "object",
+            properties = mapOf("id" to SchemaProperty("string"))
+        )
+
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException::class.java) {
+            merger.mergeDto(existing, schema)
+        }
+    }
+
+    @Test
+    fun `mergeDto throws when primary constructor missing`() {
+        val existing = "class NoPrimary { fun run() {} }"
+
+        val schema = SchemaDefinition(
+            name = "NoPrimary",
+            type = "object",
+            properties = mapOf("id" to SchemaProperty("string"))
+        )
+
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException::class.java) {
+            merger.mergeDto(existing, schema)
+        }
+    }
 }

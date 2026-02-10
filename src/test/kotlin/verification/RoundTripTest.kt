@@ -111,6 +111,45 @@ class RoundTripTest {
     }
 
     @Test
+    fun `Array alias Round Trip preserves items`() {
+        val originalSchema = SchemaDefinition(
+            name = "IdList",
+            type = "array",
+            items = SchemaProperty("integer", format = "int64")
+        )
+
+        val kotlinFile = dtoGenerator.generateDto("com.test", originalSchema)
+        val sourceCode = kotlinFile.text
+        val extractedSchema = dtoParser.parse(sourceCode).first()
+
+        assertEquals("array", extractedSchema.type)
+        assertEquals("integer", extractedSchema.items?.type)
+        assertEquals("int64", extractedSchema.items?.format)
+    }
+
+    @Test
+    fun `Map Round Trip preserves additionalProperties`() {
+        val originalSchema = SchemaDefinition(
+            name = "Attributes",
+            type = "object",
+            properties = mapOf(
+                "labels" to SchemaProperty(
+                    type = "object",
+                    additionalProperties = SchemaProperty("string")
+                )
+            )
+        )
+
+        val kotlinFile = dtoGenerator.generateDto("com.test", originalSchema)
+        val sourceCode = kotlinFile.text
+        val extractedSchema = dtoParser.parse(sourceCode).first()
+
+        val labels = extractedSchema.properties["labels"]
+        assertEquals("object", labels?.type)
+        assertEquals("string", labels?.additionalProperties?.type)
+    }
+
+    @Test
     fun `Network Endpoint Round Trip preserves structure`() {
         val originalEndpoint = EndpointDefinition(
             path = "/users/{id}",
@@ -123,7 +162,7 @@ class RoundTripTest {
                 EndpointParameter("id", "Long", ParameterLocation.PATH)
             ),
             responses = mapOf(
-                "200" to EndpointResponse("200", "Success", "TestUser")
+                "200" to EndpointResponse(statusCode = "200", description = "Success", type = "TestUser")
             ),
             requestBodyType = null
         )

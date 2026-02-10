@@ -13,6 +13,13 @@ import domain.EndpointDefinition
  */
 class NetworkMerger {
 
+    /**
+     * Merges endpoint definitions by operationId using a strict spec-first strategy.
+     *
+     * @param existing Existing code-defined endpoints.
+     * @param newSpec Newly parsed spec-defined endpoints.
+     * @return A merged list reflecting the spec as the source of truth.
+     */
     fun mergeEndpoints(
         existing: List<EndpointDefinition>,
         newSpec: List<EndpointDefinition>

@@ -26,10 +26,47 @@ data class SchemaDefinition(
     val type: String,
 
     /**
+     * Optional explicit type set for OAS 3.2 / JSON Schema multi-type definitions.
+     * When provided, this overrides [type] for codegen decisions.
+     * Example: {"string", "null"}.
+     */
+    val types: Set<String> = emptySet(),
+
+    /**
+     * The format refinement (e.g., "int32", "int64", "float", "double", "date-time", "password").
+     * This applies when [type] is a primitive.
+     */
+    val format: String? = null,
+
+    /**
+     * The standard MIME type of the content (e.g., "image/png", "application/octet-stream").
+     * Applies when [type] is "string" and content is binary/encoded.
+     */
+    val contentMediaType: String? = null,
+
+    /**
+     * The Content-Encoding specifying how the content is encoded in the schema (e.g., "base64", "base64url").
+     * Applies when [type] is "string" and content is encoded.
+     */
+    val contentEncoding: String? = null,
+
+    /**
+     * If type is "array", this describes the items schema.
+     * JSON Schema keyword: `items`.
+     */
+    val items: SchemaProperty? = null,
+
+    /**
      * If type is "object", this map contains its properties.
      * JSON Schema keyword: `properties`.
      */
     val properties: Map<String, SchemaProperty> = emptyMap(),
+
+    /**
+     * If type is "object", this schema defines the value type for additional properties.
+     * JSON Schema keyword: `additionalProperties`.
+     */
+    val additionalProperties: SchemaProperty? = null,
 
     /**
      * List of field names that are mandatory (not nullable).
@@ -48,6 +85,42 @@ data class SchemaDefinition(
      * CommonMark syntax MAY be used for rich text representation.
      */
     val description: String? = null,
+
+    /**
+     * A short title for the schema.
+     * JSON Schema keyword: `title`.
+     */
+    val title: String? = null,
+
+    /**
+     * The default value for the schema instance, expressed as a JSON-compatible literal string.
+     * JSON Schema keyword: `default`.
+     */
+    val defaultValue: String? = null,
+
+    /**
+     * A fixed value for the schema instance, expressed as a JSON-compatible literal string.
+     * JSON Schema keyword: `const`.
+     */
+    val constValue: String? = null,
+
+    /**
+     * Declares this schema to be deprecated. Consumers SHOULD refrain from usage.
+     * JSON Schema keyword: `deprecated`.
+     */
+    val deprecated: Boolean = false,
+
+    /**
+     * Declares the schema is read-only (response-only).
+     * JSON Schema keyword: `readOnly`.
+     */
+    val readOnly: Boolean = false,
+
+    /**
+     * Declares the schema is write-only (request-only).
+     * JSON Schema keyword: `writeOnly`.
+     */
+    val writeOnly: Boolean = false,
 
     /**
      * Additional external documentation for this schema.
@@ -108,7 +181,19 @@ data class SchemaDefinition(
      * Or can map to JSON Schema `examples` array logic depending on serialization.
      */
     val examples: Map<String, String>? = null
-)
+) {
+    /**
+     * Effective types for this schema, using [types] when provided, otherwise [type].
+     */
+    val effectiveTypes: Set<String>
+        get() = if (types.isNotEmpty()) types else setOf(type)
+
+    /**
+     * Primary type for codegen (ignores "null" when present).
+     */
+    val primaryType: String
+        get() = effectiveTypes.firstOrNull { it != "null" } ?: effectiveTypes.firstOrNull() ?: type
+}
 
 /**
  * When request bodies or response payloads may be one of a number of different schemas,
@@ -225,6 +310,12 @@ data class SchemaProperty(
     val items: SchemaProperty? = null,
 
     /**
+     * If type contains "object", this describes the value schema for dynamic keys.
+     * Corresponds to JSON Schema `additionalProperties`.
+     */
+    val additionalProperties: SchemaProperty? = null,
+
+    /**
      * If this property is a reference to another object, this holds the URI Reference.
      * Supports:
      * - Internal Pointers: `#/components/schemas/User`
@@ -237,6 +328,42 @@ data class SchemaProperty(
      * Documentation for this specific property.
      */
     val description: String? = null,
+
+    /**
+     * A short title for the property schema.
+     * JSON Schema keyword: `title`.
+     */
+    val title: String? = null,
+
+    /**
+     * The default value for the property, expressed as a JSON-compatible literal string.
+     * JSON Schema keyword: `default`.
+     */
+    val defaultValue: String? = null,
+
+    /**
+     * A fixed value for the property, expressed as a JSON-compatible literal string.
+     * JSON Schema keyword: `const`.
+     */
+    val constValue: String? = null,
+
+    /**
+     * Declares this property to be deprecated. Consumers SHOULD refrain from usage.
+     * JSON Schema keyword: `deprecated`.
+     */
+    val deprecated: Boolean = false,
+
+    /**
+     * Declares the property is read-only (response-only).
+     * JSON Schema keyword: `readOnly`.
+     */
+    val readOnly: Boolean = false,
+
+    /**
+     * Declares the property is write-only (request-only).
+     * JSON Schema keyword: `writeOnly`.
+     */
+    val writeOnly: Boolean = false,
 
     /**
      * A sample value for this property (serialized as String).
@@ -258,8 +385,15 @@ data class SchemaProperty(
         contentMediaType: String? = null,
         contentEncoding: String? = null,
         items: SchemaProperty? = null,
+        additionalProperties: SchemaProperty? = null,
         ref: String? = null,
         description: String? = null,
+        title: String? = null,
+        defaultValue: String? = null,
+        constValue: String? = null,
+        deprecated: Boolean = false,
+        readOnly: Boolean = false,
+        writeOnly: Boolean = false,
         example: String? = null,
         xml: Xml? = null
     ) : this(
@@ -268,8 +402,15 @@ data class SchemaProperty(
         contentMediaType = contentMediaType,
         contentEncoding = contentEncoding,
         items = items,
+        additionalProperties = additionalProperties,
         ref = ref,
         description = description,
+        title = title,
+        defaultValue = defaultValue,
+        constValue = constValue,
+        deprecated = deprecated,
+        readOnly = readOnly,
+        writeOnly = writeOnly,
         example = example,
         xml = xml
     )

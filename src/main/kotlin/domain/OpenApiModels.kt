@@ -37,10 +37,10 @@ data class OpenApiDefinition(
     /**
      * The available paths and operations for the API.
      *
-     * Note: In this domain model, we map the path string (e.g. "/users/{id}") to a flattened
-     * [EndpointDefinition] which contains the Method and Operation details.
+     * This maps the path string (e.g. "/users/{id}") to a [PathItem], which can contain
+     * multiple operations (GET, POST, etc.) and path-level parameters.
      */
-    val paths: Map<String, EndpointDefinition> = emptyMap(),
+    val paths: Map<String, PathItem> = emptyMap(),
 
     /**
      * The incoming webhooks that MAY be received as part of this API and that the API consumer MAY choose to implement.
@@ -73,7 +73,14 @@ data class OpenApiDefinition(
     /**
      * Additional external documentation.
      */
-    val externalDocs: ExternalDocumentation? = null
+    val externalDocs: ExternalDocumentation? = null,
+
+    /**
+     * The self-assigned URI of this document, which also serves as its base URI.
+     * This maps to the `$self` field in the OpenAPI Object.
+     * This MUST be in the form of a URI reference.
+     */
+    val self: String? = null
 )
 
 /**
@@ -93,14 +100,29 @@ data class Components(
     /** An object to hold reusable [EndpointParameter] Objects. */
     val parameters: Map<String, EndpointParameter> = emptyMap(),
 
-    /** An object to hold reusable [SecurityScheme] Objects. */
-    val securitySchemes: Map<String, SecurityScheme> = emptyMap(),
+    /** An object to hold reusable [RequestBody] Objects. */
+    val requestBodies: Map<String, RequestBody> = emptyMap(),
 
     /** An object to hold reusable [Header] Objects. */
     val headers: Map<String, Header> = emptyMap(),
 
+    /** An object to hold reusable [SecurityScheme] Objects. */
+    val securitySchemes: Map<String, SecurityScheme> = emptyMap(),
+
+    /** An object to hold reusable [ExampleObject] Objects. */
+    val examples: Map<String, ExampleObject> = emptyMap(),
+
+    /** An object to hold reusable [Link] Objects. */
+    val links: Map<String, Link> = emptyMap(),
+
+    /** An object to hold reusable [Callback] Objects. */
+    val callbacks: Map<String, Callback> = emptyMap(),
+
     /** An object to hold reusable [PathItem] Objects. */
-    val pathItems: Map<String, PathItem> = emptyMap()
+    val pathItems: Map<String, PathItem> = emptyMap(),
+
+    /** An object to hold reusable [MediaTypeObject] Objects. */
+    val mediaTypes: Map<String, MediaTypeObject> = emptyMap()
 )
 
 /**
@@ -216,7 +238,12 @@ data class Server(
     /**
      * A map between a variable name and its value. The value is used for substitution in the server's URL template.
      */
-    val variables: Map<String, ServerVariable>? = null
+    val variables: Map<String, ServerVariable>? = null,
+
+    /**
+     * An optional unique string to refer to the host designated by the URL.
+     */
+    val name: String? = null
 )
 
 /**
@@ -292,7 +319,12 @@ data class SecurityScheme(
     /**
      * **REQUIRED** (`openIdConnect`). Well-known URL to discover the OpenID Connect provider metadata.
      */
-    val openIdConnectUrl: String? = null
+    val openIdConnectUrl: String? = null,
+
+    /**
+     * (`oauth2`). URL to the OAuth2 authorization server metadata (RFC8414). TLS is required.
+     */
+    val oauth2MetadataUrl: String? = null
 )
 
 /**
@@ -339,7 +371,12 @@ data class OAuthFlow(
      * **REQUIRED**. The available scopes for the OAuth2 security scheme.
      * A map between the scope name and a short description for it.
      */
-    val scopes: Map<String, String> = emptyMap()
+    val scopes: Map<String, String> = emptyMap(),
+
+    /**
+     * **REQUIRED** (`deviceAuthorization`). The device authorization URL to be used for this flow.
+     */
+    val deviceAuthorizationUrl: String? = null
 )
 
 /**

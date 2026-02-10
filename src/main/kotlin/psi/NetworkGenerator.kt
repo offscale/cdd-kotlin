@@ -2,8 +2,10 @@ package psi
 
 import domain.EndpointDefinition
 import domain.EndpointParameter
+import domain.MediaTypeObject
 import domain.ParameterLocation
 import domain.ParameterStyle
+import domain.SchemaProperty
 import domain.SecurityScheme
 import domain.Server
 import org.jetbrains.kotlin.psi.KtFile
@@ -12,7 +14,7 @@ import org.jetbrains.kotlin.psi.KtFile
  * Generates Ktor Network Interface and Implementation code from Endpoint Definitions.
  * Supports:
  * - Result<T> return types
- * - Path, Query, Header, Cookie parameters
+ * - Path, Query, Querystring, Header, Cookie parameters
  * - Parameter Serialization Styles (Matrix, Label, Form, Pipe/Space Delimited) and Explode logic
  * - Server Base URL configuration
  * - KDoc generation
@@ -237,15 +239,25 @@ class NetworkGenerator {
 
     private fun generateKDoc(ep: EndpointDefinition): String {
         val hasSummary = !ep.summary.isNullOrBlank()
+        val hasDescription = !ep.description.isNullOrBlank()
         val hasExtDocs = ep.externalDocs != null
         val hasTags = ep.tags.isNotEmpty()
         val hasResponses = ep.responses.isNotEmpty()
+        val paramsWithDocs = ep.parameters.filter { !it.description.isNullOrBlank() }
+        val paramsWithExamples = ep.parameters.filter { it.example != null || it.examples.isNotEmpty() }
+        val hasParams = paramsWithDocs.isNotEmpty()
 
-        if (!hasSummary && !hasExtDocs && !hasTags && !hasResponses) return ""
+        if (!hasSummary && !hasDescription && !hasExtDocs && !hasTags && !hasResponses && !hasParams && paramsWithExamples.isEmpty()) {
+            return ""
+        }
 
         val sb = StringBuilder("    /**\n")
         if (hasSummary) {
             sb.append("     * ${ep.summary}\n")
+        }
+        if (hasDescription) {
+            if (hasSummary) sb.append("     *\n")
+            sb.append("     * ${ep.description}\n")
         }
         if (hasExtDocs) {
             val docs = ep.externalDocs
@@ -259,6 +271,27 @@ class NetworkGenerator {
             val tagStr = ep.tags.joinToString(", ")
             sb.append("     * @tag $tagStr\n")
         }
+        if (hasParams) {
+            paramsWithDocs.forEach { param ->
+                sb.append("     * @param ${param.name} ${param.description}\n")
+            }
+        }
+        if (paramsWithExamples.isNotEmpty()) {
+            paramsWithExamples.forEach { param ->
+                param.example?.let { example ->
+                    val value = formatExampleValue(example)
+                    if (value != null) {
+                        sb.append("     * @paramExample ${param.name} $value\n")
+                    }
+                }
+                param.examples.forEach { (key, example) ->
+                    val value = formatExampleValue(example)
+                    if (value != null) {
+                        sb.append("     * @paramExample ${param.name} $key: $value\n")
+                    }
+                }
+            }
+        }
         // Responses as @response Code Type Description
         ep.responses.forEach { (code, resp) ->
             val typeStr = resp.type ?: "Unit"
@@ -270,22 +303,35 @@ class NetworkGenerator {
         return sb.toString()
     }
 
+    private fun formatExampleValue(example: domain.ExampleObject): String? {
+        example.serializedValue?.let { return it }
+        example.dataValue?.let { return it.toString() }
+        example.value?.let { return it.toString() }
+        example.externalValue?.let { return "external:$it" }
+        return null
+    }
+
     /**
      * Generates the Kotlin function signature for an endpoint.
      * Returns Result<T>.
      */
     fun generateMethodSignature(ep: EndpointDefinition): String {
         val params = ep.parameters.map { param ->
-            val type = param.type
-            "${param.name}: $type"
+            val optional = isOptionalParam(param)
+            val type = resolveParameterType(param, optional)
+            val deprecatedAnnotation = if (param.deprecated) "@Deprecated(\"Deprecated parameter\") " else ""
+            val defaultValue = if (optional) " = null" else ""
+            "$deprecatedAnnotation${param.name}: $type$defaultValue"
         }.toMutableList()
 
-        if (ep.requestBodyType != null) {
-            params.add("body: ${ep.requestBodyType}")
+        val bodySignature = resolveRequestBodySignature(ep)
+        if (bodySignature != null) {
+            val defaultValue = if (bodySignature.isOptional) " = null" else ""
+            params.add("body: ${bodySignature.kotlinType}$defaultValue")
         }
 
         val paramString = params.joinToString(", ")
-        val returnType = ep.responseType ?: "Unit"
+        val returnType = resolveResponseType(ep)
 
         return "suspend fun ${ep.operationId}($paramString): Result<$returnType>"
     }
@@ -294,8 +340,15 @@ class NetworkGenerator {
      * Generates the Ktor implementation block for an endpoint.
      */
     fun generateMethodImpl(ep: EndpointDefinition): String {
-        val returnType = ep.responseType ?: "Unit"
+        val returnType = resolveResponseType(ep)
         val signature = generateMethodSignature(ep)
+
+        // 0. Querystring constraint (OAS 3.2): cannot mix query and querystring
+        val queryParams = ep.parameters.filter { it.location == ParameterLocation.QUERY }
+        val queryStringParam = ep.parameters.firstOrNull { it.location == ParameterLocation.QUERYSTRING }
+        if (queryStringParam != null && queryParams.isNotEmpty()) {
+            throw IllegalArgumentException("OAS 3.2: querystring and query parameters cannot be used together for ${ep.operationId}")
+        }
 
         // 1. Build Path String based on Style (Matrix, Label, Simple)
         val pathTemplate = ep.parameters
@@ -319,21 +372,33 @@ class NetworkGenerator {
                 currentPath.replace(target, replacement)
             }
 
-        val fullUrl = if (pathTemplate.startsWith("/")) "\$baseUrl$pathTemplate" else "\$baseUrl/$pathTemplate"
+        val baseUrlExpr = if (ep.servers.isNotEmpty()) ep.servers.first().url else "\$baseUrl"
+        val fullUrl = if (pathTemplate.startsWith("/")) "$baseUrlExpr$pathTemplate" else "$baseUrlExpr/$pathTemplate"
 
         // 2. Build Query/Header/Cookie Config
         val paramLines = ep.parameters.mapNotNull { param ->
-            val valueExpr = if (isListType(param.type) && param.location == ParameterLocation.QUERY) {
+            val optional = isOptionalParam(param)
+            val paramType = resolveParameterType(param, optional)
+            val valueExpr = if (isListType(paramType) && param.location == ParameterLocation.QUERY) {
                 formatQueryList(param)
             } else {
                 param.name
             }
 
-            when (param.location) {
+            val line = when (param.location) {
                 ParameterLocation.QUERY -> "parameter(\"${param.name}\", $valueExpr)"
                 ParameterLocation.HEADER -> "header(\"${param.name}\", ${param.name})"
                 ParameterLocation.COOKIE -> "cookie(\"${param.name}\", ${param.name})"
                 ParameterLocation.PATH -> null
+                ParameterLocation.QUERYSTRING -> null
+            }
+
+            if (line == null) {
+                null
+            } else if (optional) {
+                "if (${param.name} != null) {\n                $line\n            }"
+            } else {
+                line
             }
         }
 
@@ -343,20 +408,61 @@ class NetworkGenerator {
             ""
         }
 
-        val bodyConfig = if (ep.requestBodyType != null) {
-            "\n            setBody(body)"
+        if (queryStringParam != null) {
+            val cleanType = resolveParameterType(queryStringParam, isOptionalParam(queryStringParam)).replace(" ", "")
+            val isString = cleanType == "String" || cleanType == "String?"
+            if (!isString) {
+                throw IllegalArgumentException("OAS 3.2: querystring parameter must be String for ${ep.operationId}")
+            }
+        }
+
+        val queryStringConfig = if (queryStringParam != null) {
+            val assignment = "url.encodedQuery = ${queryStringParam.name}"
+            if (isOptionalParam(queryStringParam)) {
+                "\n            if (${queryStringParam.name} != null) {\n                $assignment\n            }"
+            } else {
+                "\n            $assignment"
+            }
         } else {
             ""
         }
 
-        val methodEnumName = ep.method.name.lowercase().replaceFirstChar { it.uppercase() }
-        val methodStr = "HttpMethod.$methodEnumName"
+        val bodySignature = resolveRequestBodySignature(ep)
+        val contentType = resolveRequestContentType(ep)
+        val bodyConfig = if (bodySignature != null) {
+            val lines = mutableListOf<String>()
+            if (contentType != null) {
+                lines.add("contentType(ContentType.parse(\"$contentType\"))")
+            }
+            lines.add("setBody(body)")
+
+            if (bodySignature.isOptional) {
+                val joined = lines.joinToString("\n                ")
+                "\n            if (body != null) {\n                $joined\n            }"
+            } else {
+                "\n            " + lines.joinToString("\n            ")
+            }
+        } else {
+            ""
+        }
+
+        val methodStr = when (ep.method) {
+            domain.HttpMethod.CUSTOM -> {
+                val rawMethod = ep.customMethod ?: "CUSTOM"
+                val safeMethod = rawMethod.replace("\"", "\\\"")
+                "HttpMethod(\"$safeMethod\")"
+            }
+            else -> {
+                val methodEnumName = ep.method.name.lowercase().replaceFirstChar { it.uppercase() }
+                "HttpMethod.$methodEnumName"
+            }
+        }
 
         return """
     override $signature {
         return try {
             val response = client.request("$fullUrl") {
-                method = $methodStr$paramConfig$bodyConfig
+                method = $methodStr$paramConfig$queryStringConfig$bodyConfig
             }
             if (response.status.isSuccess()) {
                 Result.success(response.body<$returnType>())
@@ -370,8 +476,78 @@ class NetworkGenerator {
         """.trimIndent()
     }
 
+    private fun resolveParameterType(param: EndpointParameter, forceNullable: Boolean = false): String {
+        val schema = param.schema ?: selectSchema(param.content)
+        val rawType = if (schema != null) {
+            TypeMappers.mapType(schema)
+        } else {
+            param.type
+        }
+
+        val requiresNullable = forceNullable || schema?.types?.contains("null") == true
+        val alreadyNullable = rawType.trim().endsWith("?")
+        return if (requiresNullable && !alreadyNullable) "$rawType?" else rawType
+    }
+
+    private fun isOptionalParam(param: EndpointParameter): Boolean {
+        if (param.location == ParameterLocation.PATH) return false
+        return !param.isRequired
+    }
+
+    private fun resolveRequestContentType(ep: EndpointDefinition): String? {
+        val content = ep.requestBody?.content ?: return null
+        if (content.isEmpty()) return null
+        return if (content.containsKey("application/json")) {
+            "application/json"
+        } else {
+            content.keys.first()
+        }
+    }
+
+    private fun resolveRequestBodyType(ep: EndpointDefinition): String? {
+        ep.requestBodyType?.let { raw ->
+            return if (ep.requestBody?.required == false && !raw.trim().endsWith("?")) {
+                "$raw?"
+            } else {
+                raw
+            }
+        }
+        val schema = selectSchema(ep.requestBody?.content ?: emptyMap()) ?: return null
+        val baseType = TypeMappers.mapType(schema)
+        return if (ep.requestBody?.required == false) "$baseType?" else baseType
+    }
+
+    private data class RequestBodySignature(val kotlinType: String, val isOptional: Boolean)
+
+    private fun resolveRequestBodySignature(ep: EndpointDefinition): RequestBodySignature? {
+        val kotlinType = resolveRequestBodyType(ep) ?: return null
+        val isOptional = kotlinType.trim().endsWith("?")
+        return RequestBodySignature(kotlinType, isOptional)
+    }
+
+    private fun resolveResponseType(ep: EndpointDefinition): String {
+        ep.responseType?.let { return it }
+        val success = ep.responses.keys
+            .filter { it.startsWith("2") }
+            .minOrNull()
+            ?: return "Unit"
+        val response = ep.responses[success] ?: return "Unit"
+        response.type?.let { return it }
+        val schema = selectSchema(response.content) ?: return "Unit"
+        return TypeMappers.mapType(schema)
+    }
+
+    private fun selectSchema(content: Map<String, MediaTypeObject>): SchemaProperty? {
+        if (content.isEmpty()) return null
+        val preferred = content["application/json"] ?: content.values.first()
+        return preferred.schema ?: preferred.itemSchema
+    }
+
     // Helper to detect Lists
-    private fun isListType(type: String): Boolean = type.startsWith("List<") || type.contains("Array")
+    private fun isListType(type: String): Boolean {
+        val clean = type.replace("?", "")
+        return clean.startsWith("List<") || clean.contains("Array")
+    }
 
     private fun formatQueryList(param: EndpointParameter): String {
         // Default for FORM is explode=true -> Ktor handles list (reproduction of keys)

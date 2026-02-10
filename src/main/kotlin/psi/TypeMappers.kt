@@ -6,6 +6,7 @@ import domain.SchemaProperty
  * Shared utilities for mapping OpenAPI types to Kotlin types and vice versa.
  * Updated to support OAS 3.2:
  * - Multi-Type (e.g. ["string", "null"]) mappings.
+ * - Map types via `additionalProperties`.
  * - Binary Content via `contentMediaType` / `contentEncoding` (replacing `format: binary`).
  */
 object TypeMappers {
@@ -36,7 +37,15 @@ object TypeMappers {
                 val itemType = prop.items?.let { mapType(it) } ?: "Any"
                 "List<$itemType>"
             }
-            else -> "Any" // Fallback for 'object' without ref or unknown types
+            "object" -> {
+                if (prop.additionalProperties != null) {
+                    val valueType = mapType(prop.additionalProperties)
+                    "Map<String, $valueType>"
+                } else {
+                    "Any"
+                }
+            }
+            else -> "Any" // Fallback for unknown types
         }
     }
 
@@ -77,6 +86,7 @@ object TypeMappers {
         // Map core type
         var format: String? = null
         var items: SchemaProperty? = null
+        var additionalProperties: SchemaProperty? = null
         var ref: String? = null
         var contentEncoding: String? = null
 
@@ -99,6 +109,13 @@ object TypeMappers {
                 val innerType = cleanType.substringAfter("List<").substringBeforeLast(">")
                 items = kotlinToSchemaProperty(innerType)
             }
+            cleanType.startsWith("Map<") || cleanType.startsWith("MutableMap<") -> {
+                types.add("object")
+                val inner = cleanType.substringAfter("<").substringBeforeLast(">")
+                val args = splitTopLevelArgs(inner)
+                val valueType = if (args.size >= 2) args[1] else "Any"
+                additionalProperties = kotlinToSchemaProperty(valueType)
+            }
             cleanType.first().isUpperCase() -> {
                 types.add("object")
                 ref = cleanType
@@ -116,7 +133,42 @@ object TypeMappers {
             format = format,
             contentEncoding = contentEncoding,
             items = items,
+            additionalProperties = additionalProperties,
             ref = ref
         )
+    }
+
+    private fun splitTopLevelArgs(raw: String): List<String> {
+        val result = mutableListOf<String>()
+        val current = StringBuilder()
+        var depth = 0
+
+        raw.forEach { ch ->
+            when (ch) {
+                '<' -> {
+                    depth++
+                    current.append(ch)
+                }
+                '>' -> {
+                    depth--
+                    current.append(ch)
+                }
+                ',' -> {
+                    if (depth == 0) {
+                        result.add(current.toString())
+                        current.clear()
+                    } else {
+                        current.append(ch)
+                    }
+                }
+                else -> current.append(ch)
+            }
+        }
+
+        if (current.isNotEmpty()) {
+            result.add(current.toString())
+        }
+
+        return result.map { it.trim() }
     }
 }
