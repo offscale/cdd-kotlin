@@ -104,14 +104,39 @@ class NetworkMergerTest {
         // C should be removed. A should update. B, D added.
 
         val existing = listOf(
-            EndpointDefinition("/a", HttpMethod.GET, "getA", responses = simpleResponse("String")),
-            EndpointDefinition("/c", HttpMethod.GET, "getC", responses = simpleResponse("String"))
+            EndpointDefinition(
+                path = "/a",
+                method = HttpMethod.GET,
+                operationId = "getA",
+                responses = simpleResponse("String")
+            ),
+            EndpointDefinition(
+                path = "/c",
+                method = HttpMethod.GET,
+                operationId = "getC",
+                responses = simpleResponse("String")
+            )
         )
 
         val newSpec = listOf(
-            EndpointDefinition("/a", HttpMethod.GET, "getA", responses = simpleResponse("Int")), // Type changed
-            EndpointDefinition("/b", HttpMethod.GET, "getB", responses = simpleResponse("String")),
-            EndpointDefinition("/d", HttpMethod.GET, "getD", responses = simpleResponse("String"))
+            EndpointDefinition(
+                path = "/a",
+                method = HttpMethod.GET,
+                operationId = "getA",
+                responses = simpleResponse("Int") // Type changed
+            ),
+            EndpointDefinition(
+                path = "/b",
+                method = HttpMethod.GET,
+                operationId = "getB",
+                responses = simpleResponse("String")
+            ),
+            EndpointDefinition(
+                path = "/d",
+                method = HttpMethod.GET,
+                operationId = "getD",
+                responses = simpleResponse("String")
+            )
         )
 
         val result = merger.mergeEndpoints(existing, newSpec)

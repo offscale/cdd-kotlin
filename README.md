@@ -45,7 +45,7 @@ back into the exact same spec.
 
 - **Data Layer:** Generates Kotlin Data Classes with `kotlinx.serialization` and KDoc support.
 - **Network Layer:** Generates strict `Ktor` interfaces, implementations, exception handling, and parameter
-  serialization (Path, Query, Header, Body).
+  serialization (Path, Query, Querystring, Header, Cookie, Body).
 - **UI Layer (Jetpack Compose):** unique support for generating UI components based on data models:
     - **Forms:** Auto-generates Composable forms with state management, input validation, and object reconstruction.
     - **Grids:** Generates sortable data grids/tables.
@@ -142,6 +142,18 @@ The `TypeMappers` ensure correct conversion between abstract types and Kotlin sp
 | `boolean` | -       | `Boolean`                |
 | `array`   | -       | `List<T>`                |
 | `object`  | -       | `Data Class` (Reference) |
+| `object`  | `additionalProperties` | `Map<String, T>` |
+
+Top-level primitive and array schemas are generated as Kotlin `typealias` declarations (and parsed back),
+preserving formats such as `date-time` and array item types.
+
+### Schema Annotations (OAS 3.2)
+
+The DTO layer round-trips JSON Schema annotation keywords via KDoc tags and Kotlin annotations:
+
+- `title`, `default`, `const`
+- `deprecated` (also emitted as `@Deprecated`)
+- `readOnly`, `writeOnly`
 
 ### UI Generation
 

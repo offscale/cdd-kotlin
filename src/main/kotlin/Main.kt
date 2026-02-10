@@ -4,12 +4,15 @@ import domain.License
 import scaffold.ScaffoldGenerator
 import java.io.File
 
+/**
+ * Demo entry point that generates a sample KMP scaffold in a local folder.
+ */
 fun main() {
     val generator = ScaffoldGenerator()
 
     // We generate the scaffold into a folder named "generated-project" inside this project
     // just for demonstration purposes.
-    val outputDir = File("generated-project")
+    val outputDir = File(System.getProperty("user.dir"), "generated-project")
 
     println("Generating KMP Scaffold into: ${outputDir.absolutePath}...")
 

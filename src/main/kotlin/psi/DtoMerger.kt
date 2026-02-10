@@ -12,6 +12,15 @@ import org.jetbrains.kotlin.psi.psiUtil.startOffset
  */
 class DtoMerger {
 
+    /**
+     * Merges missing schema properties into an existing Kotlin data class source.
+     *
+     * @param existingCode Kotlin source containing the target class.
+     * @param schema The schema definition to reconcile against the class.
+     * @return Updated source code with any missing fields injected.
+     * @throws IllegalArgumentException if the target class cannot be located.
+     * @throws IllegalStateException if the class lacks a usable primary constructor.
+     */
     fun mergeDto(existingCode: String, schema: SchemaDefinition): String {
         val psiFactory = PsiInfrastructure.createPsiFactory()
         val file = psiFactory.createFile("Fragment.kt", existingCode)

@@ -87,7 +87,11 @@ class DtoGeneratorTest {
                 "id" to SchemaProperty("integer", format = "int64"),
                 "ratio" to SchemaProperty("number"),
                 "flag" to SchemaProperty("boolean"),
-                "tags" to SchemaProperty("array", items = SchemaProperty("string"))
+                "tags" to SchemaProperty("array", items = SchemaProperty("string")),
+                "labels" to SchemaProperty(
+                    type = "object",
+                    additionalProperties = SchemaProperty("string")
+                )
             )
         )
 
@@ -98,6 +102,65 @@ class DtoGeneratorTest {
         assertTrue(text.contains("val ratio: Double?"))
         assertTrue(text.contains("val flag: Boolean?"))
         assertTrue(text.contains("val tags: List<String>?"))
+        assertTrue(text.contains("val labels: Map<String, String>?"))
+    }
+
+    @Test
+    fun `generateDto creates Map typealias for additionalProperties schema`() {
+        val schema = SchemaDefinition(
+            name = "Attributes",
+            type = "object",
+            additionalProperties = SchemaProperty("string"),
+            description = "Dynamic attributes map"
+        )
+
+        val text = generator.generateDto("com.maps", schema).text
+
+        assertTrue(text.contains("typealias Attributes = Map<String, String>"))
+        assertTrue(text.contains("Dynamic attributes map"))
+    }
+
+    @Test
+    fun `generateDto creates typealias for primitive schema`() {
+        val schema = SchemaDefinition(
+            name = "UserId",
+            type = "string",
+            format = "date-time",
+            description = "Time-based identifier"
+        )
+
+        val text = generator.generateDto("com.alias", schema).text
+
+        assertTrue(text.contains("typealias UserId = Instant"))
+        assertTrue(text.contains("import kotlinx.datetime.Instant"))
+        assertTrue(text.contains("Time-based identifier"))
+    }
+
+    @Test
+    fun `generateDto creates typealias for array schema`() {
+        val schema = SchemaDefinition(
+            name = "Ids",
+            type = "array",
+            items = SchemaProperty("integer", format = "int64")
+        )
+
+        val text = generator.generateDto("com.alias", schema).text
+
+        assertTrue(text.contains("typealias Ids = List<Long>"))
+    }
+
+    @Test
+    fun `generateDto creates nullable typealias when null is allowed`() {
+        val schema = SchemaDefinition(
+            name = "MaybeIds",
+            type = "array",
+            types = setOf("array", "null"),
+            items = SchemaProperty("integer", format = "int64")
+        )
+
+        val text = generator.generateDto("com.alias", schema).text
+
+        assertTrue(text.contains("typealias MaybeIds = List<Long>?"))
     }
 
     @Test
@@ -258,6 +321,125 @@ class DtoGeneratorTest {
 
         assertTrue(text.contains("@example { \"name\": \"John\" }"), "Class example missing")
         assertTrue(text.contains("@example John"), "Property example missing")
+    }
+
+    @Test
+    fun `generateDto includes keyed examples in KDoc`() {
+        val schema = SchemaDefinition(
+            name = "ExampleMap",
+            type = "object",
+            examples = mapOf(
+                "valid" to "{\"id\": 1}",
+                "invalid" to "{}"
+            )
+        )
+
+        val text = generator.generateDto("com.ex", schema).text
+
+        assertTrue(text.contains("@example valid: {\"id\": 1}"))
+        assertTrue(text.contains("@example invalid: {}"))
+    }
+
+    @Test
+    fun `generateDto includes content metadata in property KDoc`() {
+        val schema = SchemaDefinition(
+            name = "Blob",
+            type = "object",
+            properties = mapOf(
+                "payload" to SchemaProperty(
+                    type = "string",
+                    contentMediaType = "application/pdf",
+                    contentEncoding = "base64"
+                )
+            )
+        )
+
+        val text = generator.generateDto("com.media", schema).text
+
+        assertTrue(text.contains("@contentMediaType application/pdf"))
+        assertTrue(text.contains("@contentEncoding base64"))
+    }
+
+    @Test
+    fun `generateDto includes schema-level content metadata`() {
+        val schema = SchemaDefinition(
+            name = "InlineBlob",
+            type = "string",
+            contentMediaType = "application/pdf",
+            contentEncoding = "base64"
+        )
+
+        val text = generator.generateDto("com.media", schema).text
+
+        assertTrue(text.contains("@contentMediaType application/pdf"))
+        assertTrue(text.contains("@contentEncoding base64"))
+    }
+
+    @Test
+    fun `generateDto includes schema annotations and deprecation`() {
+        val schema = SchemaDefinition(
+            name = "Annotated",
+            type = "object",
+            title = "Annotated schema",
+            defaultValue = "{\"id\":1}",
+            constValue = "{\"id\":1}",
+            deprecated = true,
+            readOnly = true,
+            writeOnly = true,
+            properties = mapOf(
+                "id" to SchemaProperty(
+                    type = "integer",
+                    title = "Identifier",
+                    defaultValue = "1",
+                    constValue = "1",
+                    deprecated = true,
+                    readOnly = true,
+                    writeOnly = true
+                )
+            )
+        )
+
+        val text = generator.generateDto("com.annotations", schema).text
+
+        assertTrue(text.contains("@Deprecated(\"Deprecated\")"))
+        assertTrue(text.contains("@title Annotated schema"))
+        assertTrue(text.contains("@default {\"id\":1}"))
+        assertTrue(text.contains("@const {\"id\":1}"))
+        assertTrue(text.contains("@readOnly"))
+        assertTrue(text.contains("@writeOnly"))
+        assertTrue(text.contains("@title Identifier"))
+        assertTrue(text.contains("@default 1"))
+        assertTrue(text.contains("@const 1"))
+    }
+
+    @Test
+    fun `generateDto creates sealed interface without discriminator`() {
+        val schema = SchemaDefinition(
+            name = "Shape",
+            type = "object",
+            oneOf = listOf("Circle", "Square"),
+            properties = mapOf(
+                "kind" to SchemaProperty("string")
+            )
+        )
+
+        val text = generator.generateDto("com.poly", schema).text
+
+        assertTrue(text.contains("sealed interface Shape"))
+        assertFalse(text.contains("@JsonClassDiscriminator"))
+    }
+
+    @Test
+    fun `generateDto sanitizes empty enum values to Unknown`() {
+        val schema = SchemaDefinition(
+            name = "EdgeEnum",
+            type = "string",
+            enumValues = listOf("!!!")
+        )
+
+        val text = generator.generateDto("com.enums", schema).text
+
+        assertTrue(text.contains("Unknown"))
     }
 
     @Test

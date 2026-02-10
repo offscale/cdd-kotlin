@@ -7,17 +7,22 @@ package domain
  * See [Path Item Object](https://spec.openapis.org/oas/v3.2.0#path-item-object)
  */
 enum class HttpMethod {
-    GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS, TRACE, QUERY
+    GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS, TRACE, QUERY,
+    /**
+     * Represents a non-standard or extension HTTP method.
+     * Use [EndpointDefinition.customMethod] to provide the raw method token (e.g. "COPY").
+     */
+    CUSTOM
 }
 
 /**
  * The location of the parameter.
- * Possible values are "query", "header", "path" or "cookie".
+ * Possible values are "query", "querystring", "header", "path" or "cookie".
  *
  * See [Parameter Object](https://spec.openapis.org/oas/v3.2.0#parameter-object)
  */
 enum class ParameterLocation {
-    PATH, QUERY, HEADER, COOKIE
+    PATH, QUERY, QUERYSTRING, HEADER, COOKIE
 }
 
 /**
@@ -46,6 +51,8 @@ enum class ParameterStyle {
 /**
  * Describes a single operation parameter.
  * A unique parameter is defined by a combination of a name and location.
+ * Note: For `in: querystring`, the parameter represents the *entire* query string and
+ * the `name` is not used for serialization (it is still useful for codegen signatures).
  *
  * See [Parameter Object](https://spec.openapis.org/oas/v3.2.0#parameter-object)
  */
@@ -74,10 +81,34 @@ data class EndpointParameter(
     val isRequired: Boolean = true,
 
     /**
+     * The schema defining the type used for the parameter.
+     * Mutually exclusive with [content] in the OpenAPI spec.
+     */
+    val schema: SchemaProperty? = null,
+
+    /**
+     * A map containing the representations for the parameter.
+     * Mutually exclusive with [schema] in the OpenAPI spec.
+     */
+    val content: Map<String, MediaTypeObject> = emptyMap(),
+
+    /**
      * A brief description of the parameter. This could contain examples of use.
      * CommonMark syntax MAY be used for rich text representation.
      */
     val description: String? = null,
+
+    /**
+     * Specifies that a parameter is deprecated and SHOULD be transitioned out of usage.
+     * Default value is `false`.
+     */
+    val deprecated: Boolean = false,
+
+    /**
+     * When true, clients MAY pass a zero-length string value in place of parameters
+     * that would otherwise be omitted entirely.
+     */
+    val allowEmptyValue: Boolean? = null,
 
     /**
      * Describes how the parameter value will be serialized depending on the type of the parameter value.
@@ -93,7 +124,19 @@ data class EndpointParameter(
     /**
      * When this is true, parameter values are serialized using reserved expansion, as defined by RFC6570.
      */
-    val allowReserved: Boolean? = null
+    val allowReserved: Boolean? = null,
+
+    /**
+     * Example of the parameter's potential value.
+     * Equivalent to the Parameter Object's `example` field (shorthand Example Object).
+     */
+    val example: ExampleObject? = null,
+
+    /**
+     * Examples of the parameter's potential value.
+     * Equivalent to the Parameter Object's `examples` field.
+     */
+    val examples: Map<String, ExampleObject> = emptyMap()
 )
 
 /**
@@ -112,6 +155,18 @@ data class Header(
     val type: String,
 
     /**
+     * The schema defining the type used for the header.
+     * Mutually exclusive with [content] in the OpenAPI spec.
+     */
+    val schema: SchemaProperty? = null,
+
+    /**
+     * A map containing the representations for the header.
+     * Mutually exclusive with [schema] in the OpenAPI spec.
+     */
+    val content: Map<String, MediaTypeObject> = emptyMap(),
+
+    /**
      * A brief description of the header.
      * CommonMark syntax MAY be used for rich text representation.
      */
@@ -127,6 +182,16 @@ data class Header(
      * Default value is `false`.
      */
     val deprecated: Boolean = false,
+
+    /**
+     * Example of the header's potential value.
+     */
+    val example: ExampleObject? = null,
+
+    /**
+     * Examples of the header's potential value.
+     */
+    val examples: Map<String, ExampleObject> = emptyMap(),
 
     /**
      * Describes how the header value will be serialized.
@@ -154,13 +219,30 @@ data class EndpointResponse(
     val statusCode: String,
 
     /**
+     * A short summary of the meaning of the response.
+     */
+    val summary: String? = null,
+
+    /**
      * A description of the response. CommonMark syntax MAY be used for rich text representation.
      */
     val description: String? = null,
 
     /**
+     * Maps a header name to its definition.
+     */
+    val headers: Map<String, Header> = emptyMap(),
+
+    /**
+     * A map containing descriptions of potential response payloads.
+     * The key is a media type or media type range and the value describes it.
+     */
+    val content: Map<String, MediaTypeObject> = emptyMap(),
+
+    /**
      * The Kotlin class name of the response payload, or null if no content is returned (Unit).
      * This abstracts the `content` map for simplified code generation.
+     * Legacy-friendly for Swagger 2.0 / OAS 3.0 style generators.
      */
     val type: String? = null,
 
@@ -230,6 +312,12 @@ data class EndpointDefinition(
     val method: HttpMethod,
 
     /**
+     * Raw method token for [HttpMethod.CUSTOM] (e.g. "COPY", "PROPFIND").
+     * Ignored for standard methods.
+     */
+    val customMethod: String? = null,
+
+    /**
      * Unique string used to identify the operation. The id MUST be unique among all operations described in the API.
      * Tools and libraries MAY use the operationId to uniquely identify an operation.
      */
@@ -243,8 +331,14 @@ data class EndpointDefinition(
     /**
      * The Kotlin class name of the request body, or null if none.
      * Abstracts `requestBody.content`.
+     * Legacy-friendly for Swagger 2.0 / OAS 3.0 style generators.
      */
     val requestBodyType: String? = null,
+
+    /**
+     * The request body applicable for this operation.
+     */
+    val requestBody: RequestBody? = null,
 
     /**
      * The list of possible responses as they are returned from executing this operation.
@@ -255,6 +349,11 @@ data class EndpointDefinition(
      * A short summary of what the operation does.
      */
     val summary: String? = null,
+
+    /**
+     * A verbose explanation of the operation behavior.
+     */
+    val description: String? = null,
 
     /**
      * Additional external documentation for this operation.
@@ -277,7 +376,7 @@ data class EndpointDefinition(
      *
      * See [Callback Object](https://spec.openapis.org/oas/v3.2.0#callback-object)
      */
-    val callbacks: Map<String, Map<String, PathItem>> = emptyMap(),
+    val callbacks: Map<String, Callback> = emptyMap(),
 
     /**
      * Declares this operation to be deprecated. Consumers SHOULD refrain from usage of the declared operation.
@@ -288,8 +387,22 @@ data class EndpointDefinition(
      * A declaration of which security mechanisms can be used for this operation.
      * The list of values includes alternative Security Requirement Objects that can be used.
      */
-    val security: List<SecurityRequirement> = emptyList()
+    val security: List<SecurityRequirement> = emptyList(),
+
+    /**
+     * An alternative `servers` array to service this operation.
+     * If specified, it overrides any servers defined at the Path Item or OpenAPI root.
+     */
+    val servers: List<Server> = emptyList()
 ) {
+    /**
+     * Returns the raw HTTP method token for this operation.
+     * For standard methods, this is the enum name (e.g. "GET").
+     * For custom methods, this is [customMethod] or "CUSTOM".
+     */
+    val methodName: String
+        get() = if (method == HttpMethod.CUSTOM) customMethod ?: "CUSTOM" else method.name
+
     /**
      * Helper to get the primary success type (lowest 2xx code).
      * Used for return type generation in Ktor clients.
@@ -345,6 +458,13 @@ data class PathItem(
     val trace: EndpointDefinition? = null,
     /** A definition of a QUERY operation on this path (OAS 3.2). */
     val query: EndpointDefinition? = null,
+
+    /**
+     * A map of additional operations on this path.
+     * The key is the HTTP method with the same capitalization that is to be sent in the request.
+     * Must not contain methods covered by fixed fields (e.g. no `POST` entry).
+     */
+    val additionalOperations: Map<String, EndpointDefinition> = emptyMap(),
 
     /**
      * A list of parameters that are applicable for all the operations described under this path.

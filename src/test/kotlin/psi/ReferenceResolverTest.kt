@@ -35,4 +35,19 @@ class ReferenceResolverTest {
         // Edge case where key might be complex
         assertEquals("My_Type", ReferenceResolver.resolveRefToType("#/definitions/My_Type"))
     }
+
+    @Test
+    fun `resolveRefToType handles fragment-only refs`() {
+        assertEquals("User", ReferenceResolver.resolveRefToType("#User"))
+    }
+
+    @Test
+    fun `resolveRefToType handles filenames without extensions`() {
+        assertEquals("Address", ReferenceResolver.resolveRefToType("models/Address"))
+    }
+
+    @Test
+    fun `resolveRefToType falls back on empty path`() {
+        assertEquals("#", ReferenceResolver.resolveRefToType("#"))
+    }
 }

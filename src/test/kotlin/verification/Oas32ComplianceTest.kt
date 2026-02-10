@@ -234,6 +234,33 @@ class Oas32ComplianceTest {
     }
 
     @Test
+    fun `Domain Components holds MediaTypes and Examples`() {
+        val example = ExampleObject(
+            summary = "Sample",
+            serializedValue = "{\"id\":1}"
+        )
+        val mediaType = MediaTypeObject(
+            schema = SchemaProperty("string"),
+            examples = mapOf("sample" to example)
+        )
+        val requestBody = RequestBody(
+            description = "Payload",
+            content = mapOf("application/json" to mediaType),
+            required = true
+        )
+
+        val components = Components(
+            examples = mapOf("Sample" to example),
+            mediaTypes = mapOf("application/json" to mediaType),
+            requestBodies = mapOf("Create" to requestBody)
+        )
+
+        assertEquals("Sample", components.examples.keys.first())
+        assertTrue(components.mediaTypes.containsKey("application/json"))
+        assertEquals("Payload", components.requestBodies["Create"]?.description)
+    }
+
+    @Test
     fun `Domain Supports Discriminator Mapping`() {
         val schema = SchemaDefinition(
             name = "Pet",

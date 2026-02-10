@@ -7,7 +7,8 @@ import org.jetbrains.kotlin.psi.KtFile
 /**
  * Generates Kotlin Data Transfer Objects (DTOs) from Schema Definitions.
  * Uses kotlinx.serialization annotations.
- * Updated for OAS 3.2 Dual/Array Types support and OAS 3.1 Content Encoding.
+ * Updated for OAS 3.2 Dual/Array Types support, additionalProperties maps,
+ * and OAS 3.1 Content Encoding.
  */
 class DtoGenerator {
 
@@ -36,8 +37,57 @@ class DtoGenerator {
             return buildSealedInterfaceSource(packageName, definition)
         }
 
-        // 3. Standard Data Class
+        // 3. Primitive / Array Aliases
+        if (definition.primaryType != "object") {
+            return buildAliasSource(packageName, definition)
+        }
+
+        // 4. Map/Dynamic Object Alias (additionalProperties only)
+        if (definition.primaryType == "object" && definition.properties.isEmpty() && definition.additionalProperties != null) {
+            return buildMapAliasSource(packageName, definition)
+        }
+
+        // 5. Standard Data Class
         return buildDataClassSource(packageName, definition)
+    }
+
+    private fun buildAliasSource(packageName: String, definition: SchemaDefinition): String {
+        val imports = mutableSetOf<String>()
+        addTypeImports(imports, definition)
+
+        val kdoc = buildClassKDoc(definition)
+        val deprecatedAnnotation = buildDeprecatedAnnotation(definition.deprecated)
+        val prop = schemaToProperty(definition)
+        val baseType = TypeMappers.mapType(prop)
+        val isNullable = prop.types.contains("null")
+        val kotlinType = if (isNullable) "$baseType?" else baseType
+
+        return """
+            package $packageName
+
+            ${imports.sorted().joinToString("\n") { "import $it" }}
+
+            $kdoc$deprecatedAnnotation
+            typealias ${definition.name} = $kotlinType
+        """.trimIndent()
+    }
+
+    private fun buildMapAliasSource(packageName: String, definition: SchemaDefinition): String {
+        val imports = mutableSetOf<String>()
+        addTypeImports(imports, definition)
+
+        val kdoc = buildClassKDoc(definition)
+        val deprecatedAnnotation = buildDeprecatedAnnotation(definition.deprecated)
+        val valueType = TypeMappers.mapType(definition.additionalProperties!!)
+
+        return """
+            package $packageName
+
+            ${imports.sorted().joinToString("\n") { "import $it" }}
+
+            $kdoc$deprecatedAnnotation
+            typealias ${definition.name} = Map<String, $valueType>
+        """.trimIndent()
     }
 
     private fun buildSealedInterfaceSource(packageName: String, definition: SchemaDefinition): String {
@@ -49,6 +99,7 @@ class DtoGenerator {
         addTypeImports(imports, definition)
 
         val kdoc = buildClassKDoc(definition)
+        val deprecatedAnnotation = buildDeprecatedAnnotation(definition.deprecated)
 
         val discriminatorAnnotation = if (definition.discriminator != null) {
             "@OptIn(ExperimentalSerializationApi::class)\n@JsonClassDiscriminator(\"${definition.discriminator.propertyName}\")"
@@ -59,7 +110,8 @@ class DtoGenerator {
         val propertyLines = definition.properties.map { (name, prop) ->
             val kotlinType = resolveKotlinType(name, prop, definition.required)
             val desc = buildPropertyKDoc(prop)
-            "$desc    val $name: $kotlinType"
+            val deprecatedPropAnnotation = buildDeprecatedAnnotation(prop.deprecated, indent = "    ")
+            "$desc$deprecatedPropAnnotation    val $name: $kotlinType"
         }.joinToString("\n\n")
 
         return """ 
@@ -67,7 +119,7 @@ class DtoGenerator {
 
             ${imports.sorted().joinToString("\n") { "import $it" }} 
 
-            $kdoc@Serializable
+            $kdoc$deprecatedAnnotation@Serializable
             $discriminatorAnnotation
             sealed interface ${definition.name} { 
             $propertyLines
@@ -93,19 +145,21 @@ class DtoGenerator {
             val defaultVal = if (kotlinType.endsWith("?")) " = null" else ""
 
             val desc = buildPropertyKDoc(prop)
+            val deprecatedPropAnnotation = buildDeprecatedAnnotation(prop.deprecated, indent = "    ")
             val serialName = "    @SerialName(\"$name\")"
 
-            "$desc$serialName\n    val $name: $kotlinType$defaultVal"
+            "$desc$deprecatedPropAnnotation$serialName\n    val $name: $kotlinType$defaultVal"
         }.joinToString(",\n\n")
 
         val kdoc = buildClassKDoc(definition)
+        val deprecatedAnnotation = buildDeprecatedAnnotation(definition.deprecated)
 
         return """ 
             package $packageName
             
             ${imports.sorted().joinToString("\n") { "import $it" }} 
             
-            $kdoc@Serializable
+            $kdoc$deprecatedAnnotation@Serializable
             data class ${definition.name}( 
             $propertyLines
             )$inheritanceClause
@@ -118,6 +172,7 @@ class DtoGenerator {
             "kotlinx.serialization.SerialName"
         )
         val kdoc = buildClassKDoc(definition)
+        val deprecatedAnnotation = buildDeprecatedAnnotation(definition.deprecated)
 
         val entries = definition.enumValues!!.joinToString(",\n\n") { value ->
             val validName = sanitizeEnumName(value)
@@ -130,7 +185,7 @@ class DtoGenerator {
 
             ${imports.sorted().joinToString("\n") { "import $it" }} 
 
-            $kdoc@Serializable
+            $kdoc$deprecatedAnnotation@Serializable
             enum class ${definition.name} { 
             $entries
             } 
@@ -154,7 +209,11 @@ class DtoGenerator {
     }
 
     private fun addTypeImports(imports: MutableSet<String>, definition: SchemaDefinition) {
-        val formats = definition.properties.values.mapNotNull { it.format }
+        val formats = mutableSetOf<String>()
+        definition.format?.let { formats.add(it) }
+        definition.properties.values.forEach { collectFormats(it, formats) }
+        definition.additionalProperties?.let { collectFormats(it, formats) }
+        definition.items?.let { collectFormats(it, formats) }
 
         if (formats.contains("date")) {
             imports.add("kotlinx.datetime.LocalDate")
@@ -164,13 +223,29 @@ class DtoGenerator {
         }
     }
 
+    private fun collectFormats(prop: SchemaProperty, acc: MutableSet<String>) {
+        prop.format?.let { acc.add(it) }
+        prop.items?.let { collectFormats(it, acc) }
+        prop.additionalProperties?.let { collectFormats(it, acc) }
+    }
+
     private fun buildClassKDoc(definition: SchemaDefinition): String {
         val hasDesc = !definition.description.isNullOrBlank()
         val hasExtDocs = definition.externalDocs != null
         val hasExample = definition.example != null
         val hasExamples = !definition.examples.isNullOrEmpty()
+        val hasMediaType = definition.contentMediaType != null
+        val hasEncoding = definition.contentEncoding != null
+        val hasTitle = !definition.title.isNullOrBlank()
+        val hasDefault = definition.defaultValue != null
+        val hasConst = definition.constValue != null
+        val hasDeprecated = definition.deprecated
+        val hasReadOnly = definition.readOnly
+        val hasWriteOnly = definition.writeOnly
 
-        if (!hasDesc && !hasExtDocs && !hasExample && !hasExamples) return ""
+        if (!hasDesc && !hasExtDocs && !hasExample && !hasExamples && !hasMediaType && !hasEncoding &&
+            !hasTitle && !hasDefault && !hasConst && !hasDeprecated && !hasReadOnly && !hasWriteOnly
+        ) return ""
 
         val sb = StringBuilder("/**\n")
         if (hasDesc) {
@@ -199,8 +274,73 @@ class DtoGenerator {
             }
         }
 
+        if (hasTitle) {
+            if (hasDesc || hasExtDocs || hasExample || hasExamples) sb.append(" *\n")
+            sb.append(" * @title ${definition.title}\n")
+        }
+
+        if (hasDefault) {
+            if (hasDesc || hasExtDocs || hasExample || hasExamples || hasTitle) sb.append(" *\n")
+            sb.append(" * @default ${definition.defaultValue}\n")
+        }
+
+        if (hasConst) {
+            if (hasDesc || hasExtDocs || hasExample || hasExamples || hasTitle || hasDefault) sb.append(" *\n")
+            sb.append(" * @const ${definition.constValue}\n")
+        }
+
+        if (hasDeprecated) {
+            if (hasDesc || hasExtDocs || hasExample || hasExamples || hasTitle || hasDefault || hasConst) sb.append(" *\n")
+            sb.append(" * @deprecated\n")
+        }
+
+        if (hasReadOnly) {
+            if (hasDesc || hasExtDocs || hasExample || hasExamples || hasTitle || hasDefault || hasConst || hasDeprecated) sb.append(" *\n")
+            sb.append(" * @readOnly\n")
+        }
+
+        if (hasWriteOnly) {
+            if (hasDesc || hasExtDocs || hasExample || hasExamples || hasTitle || hasDefault || hasConst || hasDeprecated || hasReadOnly) sb.append(" *\n")
+            sb.append(" * @writeOnly\n")
+        }
+
+        if (hasMediaType) {
+            if (hasDesc || hasExtDocs || hasExample || hasExamples || hasTitle || hasDefault || hasConst || hasDeprecated || hasReadOnly || hasWriteOnly) {
+                sb.append(" *\n")
+            }
+            sb.append(" * @contentMediaType ${definition.contentMediaType}\n")
+        }
+
+        if (hasEncoding) {
+            if (hasDesc || hasExtDocs || hasExample || hasExamples || hasTitle || hasDefault || hasConst || hasDeprecated || hasReadOnly || hasWriteOnly || hasMediaType) {
+                sb.append(" *\n")
+            }
+            sb.append(" * @contentEncoding ${definition.contentEncoding}\n")
+        }
+
         sb.append(" */\n")
         return sb.toString()
+    }
+
+    private fun schemaToProperty(definition: SchemaDefinition): SchemaProperty {
+        val effectiveTypes = definition.effectiveTypes
+        return SchemaProperty(
+            types = effectiveTypes,
+            format = definition.format,
+            contentMediaType = definition.contentMediaType,
+            contentEncoding = definition.contentEncoding,
+            items = definition.items,
+            additionalProperties = definition.additionalProperties,
+            description = definition.description,
+            title = definition.title,
+            defaultValue = definition.defaultValue,
+            constValue = definition.constValue,
+            deprecated = definition.deprecated,
+            readOnly = definition.readOnly,
+            writeOnly = definition.writeOnly,
+            example = definition.example,
+            xml = definition.xml
+        )
     }
 
     private fun buildPropertyKDoc(prop: SchemaProperty): String {
@@ -208,27 +348,67 @@ class DtoGenerator {
         val hasExample = prop.example != null
         val hasMediaType = prop.contentMediaType != null
         val hasEncoding = prop.contentEncoding != null
+        val hasTitle = !prop.title.isNullOrBlank()
+        val hasDefault = prop.defaultValue != null
+        val hasConst = prop.constValue != null
+        val hasDeprecated = prop.deprecated
+        val hasReadOnly = prop.readOnly
+        val hasWriteOnly = prop.writeOnly
 
-        if (!hasDesc && !hasExample && !hasMediaType && !hasEncoding) return ""
+        if (!hasDesc && !hasExample && !hasMediaType && !hasEncoding && !hasTitle && !hasDefault && !hasConst &&
+            !hasDeprecated && !hasReadOnly && !hasWriteOnly
+        ) return ""
 
         val sb = StringBuilder("    /**\n")
         if (hasDesc) {
             sb.append("     * ${prop.description}\n")
         }
-        if (hasMediaType) {
+        if (hasTitle) {
             if (hasDesc) sb.append("     *\n")
+            sb.append("     * @title ${prop.title}\n")
+        }
+        if (hasDefault) {
+            if (hasDesc || hasTitle) sb.append("     *\n")
+            sb.append("     * @default ${prop.defaultValue}\n")
+        }
+        if (hasConst) {
+            if (hasDesc || hasTitle || hasDefault) sb.append("     *\n")
+            sb.append("     * @const ${prop.constValue}\n")
+        }
+        if (hasDeprecated) {
+            if (hasDesc || hasTitle || hasDefault || hasConst) sb.append("     *\n")
+            sb.append("     * @deprecated\n")
+        }
+        if (hasReadOnly) {
+            if (hasDesc || hasTitle || hasDefault || hasConst || hasDeprecated) sb.append("     *\n")
+            sb.append("     * @readOnly\n")
+        }
+        if (hasWriteOnly) {
+            if (hasDesc || hasTitle || hasDefault || hasConst || hasDeprecated || hasReadOnly) sb.append("     *\n")
+            sb.append("     * @writeOnly\n")
+        }
+        if (hasMediaType) {
+            if (hasDesc || hasTitle || hasDefault || hasConst || hasDeprecated || hasReadOnly || hasWriteOnly) sb.append("     *\n")
             sb.append("     * @contentMediaType ${prop.contentMediaType}\n")
         }
         if (hasEncoding) {
-            if (hasDesc || hasMediaType) sb.append("     *\n")
+            if (hasDesc || hasTitle || hasDefault || hasConst || hasDeprecated || hasReadOnly || hasWriteOnly || hasMediaType) {
+                sb.append("     *\n")
+            }
             sb.append("     * @contentEncoding ${prop.contentEncoding}\n")
         }
         if (hasExample) {
-            if (hasDesc || hasMediaType || hasEncoding) sb.append("     *\n")
+            if (hasDesc || hasTitle || hasDefault || hasConst || hasDeprecated || hasReadOnly || hasWriteOnly || hasMediaType || hasEncoding) {
+                sb.append("     *\n")
+            }
             sb.append("     * @example ${prop.example}\n")
         }
         sb.append("     */\n")
         return sb.toString()
+    }
+
+    private fun buildDeprecatedAnnotation(isDeprecated: Boolean, indent: String = ""): String {
+        return if (isDeprecated) "${indent}@Deprecated(\"Deprecated\")\n" else ""
     }
 
     private fun sanitizeEnumName(raw: String): String {

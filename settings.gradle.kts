@@ -6,7 +6,5 @@ pluginManagement {
     }
 }
 
-plugins {
-    // This plugin fixes the "toolchain download repositories have not been configured" error
-    id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
-}
+// Toolchain resolver plugin removed to keep compatibility with older Gradle runtimes.
+// If you need automatic toolchain downloads, re-enable the foojay-resolver plugin.
