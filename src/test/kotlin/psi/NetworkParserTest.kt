@@ -1,9 +1,12 @@
 package psi
 
+import domain.Callback
 import domain.HttpMethod
 import domain.ParameterLocation
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.AfterAll
@@ -116,6 +119,156 @@ class NetworkParserTest {
     }
 
     @Test
+    fun `parse preserves paramRef and responseRef tags`() {
+        val code = """
+            import io.ktor.client.*
+            import io.ktor.client.request.*
+            import io.ktor.http.*
+
+            class RefApi(private val client: HttpClient) {
+                /**
+                 * @paramRef limit {"${'$'}ref":"#/components/parameters/Limit","summary":"Ref param","description":"Ref param desc"}
+                 * @response 200 String OK
+                 * @responseRef 200 {"${'$'}ref":"#/components/responses/Ok","summary":"Ref summary","description":"Ref desc"}
+                 */
+                suspend fun listItems(limit: String): Result<String> {
+                    client.request("/items") {
+                        method = HttpMethod.Get
+                        parameter("limit", limit)
+                    }
+                }
+            }
+        """.trimIndent()
+
+        val endpoint = parser.parse(code).first()
+
+        val param = endpoint.parameters.firstOrNull { it.name == "limit" }
+        assertNotNull(param?.reference)
+        assertEquals("#/components/parameters/Limit", param?.reference?.ref)
+        assertEquals("Ref param", param?.reference?.summary)
+        assertEquals("Ref param desc", param?.reference?.description)
+
+        val response = endpoint.responses["200"]
+        assertNotNull(response?.reference)
+        assertEquals("#/components/responses/Ok", response?.reference?.ref)
+        assertEquals("Ref summary", response?.reference?.summary)
+        assertEquals("Ref desc", response?.reference?.description)
+    }
+
+    @Test
+    fun `parse honors requestBody KDoc override`() {
+        val code = """
+            import io.ktor.client.*
+            import io.ktor.client.request.*
+            import io.ktor.http.*
+
+            class UploadApi(private val client: HttpClient) {
+                /**
+                 * @requestBody {"description":"payload","required":false,"content":{"application/xml":{"schema":{"type":"string"}}}}
+                 */
+                suspend fun upload(payload: String): Result<Unit> {
+                    client.request("/upload") {
+                        method = HttpMethod.Post
+                        setBody(payload)
+                    }
+                }
+            }
+        """.trimIndent()
+
+        val endpoint = parser.parse(code).first()
+
+        assertEquals("payload", endpoint.requestBody?.description)
+        assertEquals(false, endpoint.requestBody?.required)
+        assertNotNull(endpoint.requestBody?.content?.get("application/xml"))
+    }
+
+    @Test
+    fun `parse extracts response summary`() {
+        val code = """
+            class SummaryApi {
+                /**
+                 * @response 200 String ok
+                 * @responseSummary 200 Short summary
+                 */
+                suspend fun getSummary(): Result<String> {
+                    client.request("/summary") { method = HttpMethod.Get }
+                }
+            }
+        """.trimIndent()
+
+        val endpoint = parser.parse(code).first()
+
+        assertEquals("Short summary", endpoint.responses["200"]?.summary)
+    }
+
+    @Test
+    fun `parse extracts callbacks from KDoc`() {
+        val code = """
+            class CallbackApi {
+                /**
+                 * @callbacks {"onEvent":{"${'$'}ref":"#/components/callbacks/EventCb"}}
+                 */
+                suspend fun withCallbacks(): Result<Unit> {
+                    client.request("/callbacks") { method = HttpMethod.Post }
+                }
+            }
+        """.trimIndent()
+
+        val endpoint = parser.parse(code).first()
+        val callback = endpoint.callbacks["onEvent"]
+
+        assertNotNull(callback)
+        assertTrue(callback is Callback.Reference)
+        assertEquals("#/components/callbacks/EventCb", (callback as Callback.Reference).reference.ref)
+    }
+
+    @Test
+    fun `parse extracts operation extensions`() {
+        val code = """
+            class ExtensionApi {
+                /**
+                 * @extensions {"x-rate-limit":10,"x-flag":true}
+                 */
+                suspend fun getExtensions(): Result<Unit> {
+                    client.request("/extensions") { method = HttpMethod.Get }
+                }
+            }
+        """.trimIndent()
+
+        val endpoint = parser.parse(code).first()
+
+        assertEquals(10, endpoint.extensions["x-rate-limit"])
+        assertEquals(true, endpoint.extensions["x-flag"])
+    }
+
+    @Test
+    fun `parse captures custom schema keywords from response content`() {
+        val code = """
+            import io.ktor.client.*
+            import io.ktor.client.request.*
+            import io.ktor.http.*
+
+            class CustomApi(private val client: HttpClient) {
+                /**
+                 * @response 200 String ok
+                 * @responseContent 200 {"application/json":{"schema":{"type":"object","customKeyword":123,"x-extra":"yes"}}}
+                 */
+                suspend fun getCustom(): Result<String> {
+                    client.request("/custom") {
+                        method = HttpMethod.Get
+                    }
+                }
+            }
+        """.trimIndent()
+
+        val endpoint = parser.parse(code).first()
+        val schema = endpoint.responses["200"]?.content?.get("application/json")?.schema
+
+        assertEquals(123, schema?.customKeywords?.get("customKeyword"))
+        assertEquals("yes", schema?.extensions?.get("x-extra"))
+    }
+
+    @Test
     fun `parse falls back to function return type if body generic is missing`() {
         val code = """
             class ListApi {
@@ -179,6 +332,126 @@ class NetworkParserTest {
     }
 
     @Test
+    fun `parse extracts parameter metadata and deprecated tag`() {
+        val code = """
+            import io.ktor.http.*
+
+            class MetaApi {
+                /**
+                 * @deprecated
+                 * @paramStyle ids form
+                 * @paramExplode ids false
+                 * @paramAllowReserved ids true
+                 * @paramAllowEmptyValue ids true
+                 */
+                suspend fun list(ids: String): Result<Unit> {
+                    client.request("/items") {
+                        method = HttpMethod.Get
+                        parameter("ids", ids)
+                    }
+                }
+            }
+        """.trimIndent()
+
+        val endpoint = parser.parse(code).first()
+        val param = endpoint.parameters.first()
+
+        assertEquals(true, endpoint.deprecated)
+        assertEquals(ParameterLocation.QUERY, param.location)
+        assertEquals(domain.ParameterStyle.FORM, param.style)
+        assertEquals(false, param.explode)
+        assertEquals(true, param.allowReserved)
+        assertEquals(true, param.allowEmptyValue)
+    }
+
+    @Test
+    fun `parse extracts parameter extensions`() {
+        val code = """
+            import io.ktor.http.*
+
+            class ParamExtensionApi {
+                /**
+                 * @paramExtensions limit {"x-rate-limit": 50}
+                 */
+                suspend fun list(limit: Int): Result<Unit> {
+                    client.request("/items") {
+                        method = HttpMethod.Get
+                        parameter("limit", limit)
+                    }
+                }
+            }
+        """.trimIndent()
+
+        val endpoint = parser.parse(code).first()
+        val param = endpoint.parameters.firstOrNull { it.name == "limit" }
+
+        assertNotNull(param)
+        assertEquals(50, param?.extensions?.get("x-rate-limit"))
+    }
+
+    @Test
+    fun `parse extracts operation servers from KDoc`() {
+        val code = """
+            import io.ktor.client.*
+            import io.ktor.client.request.*
+            import io.ktor.http.*
+
+            class ServerApi(private val client: HttpClient) {
+                /**
+                 * @servers [{"url":"https://override.example.com","description":"Override"}]
+                 */
+                suspend fun getOverride(): Result<Unit> {
+                    client.request("/override") {
+                        method = HttpMethod.Get
+                    }
+                }
+            }
+        """.trimIndent()
+
+        val endpoint = parser.parse(code).first()
+
+        assertEquals(1, endpoint.servers.size)
+        assertEquals("https://override.example.com", endpoint.servers.first().url)
+    }
+
+    @Test
+    fun `parse extracts response headers links and content tags`() {
+        val code = """
+            import io.ktor.client.*
+            import io.ktor.client.request.*
+            import io.ktor.http.*
+
+            class ResponseMetaApi(private val client: HttpClient) {
+                /**
+                 * @response 200 String ok
+                 * @responseHeaders 200 {"X-Rate-Limit":{"description":"Limit","schema":{"type":"integer"}}}
+                 * @responseLinks 200 {"next":{"operationId":"listUsers"}}
+                 * @responseContent 200 {"application/json":{"schema":{"type":"string"}}}
+                 */
+                suspend fun listUsers(): Result<String> {
+                    client.request("/users") {
+                        method = HttpMethod.Get
+                    }
+                }
+            }
+        """.trimIndent()
+
+        val endpoint = parser.parse(code).first()
+        val response = endpoint.responses["200"]
+
+        assertNotNull(response)
+        val headers = response?.headers?.get("X-Rate-Limit")
+        assertNotNull(headers)
+        assertTrue(headers?.schema?.types?.contains("integer") == true)
+
+        val links = response?.links?.get("next")
+        assertNotNull(links)
+        assertEquals("listUsers", links?.operationId)
+
+        assertTrue(response?.content?.containsKey("application/json") == true)
+    }
+
+    @Test
     fun `parse extracts KDoc metadata and responses`() {
         val code = """
             import io.ktor.client.*
@@ -215,6 +488,55 @@ class NetworkParserTest {
         assertNotNull(endpoint.responses["201"]?.content?.get("application/json"))
         assertEquals(null, endpoint.responses["204"]?.type)
         assertEquals("NoContent", endpoint.responses["204"]?.description)
+    }
+
+    @Test
+    fun `parse extracts response extensions`() {
+        val code = """
+            import io.ktor.client.*
+            import io.ktor.client.request.*
+            import io.ktor.http.*
+
+            class ResponseExtensionsApi(private val client: HttpClient) {
+                /**
+                 * @response 200 String ok
+                 * @responseExtensions 200 {"x-response": "yes"}
+                 */
+                suspend fun getItems(): Result<String> {
+                    client.request("/items") { method = HttpMethod.Get }
+                }
+            }
+        """.trimIndent()
+
+        val endpoint = parser.parse(code).first()
+        val response = endpoint.responses["200"]
+
+        assertNotNull(response)
+        assertEquals("yes", response?.extensions?.get("x-response"))
+    }
+
+    @Test
+    fun `parse extracts externalDocs from explicit tag`() {
+        val code = """
+            import io.ktor.client.*
+            import io.ktor.client.request.*
+            import io.ktor.http.*
+
+            class ExternalDocsApi(private val client: HttpClient) {
+                /**
+                 * @externalDocs {"url":"https://docs.example.com","description":"Docs","x-docs":1}
+                 */
+                suspend fun getDocs(): Result<Unit> {
+                    client.request("/docs") { method = HttpMethod.Get }
+                }
+            }
+        """.trimIndent()
+
+        val endpoint = parser.parse(code).first()
+
+        assertEquals("https://docs.example.com", endpoint.externalDocs?.url)
+        assertEquals("Docs", endpoint.externalDocs?.description)
+        assertEquals(1, endpoint.externalDocs?.extensions?.get("x-docs"))
     }
 
     @Test
@@ -270,6 +592,91 @@ class NetworkParserTest {
 
         assertEquals("cats", param.example?.serializedValue)
         assertEquals("dogs", param.examples["dogs"]?.serializedValue)
+    }
+
+    @Test
+    fun `parse extracts structured parameter examples from KDoc`() {
+        val code = """
+            import io.ktor.client.*
+            import io.ktor.client.request.*
+            import io.ktor.http.*
+
+            class ExampleApi(private val client: HttpClient) {
+                /**
+                 * @paramExample filter {"summary":"Filter","dataValue":{"status":"active"}}
+                 */
+                suspend fun list(filter: String): Result<Unit> {
+                    client.request("/items") {
+                        method = HttpMethod.Get
+                        parameter("filter", filter)
+                    }
+                }
+            }
+        """.trimIndent()
+
+        val endpoint = parser.parse(code).first()
+        val param = endpoint.parameters.first { it.name == "filter" }
+
+        assertEquals("Filter", param.example?.summary)
+        val data = param.example?.dataValue as? Map<*, *>
+        assertEquals("active", data?.get("status"))
+    }
+
+    @Test
+    fun `parse extracts external parameter examples from KDoc`() {
+        val code = """
+            import io.ktor.client.*
+            import io.ktor.client.request.*
+            import io.ktor.http.*
+
+            class ExternalExampleApi(private val client: HttpClient) {
+                /**
+                 * @paramExample avatar external:https://example.com/avatar.png
+                 */
+                suspend fun avatar(avatar: String): Result<Unit> {
+                    client.request("/avatar") {
+                        method = HttpMethod.Get
+                        parameter("avatar", avatar)
+                    }
+                }
+            }
+        """.trimIndent()
+
+        val endpoint = parser.parse(code).first()
+        val param = endpoint.parameters.first { it.name == "avatar" }
+
+        assertEquals("https://example.com/avatar.png", param.example?.externalValue)
+    }
+
+    @Test
+    fun `parse extracts parameter schema and content from KDoc`() {
+        val code = """
+            import io.ktor.client.*
+            import io.ktor.client.request.*
+            import io.ktor.http.*
+
+            class ParamSchemaApi(private val client: HttpClient) {
+                /**
+                 * @paramSchema limit {"type":"integer","minimum":1}
+                 * @paramContent filter {"application/json":{"schema":{"type":"string"}}}
+                 */
+                suspend fun list(limit: Int, filter: String): Result<Unit> {
+                    client.request("/items") {
+                        method = HttpMethod.Get
+                        parameter("limit", limit)
+                        parameter("filter", filter)
+                    }
+                }
+            }
+        """.trimIndent()
+
+        val endpoint = parser.parse(code).first()
+        val limit = endpoint.parameters.first { it.name == "limit" }
+        val filter = endpoint.parameters.first { it.name == "filter" }
+
+        assertEquals(1.0, limit.schema?.minimum)
+        assertTrue(filter.content.containsKey("application/json"))
+        assertNull(filter.schema)
     }
 
     @Test
@@ -339,6 +746,28 @@ class NetworkParserTest {
         assertEquals(true, id?.isRequired)
         assertEquals(false, q?.isRequired)
         assertEquals(false, limit?.isRequired)
+    }
+
+    @Test
+    fun `parse extracts parameters inside foreach loops`() {
+        val code = """
+            class FilterApi {
+                suspend fun filter(filters: Map<String, String>): Result<Unit> {
+                    client.request("/filters") {
+                        method = HttpMethod.Get
+                        filters.forEach { (key, value) ->
+                            parameter(key, value)
+                        }
+                    }
+                }
+            }
+        """.trimIndent()
+
+        val endpoint = parser.parse(code).first()
+        val param = endpoint.parameters.firstOrNull { it.location == ParameterLocation.QUERY }
+
+        assertNotNull(param)
+        assertEquals("filters", param?.name)
     }
 
     @Test
@@ -480,5 +909,98 @@ class NetworkParserTest {
         val endpoint = parser.parse(code).first()
 
         assertEquals("Int", endpoint.responseType)
+    }
+
+    @Test
+    fun `parse extracts security requirements from KDoc`() {
+        val code = """
+            import io.ktor.client.*
+            import io.ktor.client.request.*
+            import io.ktor.http.*
+
+            class SecureApi(private val client: HttpClient) {
+                /**
+                 * @security {"api_key":[]}
+                 * @security {"oauth2":["read"]}
+                 */
+                suspend fun secureCall(): Result<Unit> {
+                    return client.request("/secure") { method = HttpMethod.Get }
+                }
+
+                /**
+                 * @securityEmpty
+                 */
+                suspend fun publicCall(): Result<Unit> {
+                    return client.request("/public") { method = HttpMethod.Get }
+                }
+            }
+        """.trimIndent()
+
+        val endpoints = parser.parse(code)
+        val secure = endpoints.first { it.operationId == "secureCall" }
+        val public = endpoints.first { it.operationId == "publicCall" }
+
+        assertEquals(2, secure.security.size)
+        assertEquals(emptyList<String>(), secure.security[0]["api_key"])
+        assertEquals(listOf("read"), secure.security[1]["oauth2"])
+        assertEquals(false, secure.securityExplicitEmpty)
+
+        assertTrue(public.security.isEmpty())
+        assertEquals(true, public.securityExplicitEmpty)
+    }
+
+    @Test
+    fun `parseWithMetadata extracts webhooks from interface KDoc`() {
+        val code = """
+            /**
+             * @webhooks {"onPing":{"post":{"operationId":"onPing","responses":{"200":{"description":"ok"}}}}}
+             */
+            interface IWebhookApi
+        """.trimIndent()
+
+        val result = parser.parseWithMetadata(code)
+        val webhook = result.webhooks["onPing"]
+
+        assertNotNull(webhook)
+        assertEquals("onPing", webhook?.post?.operationId)
+    }
+
+    @Test
+    fun `parseWithMetadata extracts root metadata from interface KDoc`() {
+        val code = """
+            /**
+             * @openapi {"openapi":"3.2.0","jsonSchemaDialect":"https://spec.openapis.org/oas/3.1/dialect/base","${'$'}self":"https://example.com/openapi"}
+             * @info {"title":"Meta API","version":"1.0.0","summary":"Summary"}
+             * @servers [{"url":"https://api.example.com","description":"Prod"}]
+             * @security {"api_key":[]}
+             * @tags [{"name":"alpha","summary":"Alpha"}]
+             * @externalDocs {"url":"https://docs.example.com","description":"Docs"}
+             * @extensions {"x-root":true}
+             * @pathsExtensions {"x-paths":"paths-ext"}
+             * @webhooksExtensions {"x-webhooks":{"flag":true}}
+             * @securitySchemes {"api_key":{"type":"apiKey","name":"X-API-KEY","in":"header"}}
+             */
+            interface IRootApi
+        """.trimIndent()
+
+        val result = parser.parseWithMetadata(code)
+        val meta = result.metadata
+
+        assertEquals("3.2.0", meta.openapi)
+        assertEquals("https://spec.openapis.org/oas/3.1/dialect/base", meta.jsonSchemaDialect)
+        assertEquals("https://example.com/openapi", meta.self)
+        assertEquals("Meta API", meta.info?.title)
+        assertEquals("1.0.0", meta.info?.version)
+        assertEquals(1, meta.servers.size)
+        assertEquals("https://api.example.com", meta.servers.first().url)
+        assertEquals(1, meta.security.size)
+        assertEquals(emptyList<String>(), meta.security.first()["api_key"])
+        assertEquals(1, meta.tags.size)
+        assertEquals("alpha", meta.tags.first().name)
+        assertEquals("Docs", meta.externalDocs?.description)
+        assertEquals(true, meta.extensions["x-root"])
+        assertEquals("paths-ext", meta.pathsExtensions["x-paths"])
+        assertEquals(mapOf("flag" to true), meta.webhooksExtensions["x-webhooks"])
+        assertEquals("apiKey", meta.securitySchemes["api_key"]?.type)
     }
 }

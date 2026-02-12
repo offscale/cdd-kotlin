@@ -12,6 +12,12 @@ class TypeMappersTest {
         val refProp = SchemaProperty(types = setOf("object"), ref = "#/components/schemas/User")
         assertEquals("User", TypeMappers.mapType(refProp))
 
+        val anySchema = SchemaProperty(booleanSchema = true)
+        assertEquals("Any", TypeMappers.mapType(anySchema))
+
+        val neverSchema = SchemaProperty(booleanSchema = false)
+        assertEquals("Nothing", TypeMappers.mapType(neverSchema))
+
         val base64Prop = SchemaProperty(type = "string", contentEncoding = "base64url")
         assertEquals("ByteArray", TypeMappers.mapType(base64Prop))
 

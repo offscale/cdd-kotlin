@@ -1,11 +1,37 @@
 package domain
 
 /**
+ * A simple Reference Object used to reference other components.
+ *
+ * See [Reference Object](https://spec.openapis.org/oas/v3.2.0#reference-object)
+ */
+data class ReferenceObject(
+    /**
+     * **REQUIRED**. The reference identifier.
+     * This MUST be in the form of a URI.
+     */
+    val ref: String,
+    /**
+     * A short summary which by default SHOULD override that of the referenced component.
+     */
+    val summary: String? = null,
+    /**
+     * A description which by default SHOULD override that of the referenced component.
+     */
+    val description: String? = null
+)
+
+/**
  * An object grouping an internal or external example value with basic `summary` and `description` metadata.
  *
  * See [Example Object](https://spec.openapis.org/oas/v3.2.0#example-object)
  */
 data class ExampleObject(
+    /**
+     * Reference to an Example Object.
+     * When present, this is treated as a Reference Object and other fields are ignored.
+     */
+    val ref: String? = null,
     /** Short description for the example. */
     val summary: String? = null,
     /** Long description for the example. */
@@ -30,7 +56,12 @@ data class ExampleObject(
      *
      * **Deprecated for non-JSON serialization targets.**
      */
-    val value: Any? = null
+    val value: Any? = null,
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 )
 
 /**
@@ -74,7 +105,12 @@ data class EncodingObject(
     /**
      * Applies a single Encoding Object to remaining items in a positional `multipart` array.
      */
-    val itemEncoding: EncodingObject? = null
+    val itemEncoding: EncodingObject? = null,
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 )
 
 /**
@@ -83,6 +119,16 @@ data class EncodingObject(
  * See [Media Type Object](https://spec.openapis.org/oas/v3.2.0#media-type-object)
  */
 data class MediaTypeObject(
+    /**
+     * Reference to a Media Type Object.
+     * When present, this is treated as a Reference Object and other fields are ignored.
+     */
+    val ref: String? = null,
+    /**
+     * Reference Object allowing `$ref` with optional summary/description overrides.
+     * When present, this is treated as a Reference Object and other fields are ignored for serialization.
+     */
+    val reference: ReferenceObject? = null,
     /**
      * A schema describing the complete content of the request, response, parameter, or header.
      */
@@ -110,7 +156,12 @@ data class MediaTypeObject(
     /**
      * Single encoding information for `multipart` array items.
      */
-    val itemEncoding: EncodingObject? = null
+    val itemEncoding: EncodingObject? = null,
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 )
 
 /**
@@ -130,13 +181,43 @@ data class RequestBody(
     /**
      * Determines if the request body is required in the request.
      */
-    val required: Boolean = false
+    val required: Boolean = false,
+
+    /**
+     * Reference Object allowing `$ref` with optional summary/description overrides.
+     * When present, this is treated as a Reference Object and other fields are ignored for serialization.
+     */
+    val reference: ReferenceObject? = null,
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 )
 
 /**
- * A map of possible out-of-band callbacks related to the parent operation.
- * The key is a runtime expression evaluated at runtime to identify the callback URL.
+ * A Callback Object describes possible out-of-band requests related to a parent operation.
+ *
+ * A callback can be expressed inline as a map of runtime expressions to [PathItem] objects,
+ * or as a Reference Object that points to a reusable callback definition.
  *
  * See [Callback Object](https://spec.openapis.org/oas/v3.2.0#callback-object)
  */
-typealias Callback = Map<String, PathItem>
+sealed interface Callback {
+
+    /**
+     * Inline callback definition: runtime expression -> [PathItem].
+     * Extensions are allowed as siblings of the expression keys.
+     */
+    data class Inline(
+        val expressions: Map<String, PathItem> = emptyMap(),
+        val extensions: Map<String, Any?> = emptyMap()
+    ) : Callback
+
+    /**
+     * Reference to a reusable callback definition.
+     */
+    data class Reference(
+        val reference: ReferenceObject
+    ) : Callback
+}

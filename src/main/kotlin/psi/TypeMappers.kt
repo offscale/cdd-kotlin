@@ -19,6 +19,9 @@ object TypeMappers {
      * Resolves references via [ReferenceResolver].
      */
     fun mapType(prop: SchemaProperty): String {
+        prop.booleanSchema?.let { booleanValue ->
+            return if (booleanValue) "Any" else "Nothing"
+        }
         if (prop.ref != null) {
             val typeName = ReferenceResolver.resolveRefToType(prop.ref)
             // If explicit type set is just null reference (impossible) or ref is primary

@@ -4,6 +4,7 @@ import domain.SchemaDefinition
 import domain.SchemaProperty
 import domain.ExternalDocumentation
 import domain.Discriminator
+import domain.Xml
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Test
@@ -238,6 +239,88 @@ class DtoGeneratorTest {
     }
 
     @Test
+    fun `generateDto emits advanced schema tags`() {
+        val schema = SchemaDefinition(
+            name = "AdvancedDoc",
+            type = "object",
+            comment = "root comment",
+            patternProperties = mapOf("^x-" to SchemaProperty("string")),
+            propertyNames = SchemaProperty(types = setOf("string"), pattern = "^[a-z]+$"),
+            dependentRequired = mapOf("credit_card" to listOf("billing_address")),
+            dependentSchemas = mapOf(
+                "shipping_address" to SchemaProperty(
+                    types = setOf("object"),
+                    required = listOf("country"),
+                    properties = mapOf("country" to SchemaProperty("string"))
+                )
+            ),
+            unevaluatedProperties = SchemaProperty(booleanSchema = false),
+            unevaluatedItems = SchemaProperty("string"),
+            contentSchema = SchemaProperty(
+                types = setOf("object"),
+                properties = mapOf("id" to SchemaProperty("integer"))
+            ),
+            properties = mapOf(
+                "payload" to SchemaProperty(
+                    types = setOf("object"),
+                    comment = "payload comment",
+                    patternProperties = mapOf("^data-" to SchemaProperty("string")),
+                    propertyNames = SchemaProperty(types = setOf("string"), pattern = "^[a-z]+$"),
+                    dependentRequired = mapOf("a" to listOf("b")),
+                    dependentSchemas = mapOf(
+                        "meta" to SchemaProperty(
+                            types = setOf("object"),
+                            required = listOf("id"),
+                            properties = mapOf("id" to SchemaProperty("integer"))
+                        )
+                    ),
+                    unevaluatedProperties = SchemaProperty(booleanSchema = false),
+                    unevaluatedItems = SchemaProperty("string"),
+                    contentSchema = SchemaProperty(
+                        types = setOf("object"),
+                        properties = mapOf("id" to SchemaProperty("integer"))
+                    )
+                )
+            )
+        )
+
+        val text = generator.generateDto("com.docs", schema).text
+
+        assertTrue(text.contains("@comment root comment"))
+        assertTrue(text.contains("@patternProperties {\"^x-\""))
+        assertTrue(text.contains("@propertyNames {\"type\":\"string\""))
+        assertTrue(text.contains("@dependentRequired {\"credit_card\""))
+        assertTrue(text.contains("@dependentSchemas {\"shipping_address\""))
+        assertTrue(text.contains("@unevaluatedProperties false"))
+        assertTrue(text.contains("@unevaluatedItems {\"type\":\"string\""))
+        assertTrue(text.contains("@contentSchema {\"type\":\"object\""))
+
+        assertTrue(text.contains("@comment payload comment"))
+        assertTrue(text.contains("@patternProperties {\"^data-\""))
+        assertTrue(text.contains("@dependentRequired {\"a\""))
+    }
+
+    @Test
+    fun `generateDto emits custom keywords tag`() {
+        val schema = SchemaDefinition(
+            name = "CustomKeywords",
+            type = "object",
+            customKeywords = mapOf("vendorKeyword" to "alpha"),
+            properties = mapOf(
+                "name" to SchemaProperty(
+                    type = "string",
+                    customKeywords = mapOf("custom" to listOf("a", "b"))
+                )
+            )
+        )
+
+        val text = generator.generateDto("com.custom", schema).text
+
+        assertTrue(text.contains("@keywords {\"vendorKeyword\":\"alpha\"}"))
+        assertTrue(text.contains("@keywords {\"custom\":[\"a\",\"b\"]}"))
+    }
+
+    @Test
     fun `generateDto creates Enum class with SerialName mappings`() {
         val schema = SchemaDefinition(
             name = "SortArgs",
@@ -268,6 +351,21 @@ class DtoGeneratorTest {
     }
 
     @Test
+    fun `generateDto uses typealias for non-string enums and preserves values`() {
+        val schema = SchemaDefinition(
+            name = "Level",
+            type = "integer",
+            enumValues = listOf(1, 2, 3)
+        )
+
+        val text = generator.generateDto("com.enums", schema).text
+
+        assertTrue(text.contains("typealias Level = Int"), "Non-string enums should not generate enum class")
+        assertTrue(text.contains("@enum 1"))
+        assertTrue(text.contains("@enum 2"))
+    }
+
+    @Test
     fun `generateDto creates Sealed Interface for oneOf`() {
         val schema = SchemaDefinition(
             name = "PolymorphicPet",
@@ -286,6 +384,26 @@ class DtoGeneratorTest {
         assertTrue(text.contains("@JsonClassDiscriminator(\"petType\")"))
         assertTrue(text.contains("val id: Int?"))
         assertTrue(text.contains("import kotlinx.serialization.JsonClassDiscriminator"))
+    }
+
+    @Test
+    fun `generateDto creates Sealed Interface for inline oneOf schemas`() {
+        val schema = SchemaDefinition(
+            name = "InlinePoly",
+            type = "object",
+            oneOfSchemas = listOf(
+                SchemaProperty(types = setOf("string")),
+                SchemaProperty(types = setOf("integer"))
+            ),
+            properties = mapOf(
+                "id" to SchemaProperty("integer")
+            )
+        )
+
+        val text = generator.generateDto("com.poly", schema).text
+
+        assertTrue(text.contains("sealed interface InlinePoly"))
+        assertTrue(text.contains("val id: Int?"))
     }
 
     @Test
@@ -311,7 +429,7 @@ class DtoGeneratorTest {
         val schema = SchemaDefinition(
             name = "ExampleUser",
             type = "object",
-            example = "{ \"name\": \"John\" }",
+            example = mapOf("name" to "John"),
             properties = mapOf(
                 "name" to SchemaProperty(type = "string", example = "John")
             )
@@ -319,7 +437,7 @@ class DtoGeneratorTest {
 
         val text = generator.generateDto("com.ex", schema).text
 
-        assertTrue(text.contains("@example { \"name\": \"John\" }"), "Class example missing")
+        assertTrue(text.contains("@example {\"name\":\"John\"}"), "Class example missing")
         assertTrue(text.contains("@example John"), "Property example missing")
     }
 
@@ -329,15 +447,28 @@ class DtoGeneratorTest {
             name = "ExampleMap",
             type = "object",
             examples = mapOf(
-                "valid" to "{\"id\": 1}",
-                "invalid" to "{}"
+                "valid" to mapOf("id" to 1),
+                "invalid" to emptyMap<String, Any>()
             )
         )
 
         val text = generator.generateDto("com.ex", schema).text
 
-        assertTrue(text.contains("@example valid: {\"id\": 1}"))
+        assertTrue(text.contains("@example valid: {\"id\":1}"))
         assertTrue(text.contains("@example invalid: {}"))
+    }
+
+    @Test
+    fun `generateDto includes examples list in KDoc`() {
+        val schema = SchemaDefinition(
+            name = "ExampleList",
+            type = "object",
+            examplesList = listOf("alpha", "beta")
+        )
+
+        val text = generator.generateDto("com.ex", schema).text
+
+        assertTrue(text.contains("@examples [\"alpha\",\"beta\"]"))
     }
 
     @Test
@@ -361,6 +492,54 @@ class DtoGeneratorTest {
     }
 
     @Test
+    fun `generateDto includes property external docs and discriminator`() {
+        val schema = SchemaDefinition(
+            name = "Profile",
+            type = "object",
+            properties = mapOf(
+                "profile" to SchemaProperty(
+                    types = setOf("object"),
+                    externalDocs = ExternalDocumentation(
+                        url = "https://example.com/props",
+                        description = "Property docs"
+                    ),
+                    discriminator = Discriminator(
+                        propertyName = "kind",
+                        mapping = mapOf("user" to "#/components/schemas/User"),
+                        defaultMapping = "#/components/schemas/User"
+                    )
+                )
+            )
+        )
+
+        val text = generator.generateDto("com.docs", schema).text
+
+        assertTrue(text.contains("@see https://example.com/props Property docs"))
+        assertTrue(text.contains("@discriminator kind"))
+        assertTrue(text.contains("@discriminatorMapping {\"user\":\"#/components/schemas/User\"}"))
+        assertTrue(text.contains("@discriminatorDefault #/components/schemas/User"))
+    }
+
+    @Test
+    fun `generateDto includes property examples list`() {
+        val schema = SchemaDefinition(
+            name = "ExampleProp",
+            type = "object",
+            properties = mapOf(
+                "count" to SchemaProperty(
+                    types = setOf("integer"),
+                    examples = listOf(1, 2)
+                )
+            )
+        )
+
+        val text = generator.generateDto("com.examples", schema).text
+
+        assertTrue(text.contains("@example example1: 1"))
+        assertTrue(text.contains("@example example2: 2"))
+    }
+
+    @Test
     fun `generateDto includes schema-level content metadata`() {
         val schema = SchemaDefinition(
             name = "InlineBlob",
@@ -381,8 +560,12 @@ class DtoGeneratorTest {
             name = "Annotated",
             type = "object",
             title = "Annotated schema",
-            defaultValue = "{\"id\":1}",
-            constValue = "{\"id\":1}",
+            defaultValue = mapOf("id" to 1),
+            constValue = mapOf("id" to 1),
+            schemaId = "https://example.com/schemas/Annotated",
+            schemaDialect = "https://json-schema.org/draft/2020-12/schema",
+            anchor = "annotated",
+            dynamicAnchor = "annotatedDyn",
             deprecated = true,
             readOnly = true,
             writeOnly = true,
@@ -390,8 +573,12 @@ class DtoGeneratorTest {
                 "id" to SchemaProperty(
                     type = "integer",
                     title = "Identifier",
-                    defaultValue = "1",
-                    constValue = "1",
+                    defaultValue = 1,
+                    constValue = 1,
+                    schemaId = "https://example.com/schemas/Identifier",
+                    schemaDialect = "https://json-schema.org/draft/2020-12/schema",
+                    anchor = "id",
+                    dynamicAnchor = "idDyn",
                     deprecated = true,
                     readOnly = true,
                     writeOnly = true
@@ -405,11 +592,19 @@ class DtoGeneratorTest {
         assertTrue(text.contains("@title Annotated schema"))
         assertTrue(text.contains("@default {\"id\":1}"))
         assertTrue(text.contains("@const {\"id\":1}"))
+        assertTrue(text.contains("@schemaId https://example.com/schemas/Annotated"))
+        assertTrue(text.contains("@schemaDialect https://json-schema.org/draft/2020-12/schema"))
+        assertTrue(text.contains("@anchor annotated"))
+        assertTrue(text.contains("@dynamicAnchor annotatedDyn"))
         assertTrue(text.contains("@readOnly"))
         assertTrue(text.contains("@writeOnly"))
         assertTrue(text.contains("@title Identifier"))
         assertTrue(text.contains("@default 1"))
         assertTrue(text.contains("@const 1"))
+        assertTrue(text.contains("@schemaId https://example.com/schemas/Identifier"))
+        assertTrue(text.contains("@schemaDialect https://json-schema.org/draft/2020-12/schema"))
+        assertTrue(text.contains("@anchor id"))
+        assertTrue(text.contains("@dynamicAnchor idDyn"))
     }
 
     @Test
@@ -462,5 +657,152 @@ class DtoGeneratorTest {
         assertTrue(text.contains("val nullableString: String? = null"), "Should be nullable due to dual type")
         assertTrue(text.contains("val strictInt: Int"), "Should be non-null")
         assertFalse(text.contains("val strictInt: Int?"))
+    }
+
+    @Test
+    fun `generateDto includes constraint tags in KDoc`() {
+        val schema = SchemaDefinition(
+            name = "Constrained",
+            type = "object",
+            minLength = 2,
+            maxLength = 10,
+            pattern = "^[a-z]+$",
+            minimum = 1.0,
+            maximum = 9.0,
+            minItems = 1,
+            maxItems = 5,
+            uniqueItems = true,
+            minProperties = 1,
+            maxProperties = 4,
+            properties = mapOf(
+                "tags" to SchemaProperty(
+                    type = "array",
+                    items = SchemaProperty(type = "string"),
+                    minItems = 2,
+                    maxItems = 6,
+                    uniqueItems = false
+                )
+            )
+        )
+
+        val text = generator.generateDto("com.constraints", schema).text
+
+        assertTrue(text.contains("@minLength 2"))
+        assertTrue(text.contains("@maxLength 10"))
+        assertTrue(text.contains("@pattern ^[a-z]+$"))
+        assertTrue(text.contains("@minimum 1.0"))
+        assertTrue(text.contains("@maximum 9.0"))
+        assertTrue(text.contains("@minItems 1"))
+        assertTrue(text.contains("@maxItems 5"))
+        assertTrue(text.contains("@uniqueItems true"))
+        assertTrue(text.contains("@minProperties 1"))
+        assertTrue(text.contains("@maxProperties 4"))
+
+        assertTrue(text.contains("@minItems 2"))
+        assertTrue(text.contains("@maxItems 6"))
+        assertTrue(text.contains("@uniqueItems false"))
+    }
+
+    @Test
+    fun `generateDto emits discriminator mapping tags`() {
+        val schema = SchemaDefinition(
+            name = "Pet",
+            type = "object",
+            oneOf = listOf("Cat", "Dog"),
+            discriminator = Discriminator(
+                propertyName = "petType",
+                mapping = mapOf("dog" to "#/components/schemas/Dog"),
+                defaultMapping = "OtherPet"
+            )
+        )
+
+        val text = generator.generateDto("com.api", schema).text
+
+        assertTrue(text.contains("@discriminator petType"))
+        assertTrue(text.contains("@discriminatorMapping"))
+        assertTrue(text.contains("#/components/schemas/Dog"))
+        assertTrue(text.contains("@discriminatorDefault OtherPet"))
+    }
+
+    @Test
+    fun `generateDto emits xml metadata tags`() {
+        val schema = SchemaDefinition(
+            name = "Person",
+            type = "object",
+            xml = Xml(
+                name = "person",
+                namespace = "https://example.com/schema",
+                prefix = "ex",
+                nodeType = "element"
+            ),
+            properties = mapOf(
+                "id" to SchemaProperty(type = "string", xml = Xml(attribute = true, name = "pid")),
+                "tags" to SchemaProperty(type = "array", xml = Xml(wrapped = true, name = "tags"))
+            )
+        )
+
+        val text = generator.generateDto("com.xml", schema).text
+
+        assertTrue(text.contains("@xmlName person"))
+        assertTrue(text.contains("@xmlNamespace https://example.com/schema"))
+        assertTrue(text.contains("@xmlPrefix ex"))
+        assertTrue(text.contains("@xmlNodeType element"))
+        assertTrue(text.contains("@xmlAttribute"))
+        assertTrue(text.contains("@xmlWrapped"))
+        assertTrue(text.contains("@xmlName pid"))
+    }
+
+    @Test
+    fun `generateDto emits minContains and maxContains tags`() {
+        val schema = SchemaDefinition(
+            name = "Bag",
+            type = "array",
+            minContains = 1,
+            maxContains = 3,
+            items = SchemaProperty("string")
+        )
+
+        val text = generator.generateDto("com.constraints", schema).text
+
+        assertTrue(text.contains("@minContains 1"))
+        assertTrue(text.contains("@maxContains 3"))
+    }
+
+    @Test
+    fun `generateDto emits contains, prefixItems, defs, and dynamicRef tags`() {
+        val schema = SchemaDefinition(
+            name = "Composite",
+            type = "array",
+            dynamicRef = "#/components/schemas/DynamicRoot",
+            defs = mapOf("RootDef" to SchemaProperty(types = setOf("string"))),
+            contains = SchemaProperty(types = setOf("integer")),
+            prefixItems = listOf(
+                SchemaProperty(types = setOf("string")),
+                SchemaProperty(types = setOf("integer"))
+            ),
+            items = SchemaProperty("string"),
+            properties = mapOf(
+                "items" to SchemaProperty(
+                    types = setOf("array"),
+                    items = SchemaProperty(types = setOf("string")),
+                    dynamicRef = "#/components/schemas/DynamicProp",
+                    defs = mapOf("PropDef" to SchemaProperty(types = setOf("boolean"))),
+                    contains = SchemaProperty(types = setOf("string")),
+                    prefixItems = listOf(SchemaProperty(types = setOf("string")))
+                )
+            )
+        )
+
+        val text = generator.generateDto("com.constraints", schema).text
+
+        assertTrue(text.contains("@dynamicRef #/components/schemas/DynamicRoot"))
+        assertTrue(text.contains("@defs {\"RootDef\":{\"type\":\"string\"}}"))
+        assertTrue(text.contains("@contains {\"type\":\"integer\"}"))
+        assertTrue(text.contains("@prefixItems [{\"type\":\"string\"},{\"type\":\"integer\"}]"))
+
+        assertTrue(text.contains("@dynamicRef #/components/schemas/DynamicProp"))
+        assertTrue(text.contains("@defs {\"PropDef\":{\"type\":\"boolean\"}}"))
+        assertTrue(text.contains("@contains {\"type\":\"string\"}"))
+        assertTrue(text.contains("@prefixItems [{\"type\":\"string\"}]"))
     }
 }

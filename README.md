@@ -46,6 +46,30 @@ back into the exact same spec.
 - **Data Layer:** Generates Kotlin Data Classes with `kotlinx.serialization` and KDoc support.
 - **Network Layer:** Generates strict `Ktor` interfaces, implementations, exception handling, and parameter
   serialization (Path, Query, Querystring, Header, Cookie, Body).
+  - **Query serialization styles:** Supports `form` (explode true/false), `spaceDelimited`, `pipeDelimited`,
+    and `deepObject` for array/object query parameters.
+  - **Query flags:** Honors `allowReserved` and `allowEmptyValue` when generating client query serialization.
+  - **Path/Header/Cookie serialization:** Supports path `matrix`/`label`/`simple` and header/cookie array/object
+    expansion (including `cookie` style).
+  - **Parameter schema/content:** Preserves full Parameter Object `schema`/`content` via `@paramSchema` and
+    `@paramContent` KDoc tags for round-trip parsing.
+  - **Parameter references:** Preserves `$ref` parameters via `@paramRef` KDoc tags for round-trip parsing.
+  - **Parameter examples:** `@paramExample` supports JSON Example Objects (e.g. `summary`, `dataValue`,
+    `serializedValue`, `externalValue`) for richer round-trip fidelity.
+  - **Parameter extensions:** Preserves Parameter Object `x-` extensions via `@paramExtensions` KDoc tags.
+  - **Security metadata:** Preserves operation-level security requirements via KDoc tags for round-trip parsing.
+  - **Operation external docs:** Supports `@see` and `@externalDocs` (with extensions) for operation-level ExternalDocumentation.
+  - **Operation servers:** Preserves per-operation server overrides via `@servers` KDoc tags for round-trip parsing.
+  - **Request bodies:** Preserves requestBody description/required/content via `@requestBody` KDoc tags for round-trip parsing.
+  - **Callbacks:** Preserves operation-level callbacks via `@callbacks` KDoc tags for round-trip parsing.
+  - **Response summaries:** Preserves Response Object `summary` via `@responseSummary` KDoc tags for round-trip parsing.
+  - **Response references:** Preserves `$ref` responses via `@responseRef` KDoc tags for round-trip parsing.
+  - **Response extensions:** Preserves Response Object `x-` extensions via `@responseExtensions` KDoc tags.
+  - **Operation extensions:** Preserves Operation Object `x-` extensions via `@extensions` KDoc tags for round-trip parsing.
+  - **Root metadata:** Preserves OpenAPI root metadata via interface KDoc tags:
+    `@openapi`, `@info`, `@servers`, `@security`, `@securityEmpty`, `@tags`, `@externalDocs`,
+    `@extensions`, `@pathsExtensions`, `@webhooksExtensions`, and `@securitySchemes`.
+- **Server Variables:** Emits typed helpers to resolve templated server URLs using default values.
 - **UI Layer (Jetpack Compose):** unique support for generating UI components based on data models:
     - **Forms:** Auto-generates Composable forms with state management, input validation, and object reconstruction.
     - **Grids:** Generates sortable data grids/tables.
@@ -149,11 +173,52 @@ preserving formats such as `date-time` and array item types.
 
 ### Schema Annotations (OAS 3.2)
 
-The DTO layer round-trips JSON Schema annotation keywords via KDoc tags and Kotlin annotations:
+The DTO layer round-trips JSON Schema annotation and selected structural keywords via KDoc tags and Kotlin annotations:
 
 - `title`, `default`, `const`
+- `enum` (including non-string values via `@enum` KDoc tags)
+- `schemaId`, `schemaDialect`, `anchor`, `dynamicAnchor`, `dynamicRef`, `defs`
 - `deprecated` (also emitted as `@Deprecated`)
 - `readOnly`, `writeOnly`
+- `contentMediaType`, `contentEncoding`
+- `minContains`, `maxContains`, `contains`, `prefixItems`
+- `discriminator`, `discriminatorMapping`, `discriminatorDefault`
+- `xmlName`, `xmlNamespace`, `xmlPrefix`, `xmlNodeType`, `xmlAttribute`, `xmlWrapped`
+- `comment`
+- `patternProperties`, `propertyNames`
+- `dependentRequired`, `dependentSchemas`
+- `unevaluatedProperties`, `unevaluatedItems`
+- `contentSchema`
+- `customKeywords` (arbitrary JSON Schema keywords via `@keywords {...}`)
+
+OpenAPI parsing/writing also supports additional JSON Schema structural keywords in the IR:
+
+- `$comment`
+- `$dynamicRef`
+- `$defs`
+- `if` / `then` / `else`
+- `patternProperties`, `propertyNames`
+- `dependentRequired`, `dependentSchemas`
+- `unevaluatedProperties`, `unevaluatedItems`
+- `contentSchema`
+- `additionalProperties: false`
+- custom JSON Schema keywords (non-`x-`) preserved via `customKeywords`
+
+OpenAPI 3.2 object handling also preserves:
+
+- `style: cookie` for cookie parameters
+- Non-string `enum` values in Schema Objects
+- Response `headers`, `links`, and `content` maps via `@responseHeaders`, `@responseLinks`, and `@responseContent`
+- Reference Objects (`$ref`) for Parameter and Response objects via `@paramRef` and `@responseRef`
+- Reference Objects (`$ref`) for Link and Example objects
+- Reference Objects (`$ref`) for Callback objects
+- Reference Objects (`$ref`) for Security Schemes
+- Reference Objects (`$ref`) for Media Type objects (including summary/description overrides)
+- Explicit empty `security: []` at root/operation to clear inherited security
+- Link `parameters` and `requestBody` with non-string JSON values
+- Schema Object `externalDocs` and `discriminator` on nested properties
+- Schema Object `$ref` siblings (JSON Schema 2020-12 behavior) on nested properties
+- Specification Extensions (`x-...`) across OpenAPI objects
 
 ### UI Generation
 
@@ -214,6 +279,27 @@ val dto = DtoGenerator().generateDto("com.app.model", userSchema)
 val form = UiGenerator().generateForm("com.app.ui", userSchema)
 ```
 
+### Exporting OpenAPI (Kotlin -> OpenAPI)
+
+You can assemble an OpenAPI document from Kotlin source parsing results and serialize it to JSON or YAML:
+
+```kotlin
+val schemas = DtoParser().parse(kotlinDtosSource)
+val endpoints = NetworkParser().parse(ktorClientSource)
+
+val definition = OpenApiAssembler().assemble(
+    info = Info(title = "My API", version = "1.0.0"),
+    schemas = schemas,
+    endpoints = endpoints,
+    servers = listOf(Server(url = "https://api.example.com")),
+    // Optional: lift shared path params/summary/description/servers into Path Items
+    liftCommonPathMetadata = true
+)
+
+val json = OpenApiWriter().writeJson(definition)
+val yaml = OpenApiWriter().writeYaml(definition)
+```
+
 ## Testing & Verification
 
 The project contains a comprehensive test suite in `src/test/kotlin` split into three categories:
@@ -232,6 +318,28 @@ Run tests via Gradle:
 ```bash
 ./gradlew test
 ```
+
+### Compliance Validation (OAS 3.2)
+
+Use the validator to catch common OpenAPI 3.2 structural violations:
+
+```kotlin
+val issues = OpenApiValidator().validate(definition)
+if (issues.isNotEmpty()) {
+    issues.forEach { println("${it.severity}: ${it.path} -> ${it.message}") }
+}
+```
+
+Validator coverage includes:
+
+- Path template + path parameter consistency (including duplicate template names)
+- Path template collision detection across paths with equivalent templated structure
+- OperationId uniqueness across paths and webhooks
+- Response code format validation (`200`, `2XX`, `default`)
+- Server variable enum/default consistency and url-variable usage rules
+- Response presence, required response descriptions, and header `Content-Type` restrictions
+- Parameter/header schema/content rules and style/explode constraints
+- Sequential media type rules for `itemSchema` and positional encoding
 
 ## License
 

@@ -141,7 +141,7 @@ class UiGeneratorTest {
 
     @Test
     fun `generateScreen connects API to Grid with state management`() {
-        val schema = SchemaDefinition("User", "object")
+        val schema = SchemaDefinition(name = "User", type = "object")
 
         val file = generator.generateScreen(
             packageName = "com.app",

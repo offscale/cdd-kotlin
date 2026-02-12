@@ -49,14 +49,16 @@ class Oas32ComplianceTest {
             method = HttpMethod.POST,
             operationId = "subscribeHook",
             callbacks = mapOf(
-                "onDataEvent" to mapOf(
-                    // Runtime Expression -> Path Item
-                    "{\$request.query.callbackUrl}" to PathItem(
-                        post = EndpointDefinition(
-                            path = "/",
-                            method = HttpMethod.POST,
-                            operationId = "sendEvent",
-                            requestBodyType = "EventPayload"
+                "onDataEvent" to Callback.Inline(
+                    expressions = mapOf(
+                        // Runtime Expression -> Path Item
+                        "{\$request.query.callbackUrl}" to PathItem(
+                            post = EndpointDefinition(
+                                path = "/",
+                                method = HttpMethod.POST,
+                                operationId = "sendEvent",
+                                requestBodyType = "EventPayload"
+                            )
                         )
                     )
                 )
@@ -65,10 +67,10 @@ class Oas32ComplianceTest {
 
         // Verify the callback structure
         assertTrue(registerOp.callbacks.containsKey("onDataEvent"))
-        val callbackMap = registerOp.callbacks["onDataEvent"]!!
-        assertTrue(callbackMap.containsKey("{\$request.query.callbackUrl}"))
+        val callback = registerOp.callbacks["onDataEvent"] as? Callback.Inline
+        assertTrue(callback?.expressions?.containsKey("{\$request.query.callbackUrl}") == true)
 
-        val callbackPathItem = callbackMap["{\$request.query.callbackUrl}"]
+        val callbackPathItem = callback?.expressions?.get("{\$request.query.callbackUrl}")
         assertNotNull(callbackPathItem)
         assertEquals("sendEvent", callbackPathItem?.post?.operationId)
     }

@@ -43,6 +43,12 @@ data class OpenApiDefinition(
     val paths: Map<String, PathItem> = emptyMap(),
 
     /**
+     * Specification extensions applied to the Paths Object (keys starting with `x-`).
+     * These are siblings of path entries under the `paths` object.
+     */
+    val pathsExtensions: Map<String, Any?> = emptyMap(),
+
+    /**
      * The incoming webhooks that MAY be received as part of this API and that the API consumer MAY choose to implement.
      * Closely related to the `callbacks` feature, this section describes requests initiated other than by an API call,
      * for example by an out of band registration.
@@ -50,6 +56,12 @@ data class OpenApiDefinition(
      * Webhooks are defined as a map of Name -> [PathItem].
      */
     val webhooks: Map<String, PathItem> = emptyMap(),
+
+    /**
+     * Specification extensions applied to the Webhooks Object (keys starting with `x-`).
+     * These are siblings of webhook entries under the `webhooks` object.
+     */
+    val webhooksExtensions: Map<String, Any?> = emptyMap(),
 
     /**
      * An element to hold various schemas for the OpenAPI Description.
@@ -63,6 +75,12 @@ data class OpenApiDefinition(
      * Individual operations can override this definition.
      */
     val security: List<SecurityRequirement> = emptyList(),
+
+    /**
+     * When true, serialize an explicit empty security array (`security: []`).
+     * This distinguishes between "not specified" and "explicitly no security requirements".
+     */
+    val securityExplicitEmpty: Boolean = false,
 
     /**
      * A list of tags used by the OpenAPI Description with additional metadata.
@@ -80,7 +98,12 @@ data class OpenApiDefinition(
      * This maps to the `$self` field in the OpenAPI Object.
      * This MUST be in the form of a URI reference.
      */
-    val self: String? = null
+    val self: String? = null,
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 )
 
 /**
@@ -122,7 +145,12 @@ data class Components(
     val pathItems: Map<String, PathItem> = emptyMap(),
 
     /** An object to hold reusable [MediaTypeObject] Objects. */
-    val mediaTypes: Map<String, MediaTypeObject> = emptyMap()
+    val mediaTypes: Map<String, MediaTypeObject> = emptyMap(),
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 )
 
 /**
@@ -167,7 +195,12 @@ data class Info(
     /**
      * The license information for the exposed API.
      */
-    val license: License? = null
+    val license: License? = null,
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 )
 
 /**
@@ -189,7 +222,12 @@ data class Contact(
     /**
      * The email address of the contact person/organization. This MUST be in the form of an email address.
      */
-    val email: String? = null
+    val email: String? = null,
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 )
 
 /**
@@ -213,7 +251,12 @@ data class License(
      * A URI for the license used for the API. This MUST be in the form of a URI.
      * The `url` field is mutually exclusive of the `identifier` field.
      */
-    val url: String? = null
+    val url: String? = null,
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 )
 
 /**
@@ -243,7 +286,12 @@ data class Server(
     /**
      * An optional unique string to refer to the host designated by the URL.
      */
-    val name: String? = null
+    val name: String? = null,
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 )
 
 /**
@@ -267,7 +315,12 @@ data class ServerVariable(
      * An optional description for the server variable.
      * CommonMark syntax MAY be used for rich text representation.
      */
-    val description: String? = null
+    val description: String? = null,
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 )
 
 /**
@@ -280,7 +333,7 @@ data class SecurityScheme(
      * **REQUIRED**. The type of the security scheme.
      * Valid values are `"apiKey"`, `"http"`, `"mutualTLS"`, `"oauth2"`, `"openIdConnect"`.
      */
-    val type: String,
+    val type: String = "apiKey",
 
     /**
      * A description for security scheme.
@@ -324,7 +377,24 @@ data class SecurityScheme(
     /**
      * (`oauth2`). URL to the OAuth2 authorization server metadata (RFC8414). TLS is required.
      */
-    val oauth2MetadataUrl: String? = null
+    val oauth2MetadataUrl: String? = null,
+
+    /**
+     * Declares this security scheme to be deprecated. Consumers SHOULD refrain from usage of the declared scheme.
+     * Default value is `false`.
+     */
+    val deprecated: Boolean = false,
+
+    /**
+     * Reference Object allowing `$ref` with optional summary/description overrides.
+     * When present, this is treated as a Reference Object and other fields are ignored for serialization.
+     */
+    val reference: ReferenceObject? = null,
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 )
 
 /**
@@ -342,7 +412,12 @@ data class OAuthFlows(
     /** Configuration for the OAuth Authorization Code flow. */
     val authorizationCode: OAuthFlow? = null,
     /** Configuration for the OAuth Device Authorization flow. */
-    val deviceAuthorization: OAuthFlow? = null
+    val deviceAuthorization: OAuthFlow? = null,
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 )
 
 /**
@@ -376,7 +451,12 @@ data class OAuthFlow(
     /**
      * **REQUIRED** (`deviceAuthorization`). The device authorization URL to be used for this flow.
      */
-    val deviceAuthorizationUrl: String? = null
+    val deviceAuthorizationUrl: String? = null,
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 )
 
 /**
@@ -426,7 +506,12 @@ data class Tag(
      * A machine-readable string to categorize what sort of tag it is.
      * Any string value can be used; common uses are `nav` for Navigation, `badge` for visible badges, `audience` for APIs used by different groups.
      */
-    val kind: String? = null
+    val kind: String? = null,
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 )
 
 /**
@@ -443,5 +528,10 @@ data class ExternalDocumentation(
     /**
      * **REQUIRED**. The URI for the target documentation. This MUST be in the form of a URI.
      */
-    val url: String
+    val url: String,
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 )
