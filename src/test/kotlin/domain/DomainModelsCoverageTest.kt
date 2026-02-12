@@ -47,7 +47,8 @@ class DomainModelsCoverageTest {
             bearerFormat = "JWT",
             flows = flows,
             openIdConnectUrl = "https://id.example.com/.well-known/openid-configuration",
-            oauth2MetadataUrl = "https://auth.example.com/.well-known/oauth-authorization-server"
+            oauth2MetadataUrl = "https://auth.example.com/.well-known/oauth-authorization-server",
+            deprecated = true
         )
 
         val tag = Tag(
@@ -90,12 +91,40 @@ class DomainModelsCoverageTest {
                 "User" to SchemaDefinition(
                     name = "User",
                     type = "object",
+                    schemaId = "https://example.com/schemas/User",
+                    schemaDialect = "https://json-schema.org/draft/2020-12/schema",
+                    anchor = "user",
+                    dynamicAnchor = "userDyn",
+                    dynamicRef = "#/components/schemas/BaseUser",
+                    comment = "User schema comment",
+                    defs = mapOf(
+                        "PositiveInt" to SchemaProperty(types = setOf("integer"), minimum = 1.0)
+                    ),
                     title = "User schema",
                     defaultValue = "{\"id\":1}",
                     constValue = "{\"id\":1}",
                     deprecated = true,
                     readOnly = true,
-                    writeOnly = false
+                    writeOnly = false,
+                    prefixItems = listOf(SchemaProperty("string")),
+                    contains = SchemaProperty("string"),
+                    minContains = 1,
+                    maxContains = 1,
+                    not = SchemaProperty(types = setOf("null"), comment = "no nulls"),
+                    ifSchema = SchemaProperty(
+                        types = setOf("object"),
+                        properties = mapOf("country" to SchemaProperty("string", constValue = "US"))
+                    ),
+                    thenSchema = SchemaProperty(
+                        types = setOf("object"),
+                        required = listOf("state"),
+                        properties = mapOf("state" to SchemaProperty("string"))
+                    ),
+                    elseSchema = SchemaProperty(
+                        types = setOf("object"),
+                        required = listOf("province"),
+                        properties = mapOf("province" to SchemaProperty("string"))
+                    )
                 )
             ),
             responses = mapOf(
@@ -136,7 +165,11 @@ class DomainModelsCoverageTest {
             ),
             examples = mapOf("ExampleUser" to example),
             links = mapOf("UserLink" to Link(operationId = "getUser")),
-            callbacks = mapOf("OnEvent" to mapOf("{\$request.body#/url}" to PathItem())),
+            callbacks = mapOf(
+                "OnEvent" to Callback.Inline(
+                    expressions = mapOf("{\$request.body#/url}" to PathItem())
+                )
+            ),
             pathItems = mapOf("Users" to PathItem(summary = "Users path")),
             mediaTypes = mapOf("application/json" to mediaType)
         )
@@ -156,12 +189,22 @@ class DomainModelsCoverageTest {
         assertEquals("https://api.example.com/{version}", root.servers.first().url)
         assertEquals("primary", root.servers.first().name)
         assertEquals("https://auth.example.com/.well-known/oauth-authorization-server", scheme.oauth2MetadataUrl)
+        assertEquals(true, scheme.deprecated)
         assertEquals("https://auth.example.com/device", flow.deviceAuthorizationUrl)
         assertEquals("User schema", components.schemas["User"]?.title)
+        assertEquals("https://example.com/schemas/User", components.schemas["User"]?.schemaId)
+        assertEquals("https://json-schema.org/draft/2020-12/schema", components.schemas["User"]?.schemaDialect)
+        assertEquals("user", components.schemas["User"]?.anchor)
+        assertEquals("userDyn", components.schemas["User"]?.dynamicAnchor)
+        assertEquals("#/components/schemas/BaseUser", components.schemas["User"]?.dynamicRef)
+        assertEquals("User schema comment", components.schemas["User"]?.comment)
+        assertEquals("integer", components.schemas["User"]?.defs?.get("PositiveInt")?.type)
         assertEquals("{\"id\":1}", components.schemas["User"]?.defaultValue)
         assertEquals("{\"id\":1}", components.schemas["User"]?.constValue)
         assertEquals(true, components.schemas["User"]?.deprecated)
         assertEquals(true, components.parameters["limit"]?.deprecated)
+        assertEquals("state", components.schemas["User"]?.thenSchema?.required?.first())
+        assertEquals("province", components.schemas["User"]?.elseSchema?.required?.first())
     }
 
     @Test
@@ -189,6 +232,7 @@ class DomainModelsCoverageTest {
         assertTrue(ParameterLocation.values().contains(ParameterLocation.COOKIE))
         assertTrue(ParameterLocation.values().contains(ParameterLocation.QUERYSTRING))
         assertTrue(ParameterStyle.values().contains(ParameterStyle.DEEP_OBJECT))
+        assertTrue(ParameterStyle.values().contains(ParameterStyle.COOKIE))
     }
 
     @Test

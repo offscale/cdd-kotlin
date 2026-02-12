@@ -96,10 +96,10 @@ class RoundTripTest {
         val originalSchema = SchemaDefinition(
             name = "MockSample",
             type = "object",
-            example = "{\"id\": 1}",
-            examples = mapOf("valid" to "{\"id\": 1}", "invalid" to "{}"),
+            example = mapOf("id" to 1),
+            examples = mapOf("valid" to mapOf("id" to 1), "invalid" to emptyMap<String, Any>()),
             properties = mapOf(
-                "id" to SchemaProperty("integer", example = "1")
+                "id" to SchemaProperty("integer", example = 1)
             )
         )
         val kotlinFile = dtoGenerator.generateDto("com.test", originalSchema)
@@ -186,5 +186,112 @@ class RoundTripTest {
         assertEquals("Success", extractedEndpoint.responses["200"]?.description)
 
         assertEquals(originalEndpoint.tags, extractedEndpoint.tags)
+    }
+
+    @Test
+    fun `Network Endpoint Round Trip preserves security requirements`() {
+        val secured = EndpointDefinition(
+            path = "/secure",
+            method = HttpMethod.GET,
+            operationId = "secureCall",
+            responses = mapOf(
+                "200" to EndpointResponse(statusCode = "200", description = "ok", type = "String")
+            ),
+            security = listOf(
+                mapOf("api_key" to emptyList()),
+                mapOf("oauth2" to listOf("read", "write"))
+            )
+        )
+
+        val open = EndpointDefinition(
+            path = "/public",
+            method = HttpMethod.GET,
+            operationId = "publicCall",
+            responses = mapOf(
+                "200" to EndpointResponse(statusCode = "200", description = "ok", type = "String")
+            ),
+            securityExplicitEmpty = true
+        )
+
+        val kotlinFile = networkGenerator.generateApi(
+            packageName = "com.test",
+            apiName = "SecureApi",
+            endpoints = listOf(secured, open)
+        )
+
+        val extracted = networkParser.parse(kotlinFile.text)
+        val securedParsed = extracted.first { it.operationId == "secureCall" }
+        val openParsed = extracted.first { it.operationId == "publicCall" }
+
+        assertEquals(secured.security, securedParsed.security)
+        assertEquals(false, securedParsed.securityExplicitEmpty)
+        assertEquals(true, openParsed.securityExplicitEmpty)
+        assertTrue(openParsed.security.isEmpty())
+    }
+
+    @Test
+    fun `Network Endpoint Round Trip preserves operation servers`() {
+        val originalEndpoint = EndpointDefinition(
+            path = "/servers",
+            method = HttpMethod.GET,
+            operationId = "serverOverride",
+            servers = listOf(Server(url = "https://override.example.com", description = "Override")),
+            responses = mapOf(
+                "200" to EndpointResponse(statusCode = "200", description = "ok", type = "Unit")
+            )
+        )
+
+        val kotlinFile = networkGenerator.generateApi(
+            packageName = "com.test",
+            apiName = "ServerApi",
+            endpoints = listOf(originalEndpoint)
+        )
+        val extractedEndpoint = networkParser.parse(kotlinFile.text).first()
+
+        assertEquals(1, extractedEndpoint.servers.size)
+        assertEquals("https://override.example.com", extractedEndpoint.servers.first().url)
+    }
+
+    @Test
+    fun `Network Endpoint Round Trip preserves response headers links and content`() {
+        val response = EndpointResponse(
+            statusCode = "200",
+            description = "ok",
+            type = "String",
+            headers = mapOf(
+                "X-Trace" to Header(
+                    type = "String",
+                    schema = SchemaProperty(types = setOf("string")),
+                    description = "Trace id"
+                )
+            ),
+            links = mapOf(
+                "next" to Link(operationId = "listUsers")
+            ),
+            content = mapOf(
+                "application/json" to MediaTypeObject(
+                    schema = SchemaProperty(types = setOf("string"))
+                )
+            )
+        )
+
+        val originalEndpoint = EndpointDefinition(
+            path = "/users",
+            method = HttpMethod.GET,
+            operationId = "listUsers",
+            responses = mapOf("200" to response)
+        )
+
+        val kotlinFile = networkGenerator.generateApi(
+            packageName = "com.test",
+            apiName = "ResponseMetaApi",
+            endpoints = listOf(originalEndpoint)
+        )
+        val extractedEndpoint = networkParser.parse(kotlinFile.text).first()
+        val extractedResponse = extractedEndpoint.responses["200"]!!
+
+        assertEquals(response.headers.keys, extractedResponse.headers.keys)
+        assertEquals(response.links?.keys, extractedResponse.links?.keys)
+        assertTrue(extractedResponse.content.containsKey("application/json"))
     }
 }

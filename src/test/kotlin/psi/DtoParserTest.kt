@@ -112,6 +112,56 @@ class DtoParserTest {
     }
 
     @Test
+    fun `parse extracts custom keywords from KDoc`() {
+        val code = """
+            /**
+             * @keywords {"vendorKeyword":"alpha"}
+             */
+            data class Item(
+                /**
+                 * @keywords {"custom":[1,2]}
+                 */
+                val name: String
+            )
+        """.trimIndent()
+
+        val schema = parser.parse(code).first()
+        assertEquals("alpha", schema.customKeywords["vendorKeyword"])
+        val nameProp = schema.properties["name"]
+        assertEquals(listOf(1, 2), nameProp?.customKeywords?.get("custom"))
+    }
+
+    @Test
+    fun `parse preserves custom keywords inside schema tags`() {
+        val code = """
+            /**
+             * @contains {"type":"string","extra":42}
+             */
+            data class Sample(
+                val items: List<String>
+            )
+        """.trimIndent()
+
+        val schema = parser.parse(code).first()
+        assertEquals(42, (schema.contains?.customKeywords?.get("extra") as? Number)?.toInt())
+    }
+
+    @Test
+    fun `parse extracts enum values from KDoc tags`() {
+        val code = """
+            /**
+             * @enum 1
+             * @enum 2
+             * @enum {"k":"v"}
+             */
+            typealias Level = Int
+        """.trimIndent()
+
+        val schema = parser.parse(code).first()
+        assertEquals(listOf(1, 2, mapOf("k" to "v")), schema.enumValues)
+    }
+
+    @Test
     fun `parse handles complex types and lists`() {
         val code = """ 
             data class Group( 
@@ -258,6 +308,10 @@ class DtoParserTest {
             data class Example(
                 /**
                  * @example propExample
+                 * @see https://example.com/props Property docs
+                 * @discriminator kind
+                 * @discriminatorMapping {"user":"#/components/schemas/User"}
+                 * @discriminatorDefault #/components/schemas/User
                  */
                 val id: String
             )
@@ -267,10 +321,38 @@ class DtoParserTest {
 
         assertEquals("Example entity.", schema.description)
         assertEquals("simpleExample", schema.example)
-        assertEquals("{\"id\": 1}", schema.examples?.get("keyed"))
+        val keyedExample = schema.examples?.get("keyed") as? Map<*, *>
+        assertEquals(1, keyedExample?.get("id"))
         assertEquals("https://example.com/docs", schema.externalDocs?.url)
         assertEquals("Entity docs", schema.externalDocs?.description)
         assertEquals("propExample", schema.properties["id"]?.example)
+        assertEquals("https://example.com/props", schema.properties["id"]?.externalDocs?.url)
+        assertEquals("Property docs", schema.properties["id"]?.externalDocs?.description)
+        assertEquals("kind", schema.properties["id"]?.discriminator?.propertyName)
+        assertEquals(
+            "#/components/schemas/User",
+            schema.properties["id"]?.discriminator?.mapping?.get("user")
+        )
+        assertEquals(
+            "#/components/schemas/User",
+            schema.properties["id"]?.discriminator?.defaultMapping
+        )
+    }
+
+    @Test
+    fun `parse extracts schema-level examples list`() {
+        val code = """
+            /**
+             * @examples ["alpha", "beta"]
+             */
+            data class ExampleList(
+                val name: String
+            )
+        """.trimIndent()
+
+        val schema = parser.parse(code).first()
+
+        assertEquals(listOf("alpha", "beta"), schema.examplesList)
     }
 
     @Test
@@ -311,6 +393,10 @@ class DtoParserTest {
              * @title Annotated schema
              * @default {"id":1}
              * @const {"id":1}
+             * @schemaId https://example.com/schemas/Annotated
+             * @schemaDialect https://json-schema.org/draft/2020-12/schema
+             * @anchor annotated
+             * @dynamicAnchor annotatedDyn
              * @deprecated
              * @readOnly
              * @writeOnly
@@ -321,6 +407,10 @@ class DtoParserTest {
                  * @title Identifier
                  * @default 1
                  * @const 1
+                 * @schemaId https://example.com/schemas/Identifier
+                 * @schemaDialect https://json-schema.org/draft/2020-12/schema
+                 * @anchor id
+                 * @dynamicAnchor idDyn
                  * @deprecated
                  * @readOnly
                  * @writeOnly
@@ -333,18 +423,299 @@ class DtoParserTest {
         val schema = parser.parse(code).first()
 
         assertEquals("Annotated schema", schema.title)
-        assertEquals("{\"id\":1}", schema.defaultValue)
-        assertEquals("{\"id\":1}", schema.constValue)
+        val defaultValue = schema.defaultValue as? Map<*, *>
+        val constValue = schema.constValue as? Map<*, *>
+        assertEquals(1, defaultValue?.get("id"))
+        assertEquals(1, constValue?.get("id"))
+        assertEquals("https://example.com/schemas/Annotated", schema.schemaId)
+        assertEquals("https://json-schema.org/draft/2020-12/schema", schema.schemaDialect)
+        assertEquals("annotated", schema.anchor)
+        assertEquals("annotatedDyn", schema.dynamicAnchor)
         assertTrue(schema.deprecated)
         assertTrue(schema.readOnly)
         assertTrue(schema.writeOnly)
 
         val idProp = schema.properties["id"]
         assertEquals("Identifier", idProp?.title)
-        assertEquals("1", idProp?.defaultValue)
-        assertEquals("1", idProp?.constValue)
+        assertEquals(1, idProp?.defaultValue)
+        assertEquals(1, idProp?.constValue)
+        assertEquals("https://example.com/schemas/Identifier", idProp?.schemaId)
+        assertEquals("https://json-schema.org/draft/2020-12/schema", idProp?.schemaDialect)
+        assertEquals("id", idProp?.anchor)
+        assertEquals("idDyn", idProp?.dynamicAnchor)
         assertTrue(idProp?.deprecated == true)
         assertTrue(idProp?.readOnly == true)
         assertTrue(idProp?.writeOnly == true)
+    }
+
+    @Test
+    fun `parse extracts schema constraint tags`() {
+        val code = """
+            /**
+             * @minLength 2
+             * @maxLength 10
+             * @pattern ^[a-z]+$
+             * @minimum 1
+             * @maximum 9
+             * @minItems 1
+             * @maxItems 5
+             * @uniqueItems
+             * @minProperties 1
+             * @maxProperties 4
+             */
+            data class Constrained(
+                /**
+                 * @minLength 1
+                 * @maxLength 20
+                 * @pattern ^[A-Z]+$
+                 * @minimum 0
+                 * @maximum 100
+                 * @minItems 2
+                 * @maxItems 6
+                 * @uniqueItems false
+                 * @minProperties 0
+                 * @maxProperties 8
+                 */
+                val tags: List<String>
+            )
+        """.trimIndent()
+
+        val schema = parser.parse(code).first()
+
+        assertEquals(2, schema.minLength)
+        assertEquals(10, schema.maxLength)
+        assertEquals("^[a-z]+$", schema.pattern)
+        assertEquals(1.0, schema.minimum)
+        assertEquals(9.0, schema.maximum)
+        assertEquals(1, schema.minItems)
+        assertEquals(5, schema.maxItems)
+        assertEquals(true, schema.uniqueItems)
+        assertEquals(1, schema.minProperties)
+        assertEquals(4, schema.maxProperties)
+
+        val tagsProp = schema.properties["tags"]
+        assertEquals(1, tagsProp?.minLength)
+        assertEquals(20, tagsProp?.maxLength)
+        assertEquals("^[A-Z]+$", tagsProp?.pattern)
+        assertEquals(0.0, tagsProp?.minimum)
+        assertEquals(100.0, tagsProp?.maximum)
+        assertEquals(2, tagsProp?.minItems)
+        assertEquals(6, tagsProp?.maxItems)
+        assertEquals(false, tagsProp?.uniqueItems)
+        assertEquals(0, tagsProp?.minProperties)
+        assertEquals(8, tagsProp?.maxProperties)
+    }
+
+    @Test
+    fun `parse extracts content metadata tags`() {
+        val code = """
+            /**
+             * @contentMediaType application/pdf
+             * @contentEncoding base64
+             */
+            typealias PdfBlob = String
+
+            data class Payload(
+                /**
+                 * @contentMediaType image/png
+                 * @contentEncoding base64url
+                 */
+                val data: ByteArray
+            )
+        """.trimIndent()
+
+        val schemas = parser.parse(code)
+        val pdf = schemas.first { it.name == "PdfBlob" }
+        val payload = schemas.first { it.name == "Payload" }
+
+        assertEquals("application/pdf", pdf.contentMediaType)
+        assertEquals("base64", pdf.contentEncoding)
+
+        val dataProp = payload.properties["data"]
+        assertEquals("image/png", dataProp?.contentMediaType)
+        assertEquals("base64url", dataProp?.contentEncoding)
+    }
+
+    @Test
+    fun `parse extracts property examples list`() {
+        val code = """
+            data class ExampleHost(
+                /**
+                 * @example example1: 1
+                 * @example example2: 2
+                 */
+                val count: Int
+            )
+        """.trimIndent()
+
+        val schema = parser.parse(code).first()
+        val countProp = schema.properties["count"]
+
+        assertEquals(listOf(1, 2), countProp?.examples)
+        assertEquals(null, countProp?.example)
+    }
+
+    @Test
+    fun `parse extracts discriminator and xml metadata from KDoc`() {
+        val code = """
+            /**
+             * @discriminator petType
+             * @discriminatorMapping {"dog":"#/components/schemas/Dog"}
+             * @discriminatorDefault OtherPet
+             * @xmlName pet
+             * @xmlNamespace https://example.com/schema
+             * @xmlPrefix ex
+             * @xmlNodeType element
+             */
+            data class Pet(
+                /**
+                 * @xmlAttribute
+                 * @xmlName pid
+                 */
+                val id: String,
+                /**
+                 * @xmlWrapped
+                 * @xmlName tags
+                 */
+                val tags: List<String>
+            )
+        """.trimIndent()
+
+        val schema = parser.parse(code).first()
+
+        val discriminator = schema.discriminator
+        assertEquals("petType", discriminator?.propertyName)
+        assertEquals("#/components/schemas/Dog", discriminator?.mapping?.get("dog"))
+        assertEquals("OtherPet", discriminator?.defaultMapping)
+
+        val xml = schema.xml
+        assertEquals("pet", xml?.name)
+        assertEquals("https://example.com/schema", xml?.namespace)
+        assertEquals("ex", xml?.prefix)
+        assertEquals("element", xml?.nodeType)
+
+        val idProp = schema.properties["id"]
+        assertEquals(true, idProp?.xml?.attribute)
+        assertEquals("pid", idProp?.xml?.name)
+
+        val tagsProp = schema.properties["tags"]
+        assertEquals(true, tagsProp?.xml?.wrapped)
+        assertEquals("tags", tagsProp?.xml?.name)
+    }
+
+    @Test
+    fun `parse extracts advanced schema tags`() {
+        val code = """
+            /**
+             * @comment root comment
+             * @patternProperties {"^x-":{"type":"string"}}
+             * @propertyNames {"type":"string","pattern":"^[a-z]+$"}
+             * @dependentRequired {"credit_card":["billing_address"]}
+             * @dependentSchemas {"shipping_address":{"type":"object","required":["country"],"properties":{"country":{"type":"string"}}}}
+             * @unevaluatedProperties false
+             * @unevaluatedItems {"type":"string"}
+             * @contentSchema {"type":"object","properties":{"id":{"type":"integer"}}}
+             */
+            data class Advanced(
+                /**
+                 * @comment payload comment
+                 * @patternProperties {"^data-":{"type":"string"}}
+                 * @propertyNames {"type":"string","pattern":"^[a-z]+$"}
+                 * @dependentRequired {"a":["b"]}
+                 * @dependentSchemas {"meta":{"type":"object","required":["id"],"properties":{"id":{"type":"integer"}}}}
+                 * @unevaluatedProperties false
+                 * @unevaluatedItems {"type":"string"}
+                 * @contentSchema {"type":"object","properties":{"id":{"type":"integer"}}}
+                 */
+                val payload: Map<String, String>
+            )
+        """.trimIndent()
+
+        val schema = parser.parse(code).first()
+
+        assertEquals("root comment", schema.comment)
+        assertEquals("string", schema.patternProperties["^x-"]?.type)
+        assertEquals("^[a-z]+$", schema.propertyNames?.pattern)
+        assertEquals(listOf("billing_address"), schema.dependentRequired["credit_card"])
+        assertEquals("string", schema.dependentSchemas["shipping_address"]?.properties?.get("country")?.type)
+        assertEquals(false, schema.unevaluatedProperties?.booleanSchema)
+        assertEquals("string", schema.unevaluatedItems?.type)
+        assertEquals("integer", schema.contentSchema?.properties?.get("id")?.type)
+
+        val payload = schema.properties["payload"]
+        assertEquals("payload comment", payload?.comment)
+        assertEquals("string", payload?.patternProperties?.get("^data-")?.type)
+        assertEquals(listOf("b"), payload?.dependentRequired?.get("a"))
+        assertEquals("integer", payload?.dependentSchemas?.get("meta")?.properties?.get("id")?.type)
+        assertEquals(false, payload?.unevaluatedProperties?.booleanSchema)
+        assertEquals("string", payload?.unevaluatedItems?.type)
+    }
+
+    @Test
+    fun `parse extracts minContains and maxContains tags`() {
+        val code = """
+            /**
+             * @minContains 1
+             * @maxContains 3
+             */
+            typealias Bag = List<String>
+
+            data class Container(
+                /**
+                 * @minContains 2
+                 * @maxContains 4
+                 */
+                val items: List<String>
+            )
+        """.trimIndent()
+
+        val results = parser.parse(code)
+        val bag = results.first { it.name == "Bag" }
+        val container = results.first { it.name == "Container" }
+
+        assertEquals(1, bag.minContains)
+        assertEquals(3, bag.maxContains)
+
+        val itemsProp = container.properties["items"]
+        assertEquals(2, itemsProp?.minContains)
+        assertEquals(4, itemsProp?.maxContains)
+    }
+
+    @Test
+    fun `parse extracts contains, prefixItems, defs, and dynamicRef tags`() {
+        val code = """
+            /**
+             * @dynamicRef #/components/schemas/DynamicRoot
+             * @defs {"RootDef":{"type":"string"}}
+             * @contains {"type":"integer"}
+             * @prefixItems [{"type":"string"},{"type":"integer"}]
+             */
+            data class Composite(
+                /**
+                 * @dynamicRef #/components/schemas/DynamicProp
+                 * @defs {"PropDef":{"type":"boolean"}}
+                 * @contains {"type":"string"}
+                 * @prefixItems [{"type":"string"}]
+                 */
+                val items: List<String>
+            )
+        """.trimIndent()
+
+        val schema = parser.parse(code).first()
+
+        assertEquals("#/components/schemas/DynamicRoot", schema.dynamicRef)
+        assertEquals("string", schema.defs["RootDef"]?.type)
+        assertEquals("integer", schema.contains?.type)
+        assertEquals(2, schema.prefixItems.size)
+        assertEquals("string", schema.prefixItems[0].type)
+        assertEquals("integer", schema.prefixItems[1].type)
+
+        val prop = schema.properties["items"]
+        assertNotNull(prop)
+        assertEquals("#/components/schemas/DynamicProp", prop?.dynamicRef)
+        assertEquals("boolean", prop?.defs?.get("PropDef")?.type)
+        assertEquals("string", prop?.contains?.type)
+        assertEquals(1, prop?.prefixItems?.size)
+        assertEquals("string", prop?.prefixItems?.first()?.type)
     }
 }

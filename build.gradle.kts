@@ -18,6 +18,10 @@ dependencies {
     // We will use this in Feature D-01/D-02 to parse code
     implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable:2.2.21")
 
+    // OpenAPI JSON/YAML parsing (tree model)
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.17.2")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.17.2")
+
     // Testing
     testImplementation(platform("org.junit:junit-bom:5.10.0"))
     testImplementation("org.junit.jupiter:junit-jupiter")

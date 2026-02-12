@@ -45,7 +45,9 @@ enum class ParameterStyle {
     /** Query: id=v1|v2 */
     PIPE_DELIMITED,
     /** Query: nested */
-    DEEP_OBJECT
+    DEEP_OBJECT,
+    /** Cookie: name=value; name2=value2 */
+    COOKIE
 }
 
 /**
@@ -136,7 +138,18 @@ data class EndpointParameter(
      * Examples of the parameter's potential value.
      * Equivalent to the Parameter Object's `examples` field.
      */
-    val examples: Map<String, ExampleObject> = emptyMap()
+    val examples: Map<String, ExampleObject> = emptyMap(),
+
+    /**
+     * Reference Object allowing `$ref` with optional summary/description overrides.
+     * When present, this is treated as a Reference Object and other fields are ignored for serialization.
+     */
+    val reference: ReferenceObject? = null,
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 )
 
 /**
@@ -204,7 +217,18 @@ data class Header(
      * is a comma-separated list of the array items or key-value pairs of the map.
      * The default value is `false`.
      */
-    val explode: Boolean? = false
+    val explode: Boolean? = false,
+
+    /**
+     * Reference Object allowing `$ref` with optional summary/description overrides.
+     * When present, this is treated as a Reference Object and other fields are ignored for serialization.
+     */
+    val reference: ReferenceObject? = null,
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 )
 
 /**
@@ -250,7 +274,18 @@ data class EndpointResponse(
      * A map of operations links that can be followed from the response.
      * The key of the map is a short name for the link.
      */
-    val links: Map<String, Link>? = null
+    val links: Map<String, Link>? = null,
+
+    /**
+     * Reference Object allowing `$ref` with optional summary/description overrides.
+     * When present, this is treated as a Reference Object and other fields are ignored for serialization.
+     */
+    val reference: ReferenceObject? = null,
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 )
 
 /**
@@ -261,6 +296,17 @@ data class EndpointResponse(
  * See [Link Object](https://spec.openapis.org/oas/v3.2.0#link-object)
  */
 data class Link(
+    /**
+     * Reference to a Link Object.
+     * When present, this is treated as a Reference Object and other fields are ignored.
+     */
+    val ref: String? = null,
+
+    /**
+     * Reference Object allowing `$ref` with optional summary/description overrides.
+     * When present, this is treated as a Reference Object and other fields are ignored for serialization.
+     */
+    val reference: ReferenceObject? = null,
     /**
      * The name of an *existing*, resolvable OAS operation, as defined with a unique `operationId`.
      * Mutually exclusive with `operationRef`.
@@ -276,12 +322,12 @@ data class Link(
      * A map representing parameters to pass to an operation as specified with `operationId` or identified via `operationRef`.
      * The key is the parameter name to be used, whereas the value can be a constant or an expression to be evaluated.
      */
-    val parameters: Map<String, String> = emptyMap(),
+    val parameters: Map<String, Any?> = emptyMap(),
 
     /**
      * A literal value or {expression} to use as a request body when calling the target operation.
      */
-    val requestBody: String? = null,
+    val requestBody: Any? = null,
 
     /**
      * A description of the link. CommonMark syntax MAY be used for rich text representation.
@@ -291,7 +337,12 @@ data class Link(
     /**
      * A server object to be used by the target operation.
      */
-    val server: Server? = null
+    val server: Server? = null,
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 )
 
 /**
@@ -369,10 +420,11 @@ data class EndpointDefinition(
     /**
      * A map of possible out-of band callbacks related to the parent operation.
      * The key is a unique identifier for the Callback Object.
-     * Each value in the map is a map of Runtime Expressions to Path Items.
+     * Each value is either an inline map of Runtime Expressions to Path Items
+     * or a Reference Object to a reusable callback definition.
      *
      * Example:
-     * `{"onDataProcessed": {"{$request.query.callbackUrl}": PathItem(...)}}`
+     * `{"onDataProcessed": Callback.Inline(expressions = {"{$request.query.callbackUrl}": PathItem(...)})}`
      *
      * See [Callback Object](https://spec.openapis.org/oas/v3.2.0#callback-object)
      */
@@ -390,10 +442,21 @@ data class EndpointDefinition(
     val security: List<SecurityRequirement> = emptyList(),
 
     /**
+     * When true, serialize an explicit empty security array (`security: []`) for this operation.
+     * This clears inherited security requirements from the OpenAPI root.
+     */
+    val securityExplicitEmpty: Boolean = false,
+
+    /**
      * An alternative `servers` array to service this operation.
      * If specified, it overrides any servers defined at the Path Item or OpenAPI root.
      */
-    val servers: List<Server> = emptyList()
+    val servers: List<Server> = emptyList(),
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 ) {
     /**
      * Returns the raw HTTP method token for this operation.
@@ -475,5 +538,10 @@ data class PathItem(
     /**
      * An alternative server array to service all operations in this path.
      */
-    val servers: List<Server> = emptyList()
+    val servers: List<Server> = emptyList(),
+
+    /**
+     * Specification extensions (keys starting with `x-`).
+     */
+    val extensions: Map<String, Any?> = emptyMap()
 )
