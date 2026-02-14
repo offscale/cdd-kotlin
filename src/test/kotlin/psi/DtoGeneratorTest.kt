@@ -122,6 +122,25 @@ class DtoGeneratorTest {
     }
 
     @Test
+    fun `generateDto resolves dynamicRef to dynamicAnchor types`() {
+        val schema = SchemaDefinition(
+            name = "Box",
+            type = "object",
+            defs = mapOf(
+                "Payload" to SchemaProperty(type = "string", dynamicAnchor = "payload")
+            ),
+            properties = mapOf(
+                "value" to SchemaProperty(dynamicRef = "#payload")
+            ),
+            required = listOf("value")
+        )
+
+        val text = generator.generateDto("com.dynamic", schema).text
+
+        assertTrue(text.contains("val value: String"))
+    }
+
+    @Test
     fun `generateDto creates typealias for primitive schema`() {
         val schema = SchemaDefinition(
             name = "UserId",
@@ -162,6 +181,44 @@ class DtoGeneratorTest {
         val text = generator.generateDto("com.alias", schema).text
 
         assertTrue(text.contains("typealias MaybeIds = List<Long>?"))
+    }
+
+    @Test
+    fun `generateDto emits composition and conditional schema tags`() {
+        val schema = SchemaDefinition(
+            name = "Composed",
+            type = "object",
+            oneOf = listOf("Cat"),
+            oneOfSchemas = listOf(SchemaProperty("string")),
+            anyOf = listOf("#/components/schemas/Dog"),
+            allOf = listOf("Base"),
+            not = SchemaProperty("null"),
+            ifSchema = SchemaProperty("string"),
+            thenSchema = SchemaProperty("string", minLength = 2),
+            elseSchema = SchemaProperty("string", maxLength = 1),
+            additionalProperties = SchemaProperty(booleanSchema = false),
+            properties = mapOf(
+                "value" to SchemaProperty("string").copy(
+                    oneOf = listOf(
+                        SchemaProperty("string"),
+                        SchemaProperty(ref = "#/components/schemas/Name")
+                    ),
+                    not = SchemaProperty("null"),
+                    additionalProperties = SchemaProperty("string")
+                )
+            )
+        )
+
+        val text = generator.generateDto("com.example", schema).text
+
+        assertTrue(text.contains("@oneOf"))
+        assertTrue(text.contains("@anyOf"))
+        assertTrue(text.contains("@allOf"))
+        assertTrue(text.contains("@not"))
+        assertTrue(text.contains("@if"))
+        assertTrue(text.contains("@then"))
+        assertTrue(text.contains("@else"))
+        assertTrue(text.contains("@additionalProperties false"))
     }
 
     @Test

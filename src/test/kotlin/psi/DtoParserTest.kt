@@ -297,6 +297,35 @@ class DtoParserTest {
     }
 
     @Test
+    fun `parse infers oneOf and discriminator mapping from sealed subtypes`() {
+        val code = """
+            import kotlinx.serialization.SerialName
+            import kotlinx.serialization.JsonClassDiscriminator
+            import kotlinx.serialization.Serializable
+
+            @Serializable
+            @JsonClassDiscriminator("kind")
+            sealed interface Shape
+
+            @Serializable
+            @SerialName("circle")
+            data class Circle(val radius: Double) : Shape
+
+            @Serializable
+            data class Square(val size: Double) : Shape
+        """.trimIndent()
+
+        val schemas = parser.parse(code)
+        val shape = schemas.first { it.name == "Shape" }
+
+        assertTrue(shape.oneOf.contains("#/components/schemas/Circle"))
+        assertTrue(shape.oneOf.contains("#/components/schemas/Square"))
+        assertEquals("kind", shape.discriminator?.propertyName)
+        assertEquals("#/components/schemas/Circle", shape.discriminator?.mapping?.get("circle"))
+        assertFalse(shape.discriminator?.mapping?.containsKey("Square") ?: false)
+    }
+
+    @Test
     fun `parse extracts KDoc examples and external docs`() {
         val code = """ 
             /**
@@ -368,6 +397,22 @@ class DtoParserTest {
         assertEquals("NoDisc", schema.name)
         assertEquals(null, schema.discriminator)
         assertTrue(schema.properties.containsKey("name"))
+    }
+
+    @Test
+    fun `parse sealed interface respects SerialName on properties`() {
+        val code = """
+            import kotlinx.serialization.SerialName
+
+            sealed interface Labeled {
+                @SerialName("display_name")
+                val name: String
+            }
+        """.trimIndent()
+
+        val schema = parser.parse(code).first()
+        assertTrue(schema.properties.containsKey("display_name"))
+        assertFalse(schema.properties.containsKey("name"))
     }
 
     @Test
@@ -717,5 +762,47 @@ class DtoParserTest {
         assertEquals("string", prop?.contains?.type)
         assertEquals(1, prop?.prefixItems?.size)
         assertEquals("string", prop?.prefixItems?.first()?.type)
+    }
+
+    @Test
+    fun `parse extracts composition and conditional schema tags`() {
+        val code = """
+            /**
+             * @oneOf [{"${'$'}ref":"#/components/schemas/Cat"},{"type":"string"}]
+             * @anyOf [{"type":"integer"}]
+             * @allOf [{"${'$'}ref":"#/components/schemas/Base"}]
+             * @not {"type":"null"}
+             * @if {"type":"string"}
+             * @then {"minLength":2}
+             * @else {"maxLength":1}
+             * @additionalProperties false
+             */
+            data class Sample(
+                /**
+                 * @oneOf [{"type":"string"},{"${'$'}ref":"#/components/schemas/Name"}]
+                 * @not {"type":"null"}
+                 * @additionalProperties {"type":"string"}
+                 */
+                val value: String?
+            )
+        """.trimIndent()
+
+        val schema = parser.parse(code).first()
+        assertEquals(listOf("#/components/schemas/Cat"), schema.oneOf)
+        assertEquals("string", schema.oneOfSchemas.firstOrNull()?.type)
+        assertEquals("integer", schema.anyOfSchemas.firstOrNull()?.type)
+        assertEquals(listOf("#/components/schemas/Base"), schema.allOf)
+        assertEquals(false, schema.additionalProperties?.booleanSchema)
+        assertEquals("null", schema.not?.type)
+        assertEquals("string", schema.ifSchema?.type)
+        assertEquals(2, schema.thenSchema?.minLength)
+        assertEquals(1, schema.elseSchema?.maxLength)
+
+        val valueProp = schema.properties["value"]
+        assertNotNull(valueProp)
+        assertEquals(2, valueProp?.oneOf?.size)
+        assertTrue(valueProp?.oneOf?.any { it.ref == "#/components/schemas/Name" } == true)
+        assertEquals("null", valueProp?.not?.type)
+        assertEquals("string", valueProp?.additionalProperties?.type)
     }
 }

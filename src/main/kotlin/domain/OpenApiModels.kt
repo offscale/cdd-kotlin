@@ -49,6 +49,12 @@ data class OpenApiDefinition(
     val pathsExtensions: Map<String, Any?> = emptyMap(),
 
     /**
+     * When true, serialize an explicit empty Paths Object (`paths: {}`).
+     * This preserves ACL-style "no paths available" semantics distinct from omission.
+     */
+    val pathsExplicitEmpty: Boolean = false,
+
+    /**
      * The incoming webhooks that MAY be received as part of this API and that the API consumer MAY choose to implement.
      * Closely related to the `callbacks` feature, this section describes requests initiated other than by an API call,
      * for example by an out of band registration.
@@ -62,6 +68,12 @@ data class OpenApiDefinition(
      * These are siblings of webhook entries under the `webhooks` object.
      */
     val webhooksExtensions: Map<String, Any?> = emptyMap(),
+
+    /**
+     * When true, serialize an explicit empty Webhooks Object (`webhooks: {}`).
+     * This preserves ACL-style "no webhooks available" semantics distinct from omission.
+     */
+    val webhooksExplicitEmpty: Boolean = false,
 
     /**
      * An element to hold various schemas for the OpenAPI Description.

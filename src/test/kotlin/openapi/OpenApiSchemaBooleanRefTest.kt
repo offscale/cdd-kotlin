@@ -102,4 +102,26 @@ class OpenApiSchemaBooleanRefTest {
         assertEquals(1.0, schemas["Numeric"]["exclusiveMinimum"].asDouble())
         assertEquals(9.0, schemas["Numeric"]["exclusiveMaximum"].asDouble())
     }
+
+    @Test
+    fun `boolean schema definitions can omit explicit type`() {
+        val components = Components(
+            schemas = mapOf(
+                "AnyValue" to SchemaDefinition(
+                    name = "AnyValue",
+                    booleanSchema = true
+                )
+            )
+        )
+
+        val definition = OpenApiDefinition(
+            info = Info(title = "Test", version = "1.0"),
+            components = components
+        )
+
+        val json = writer.writeJson(definition)
+        val root = jsonMapper.readTree(json)
+        val schemas = root["components"]["schemas"]
+        assertTrue(schemas["AnyValue"].booleanValue())
+    }
 }

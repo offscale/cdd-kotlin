@@ -255,4 +255,34 @@ class OpenApiSchemaKeywordsTest {
         assertEquals("keep", custom["x-ext"].asText())
         assertEquals("a", custom["properties"]["name"]["custom"][0].asText())
     }
+
+    @Test
+    fun `parse maps legacy nullable keywords to null types`() {
+        val json = """
+            {
+              "openapi": "3.2.0",
+              "info": { "title": "Legacy", "version": "1.0" },
+              "components": {
+                "schemas": {
+                  "Legacy": {
+                    "type": "object",
+                    "nullable": true,
+                    "properties": {
+                      "count": {
+                        "type": "integer",
+                        "x-nullable": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+        val schema = definition.components?.schemas?.get("Legacy")
+        assertNotNull(schema)
+        assertTrue(schema?.types?.contains("null") == true)
+        assertTrue(schema?.properties?.get("count")?.types?.contains("null") == true)
+    }
 }

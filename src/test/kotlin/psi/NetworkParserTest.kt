@@ -4,6 +4,7 @@ import domain.Callback
 import domain.HttpMethod
 import domain.ParameterLocation
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -183,6 +184,34 @@ class NetworkParserTest {
     }
 
     @Test
+    fun `parse preserves missing requestBody content in KDoc`() {
+        val code = """
+            import io.ktor.client.*
+            import io.ktor.client.request.*
+            import io.ktor.http.*
+
+            class RawApi(private val client: HttpClient) {
+                /**
+                 * @requestBody {"description":"raw payload"}
+                 */
+                suspend fun sendRaw(): Result<Unit> {
+                    client.request("/raw") {
+                        method = HttpMethod.Post
+                    }
+                }
+            }
+        """.trimIndent()
+
+        val endpoint = parser.parse(code).first()
+        val body = endpoint.requestBody
+
+        assertNotNull(body)
+        assertEquals("raw payload", body?.description)
+        assertTrue(body?.content?.isEmpty() == true)
+        assertFalse(body?.contentPresent ?: true)
+    }
+
+    @Test
     fun `parse extracts response summary`() {
         val code = """
             class SummaryApi {
@@ -199,6 +228,74 @@ class NetworkParserTest {
         val endpoint = parser.parse(code).first()
 
         assertEquals("Short summary", endpoint.responses["200"]?.summary)
+    }
+
+    @Test
+    fun `parse captures component metadata tags`() {
+        val code = """
+            import io.ktor.client.*
+            import io.ktor.client.request.*
+            import io.ktor.http.*
+
+            /**
+             * @componentExamples {"Example1":{"summary":"example","value":{"id":1}}}
+             * @componentLinks {"GetUser":{"operationId":"getUser"}}
+             * @componentCallbacks {"OnEvent":{"{${'$'}request.body#/url}":{"post":{"responses":{"200":{"description":"ok"}}}}}}
+             * @componentParameters {"Limit":{"name":"limit","in":"query","schema":{"type":"integer"}}}
+             * @componentResponses {"NotFound":{"description":"missing"}}
+             * @componentRequestBodies {"UserBody":{"content":{"application/json":{"schema":{"type":"object"}}}}}
+             * @componentHeaders {"X-Rate-Limit":{"schema":{"type":"integer"}}}
+             * @componentPathItems {"UserPath":{"get":{"responses":{"200":{"description":"ok"}}}}}
+             * @componentMediaTypes {"application/json":{"schema":{"type":"string"}}}
+             * @componentSchemas {"Extra":{"type":"object","properties":{"id":{"type":"string"}}}}
+             * @componentsExtensions {"x-component-flag":true}
+             */
+            class ComponentApi(private val client: HttpClient) {
+                suspend fun listUsers(): Result<String> {
+                    client.request("/users") { method = HttpMethod.Get }
+                }
+            }
+        """.trimIndent()
+
+        val result = parser.parseWithMetadata(code)
+        val metadata = result.metadata
+
+        assertEquals(1, metadata.componentExamples.size)
+        assertEquals(1, metadata.componentLinks.size)
+        assertEquals(1, metadata.componentCallbacks.size)
+        assertEquals(1, metadata.componentParameters.size)
+        assertEquals(1, metadata.componentResponses.size)
+        assertEquals(1, metadata.componentRequestBodies.size)
+        assertEquals(1, metadata.componentHeaders.size)
+        assertEquals(1, metadata.componentPathItems.size)
+        assertEquals(1, metadata.componentMediaTypes.size)
+        assertEquals(1, metadata.componentSchemas.size)
+        assertEquals(1, metadata.componentsExtensions.size)
+        assertTrue(metadata.componentExamples.containsKey("Example1"))
+        assertTrue(metadata.componentLinks.containsKey("GetUser"))
+        assertTrue(metadata.componentCallbacks.containsKey("OnEvent"))
+        assertTrue(metadata.componentParameters.containsKey("Limit"))
+        assertTrue(metadata.componentResponses.containsKey("NotFound"))
+        assertTrue(metadata.componentRequestBodies.containsKey("UserBody"))
+        assertTrue(metadata.componentHeaders.containsKey("X-Rate-Limit"))
+        assertTrue(metadata.componentPathItems.containsKey("UserPath"))
+        assertTrue(metadata.componentMediaTypes.containsKey("application/json"))
+        assertTrue(metadata.componentSchemas.containsKey("Extra"))
+        assertTrue(metadata.componentsExtensions.containsKey("x-component-flag"))
+
+        val components = metadata.toComponents()
+        assertNotNull(components)
+        assertTrue(components!!.schemas.containsKey("Extra"))
+        assertTrue(components!!.examples.containsKey("Example1"))
+        assertTrue(components.links.containsKey("GetUser"))
+        assertTrue(components.callbacks.containsKey("OnEvent"))
+        assertTrue(components.parameters.containsKey("Limit"))
+        assertTrue(components.responses.containsKey("NotFound"))
+        assertTrue(components.requestBodies.containsKey("UserBody"))
+        assertTrue(components.headers.containsKey("X-Rate-Limit"))
+        assertTrue(components.pathItems.containsKey("UserPath"))
+        assertTrue(components.mediaTypes.containsKey("application/json"))
+        assertTrue(components.extensions.containsKey("x-component-flag"))
     }
 
     @Test
@@ -449,6 +546,52 @@ class NetworkParserTest {
         assertEquals("listUsers", links?.operationId)
 
         assertTrue(response?.content?.containsKey("application/json") == true)
+    }
+
+    @Test
+    fun `parse prefers most specific media type for response content`() {
+        val code = """
+            import io.ktor.client.*
+            import io.ktor.client.request.*
+            import io.ktor.http.*
+
+            class MediaPrefApi(private val client: HttpClient) {
+                /**
+                 * @responseContent 200 {"application/xml":{"schema":{"type":"string"}},"application/json":{"schema":{"type":"integer"}}}
+                 */
+                suspend fun list(): Result<Unit> {
+                    client.request("/items") {
+                        method = HttpMethod.Get
+                    }
+                }
+            }
+        """.trimIndent()
+
+        val endpoint = parser.parse(code).first()
+        assertEquals("Int", endpoint.responses["200"]?.type)
+    }
+
+    @Test
+    fun `parse infers list type from itemSchema response content`() {
+        val code = """
+            import io.ktor.client.*
+            import io.ktor.client.request.*
+            import io.ktor.http.*
+
+            class StreamApi(private val client: HttpClient) {
+                /**
+                 * @responseContent 200 {"application/jsonl":{"itemSchema":{"type":"integer"}}}
+                 */
+                suspend fun stream(): Result<Unit> {
+                    client.request("/stream") {
+                        method = HttpMethod.Get
+                    }
+                }
+            }
+        """.trimIndent()
+
+        val endpoint = parser.parse(code).first()
+        assertEquals("List<Int>", endpoint.responses["200"]?.type)
     }
 
     @Test
@@ -977,7 +1120,10 @@ class NetworkParserTest {
              * @externalDocs {"url":"https://docs.example.com","description":"Docs"}
              * @extensions {"x-root":true}
              * @pathsExtensions {"x-paths":"paths-ext"}
+             * @pathsEmpty
+             * @pathItems {"/pets":{"summary":"Pets","description":"All pets"}}
              * @webhooksExtensions {"x-webhooks":{"flag":true}}
+             * @webhooksEmpty
              * @securitySchemes {"api_key":{"type":"apiKey","name":"X-API-KEY","in":"header"}}
              */
             interface IRootApi
@@ -998,9 +1144,39 @@ class NetworkParserTest {
         assertEquals(1, meta.tags.size)
         assertEquals("alpha", meta.tags.first().name)
         assertEquals("Docs", meta.externalDocs?.description)
+        assertTrue(meta.pathsExplicitEmpty)
+        assertTrue(meta.webhooksExplicitEmpty)
         assertEquals(true, meta.extensions["x-root"])
         assertEquals("paths-ext", meta.pathsExtensions["x-paths"])
+        assertEquals("Pets", meta.pathItems["/pets"]?.summary)
+        assertEquals("All pets", meta.pathItems["/pets"]?.description)
         assertEquals(mapOf("flag" to true), meta.webhooksExtensions["x-webhooks"])
         assertEquals("apiKey", meta.securitySchemes["api_key"]?.type)
+    }
+
+    @Test
+    fun `parse root metadata captures pathsEmpty when it is the only tag`() {
+        val code = """
+            /**
+             * @pathsEmpty
+             */
+            interface IEmptyPaths
+        """.trimIndent()
+
+        val result = parser.parseWithMetadata(code)
+        assertTrue(result.metadata.pathsExplicitEmpty)
+    }
+
+    @Test
+    fun `parse root metadata captures webhooksEmpty when it is the only tag`() {
+        val code = """
+            /**
+             * @webhooksEmpty
+             */
+            interface IEmptyWebhooks
+        """.trimIndent()
+
+        val result = parser.parseWithMetadata(code)
+        assertTrue(result.metadata.webhooksExplicitEmpty)
     }
 }

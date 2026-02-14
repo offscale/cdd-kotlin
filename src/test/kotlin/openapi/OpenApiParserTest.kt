@@ -1,10 +1,13 @@
 package openapi
 
+import com.fasterxml.jackson.core.JsonFactory
+import com.fasterxml.jackson.databind.ObjectMapper
 import domain.Callback
 import domain.HttpMethod
 import domain.ParameterLocation
 import domain.ParameterStyle
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -14,6 +17,7 @@ import java.io.File
 class OpenApiParserTest {
 
     private val parser = OpenApiParser()
+    private val writer = OpenApiWriter()
 
     @Test
     fun `parse JSON OpenAPI into IR`() {
@@ -136,7 +140,11 @@ class OpenApiParserTest {
                   "customString": "skip"
                 },
                 "/ref": {
-                  "${"$"}ref": "#/components/pathItems/UsersPath"
+                  "${"$"}ref": "#/components/pathItems/UsersPath",
+                  "summary": "Ref summary",
+                  "parameters": [
+                    { "name": "refParam", "in": "query", "schema": { "type": "string" } }
+                  ]
                 }
               },
               "webhooks": {
@@ -487,6 +495,8 @@ class OpenApiParserTest {
 
         val refPath = root.paths["/ref"]
         assertEquals("#/components/pathItems/UsersPath", refPath?.ref)
+        assertEquals("Ref summary", refPath?.summary)
+        assertTrue(refPath?.parameters?.any { it.name == "refParam" && it.location == ParameterLocation.QUERY } == true)
         assertEquals("paths-ext", root.pathsExtensions["x-paths"])
         assertTrue(root.paths.containsKey("x-paths") == false)
         assertEquals("hook-ext", root.webhooksExtensions["x-webhooks"])
@@ -592,10 +602,11 @@ class OpenApiParserTest {
         val onEventCallback = root.components?.callbacks?.get("OnEvent") as? Callback.Inline
         assertEquals("cb-ext", onEventCallback?.extensions?.get("x-cb"))
         assertTrue(onEventCallback?.expressions?.containsKey("\$request.body#/url") == true)
-        val refCallback = root.components?.callbacks?.get("RefCallback") as? Callback.Reference
+        val refCallback = root.components?.callbacks?.get("RefCallback") as? Callback.Inline
         assertEquals("#/components/callbacks/OnEvent", refCallback?.reference?.ref)
         assertEquals("Ref cb", refCallback?.reference?.summary)
         assertEquals("Ref cb desc", refCallback?.reference?.description)
+        assertTrue(refCallback?.expressions?.containsKey("\$request.body#/url") == true)
 
         val matrixParam = root.components?.parameters?.get("matrixParam")
         assertEquals(ParameterStyle.MATRIX, matrixParam?.style)
@@ -641,6 +652,417 @@ class OpenApiParserTest {
 
         val tag = root.tags.first()
         assertNull(tag.externalDocs)
+    }
+
+    @Test
+    fun `parse preserves explicit empty response content`() {
+        val json = """
+            {
+              "openapi": "3.2.0",
+              "info": { "title": "Ping", "version": "1.0" },
+              "paths": {
+                "/ping": {
+                  "get": {
+                    "responses": {
+                      "200": { "description": "ok", "content": {} }
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+        val response = definition.paths["/ping"]?.get?.responses?.get("200")
+        assertNotNull(response)
+        assertTrue(response!!.content.isEmpty())
+        assertTrue(response.contentPresent)
+    }
+
+    @Test
+    fun `parse resolves callback refs while preserving ref metadata`() {
+        val json = """
+            {
+              "openapi": "3.2.0",
+              "info": { "title": "Callbacks", "version": "1.0" },
+              "components": {
+                "callbacks": {
+                  "OnEvent": {
+                    "{${'$'}request.body#/url}": {
+                      "post": { "responses": { "200": { "description": "ok" } } }
+                    }
+                  }
+                }
+              },
+              "paths": {
+                "/subscribe": {
+                  "post": {
+                    "responses": { "200": { "description": "ok" } },
+                    "callbacks": {
+                      "onEvent": { "${'$'}ref": "#/components/callbacks/OnEvent" }
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+        val callback = definition.paths["/subscribe"]?.post?.callbacks?.get("onEvent")
+        assertTrue(callback is Callback.Inline)
+        val inline = callback as Callback.Inline
+        assertEquals("#/components/callbacks/OnEvent", inline.reference?.ref)
+        assertTrue(inline.expressions.containsKey("{${'$'}request.body#/url}"))
+
+        val serialized = writer.writeJson(definition)
+        val root = ObjectMapper(JsonFactory()).readTree(serialized)
+        val callbackNode = root["paths"]["/subscribe"]["post"]["callbacks"]["onEvent"]
+        assertEquals("#/components/callbacks/OnEvent", callbackNode["${'$'}ref"].asText())
+    }
+
+    @Test
+    fun `parse resolves component response refs with absolute uri`() {
+        val json = """
+            {
+              "openapi": "3.2.0",
+              "info": { "title": "Pets", "version": "1.0" },
+              "paths": {
+                "/pets": {
+                  "get": {
+                    "operationId": "listPets",
+                    "responses": {
+                      "200": { "${"$"}ref": "https://example.com/openapi.json#/components/responses/Ok" }
+                    }
+                  }
+                }
+              },
+              "components": {
+                "responses": {
+                  "Ok": { "description": "ok" }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val definition = parser.parseString(json)
+        val response = definition.paths["/pets"]?.get?.responses?.get("200")
+        assertNotNull(response)
+        assertEquals("ok", response?.description)
+    }
+
+    @Test
+    fun `parse resolves component response refs with self base match`() {
+        val json = """
+            {
+              "openapi": "3.2.0",
+              "${"$"}self": "https://example.com/openapi.json",
+              "info": { "title": "Pets", "version": "1.0" },
+              "paths": {
+                "/pets": {
+                  "get": {
+                    "operationId": "listPets",
+                    "responses": {
+                      "200": { "${"$"}ref": "https://example.com/openapi.json#/components/responses/Ok" }
+                    }
+                  }
+                }
+              },
+              "components": {
+                "responses": {
+                  "Ok": { "description": "ok" }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val definition = parser.parseString(json)
+        val response = definition.paths["/pets"]?.get?.responses?.get("200")
+        assertNotNull(response)
+        assertEquals("ok", response?.description)
+    }
+
+    @Test
+    fun `parse resolves component response refs using base uri when self missing`() {
+        val ref = "https://example.com/openapi.json#/components/responses/Ok"
+        val json = """
+            {
+              "openapi": "3.2.0",
+              "info": { "title": "Pets", "version": "1.0" },
+              "paths": {
+                "/pets": {
+                  "get": {
+                    "operationId": "listPets",
+                    "responses": {
+                      "200": { "${"$"}ref": "$ref" }
+                    }
+                  }
+                }
+              },
+              "components": {
+                "responses": {
+                  "Ok": { "description": "ok" }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val definition = parser.parseString(json, baseUri = "https://example.com/openapi.json")
+        val response = definition.paths["/pets"]?.get?.responses?.get("200")
+        assertNotNull(response)
+        assertEquals("ok", response?.description)
+    }
+
+    @Test
+    fun `parse resolves component response refs when self is relative and base uri provided`() {
+        val ref = "https://example.com/api/openapi.json#/components/responses/Ok"
+        val json = """
+            {
+              "openapi": "3.2.0",
+              "${"$"}self": "/api/openapi.json",
+              "info": { "title": "Pets", "version": "1.0" },
+              "paths": {
+                "/pets": {
+                  "get": {
+                    "operationId": "listPets",
+                    "responses": {
+                      "200": { "${"$"}ref": "$ref" }
+                    }
+                  }
+                }
+              },
+              "components": {
+                "responses": {
+                  "Ok": { "description": "ok" }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val definition = parser.parseString(json, baseUri = "https://example.com/root/openapi.json")
+        val response = definition.paths["/pets"]?.get?.responses?.get("200")
+        assertNotNull(response)
+        assertEquals("ok", response?.description)
+    }
+
+    @Test
+    fun `parse does not resolve component response refs when base uri mismatches`() {
+        val ref = "https://example.com/openapi.json#/components/responses/Ok"
+        val json = """
+            {
+              "openapi": "3.2.0",
+              "info": { "title": "Pets", "version": "1.0" },
+              "paths": {
+                "/pets": {
+                  "get": {
+                    "operationId": "listPets",
+                    "responses": {
+                      "200": { "${"$"}ref": "$ref" }
+                    }
+                  }
+                }
+              },
+              "components": {
+                "responses": {
+                  "Ok": { "description": "ok" }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val definition = parser.parseString(json, baseUri = "https://other.example.com/openapi.json")
+        val response = definition.paths["/pets"]?.get?.responses?.get("200")
+        assertNotNull(response)
+        assertEquals("ref:$ref", response?.description)
+    }
+
+    @Test
+    fun `parse does not resolve component response refs when self base mismatches`() {
+        val ref = "https://other.example.com/openapi.json#/components/responses/Ok"
+        val json = """
+            {
+              "openapi": "3.2.0",
+              "${"$"}self": "https://example.com/openapi.json",
+              "info": { "title": "Pets", "version": "1.0" },
+              "paths": {
+                "/pets": {
+                  "get": {
+                    "operationId": "listPets",
+                    "responses": {
+                      "200": { "${"$"}ref": "$ref" }
+                    }
+                  }
+                }
+              },
+              "components": {
+                "responses": {
+                  "Ok": { "description": "ok" }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val definition = parser.parseString(json)
+        val response = definition.paths["/pets"]?.get?.responses?.get("200")
+        assertNotNull(response)
+        assertEquals("ref:$ref", response?.description)
+    }
+
+    @Test
+    fun `parse resolves component response refs via registry`() {
+        val sharedJson = """
+            {
+              "openapi": "3.2.0",
+              "${"$"}self": "https://example.com/shared.json",
+              "info": { "title": "Shared", "version": "1.0" },
+              "components": {
+                "responses": {
+                  "Ok": { "description": "shared ok" }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val sharedDefinition = parser.parseString(sharedJson)
+        val registry = OpenApiDocumentRegistry()
+        registry.registerOpenApi(sharedDefinition)
+
+        val mainJson = """
+            {
+              "openapi": "3.2.0",
+              "info": { "title": "Main", "version": "1.0" },
+              "paths": {
+                "/pets": {
+                  "get": {
+                    "operationId": "listPets",
+                    "responses": {
+                      "200": { "${"$"}ref": "https://example.com/shared.json#/components/responses/Ok" }
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val definition = parser.parseString(mainJson, registry = registry)
+        val response = definition.paths["/pets"]?.get?.responses?.get("200")
+        assertNotNull(response)
+        assertEquals("shared ok", response?.description)
+    }
+
+    @Test
+    fun `parse resolves relative component refs via registry`() {
+        val sharedJson = """
+            {
+              "openapi": "3.2.0",
+              "info": { "title": "Shared", "version": "1.0" },
+              "components": {
+                "parameters": {
+                  "limit": {
+                    "name": "limit",
+                    "in": "query",
+                    "schema": { "type": "integer" }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val sharedDefinition = parser.parseString(sharedJson)
+        val registry = OpenApiDocumentRegistry()
+        val sharedBase = "https://example.com/root/shared/common.json"
+        registry.registerOpenApi(sharedDefinition, baseUri = sharedBase)
+
+        val mainJson = """
+            {
+              "openapi": "3.2.0",
+              "info": { "title": "Main", "version": "1.0" },
+              "paths": {
+                "/pets": {
+                  "get": {
+                    "operationId": "listPets",
+                    "parameters": [
+                      { "${"$"}ref": "shared/common.json#/components/parameters/limit" }
+                    ],
+                    "responses": {
+                      "200": { "description": "ok" }
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val definition = parser.parseString(
+            mainJson,
+            baseUri = "https://example.com/root/openapi.json",
+            registry = registry
+        )
+        val param = definition.paths["/pets"]?.get?.parameters?.firstOrNull()
+        assertNotNull(param)
+        assertEquals("limit", param?.name)
+        assertEquals(ParameterLocation.QUERY, param?.location)
+    }
+
+    @Test
+    fun `parse resolves component response refs with percent encoded key`() {
+        val json = """
+            {
+              "openapi": "3.2.0",
+              "info": { "title": "Pets", "version": "1.0" },
+              "paths": {
+                "/pets": {
+                  "get": {
+                    "operationId": "listPets",
+                    "responses": {
+                      "200": { "${"$"}ref": "#/components/responses/Ok%20Response" }
+                    }
+                  }
+                }
+              },
+              "components": {
+                "responses": {
+                  "Ok Response": { "description": "ok" }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val definition = parser.parseString(json)
+        val response = definition.paths["/pets"]?.get?.responses?.get("200")
+        assertNotNull(response)
+        assertEquals("ok", response?.description)
+    }
+
+    @Test
+    fun `parseDocumentString returns Schema document when root is schema`() {
+        val schemaJson = """{ "type": "string", "minLength": 1 }"""
+        val doc = parser.parseDocumentString(schemaJson, OpenApiParser.Format.JSON)
+
+        val schemaDoc = doc as? OpenApiDocument.Schema
+        assertNotNull(schemaDoc)
+        assertEquals(setOf("string"), schemaDoc?.schema?.types)
+        assertEquals(1, schemaDoc?.schema?.minLength)
+    }
+
+    @Test
+    fun `parseDocumentString returns OpenAPI document when openapi field present`() {
+        val openapiJson = """{ "openapi": "3.2.0", "info": { "title": "X", "version": "1" } }"""
+        val doc = parser.parseDocumentString(openapiJson, OpenApiParser.Format.JSON)
+        val openapiDoc = doc as? OpenApiDocument.OpenApi
+        assertNotNull(openapiDoc)
+        assertEquals("3.2.0", openapiDoc?.definition?.openapi)
+    }
+
+    @Test
+    fun `parseSchemaString throws when document is OpenAPI`() {
+        val openapiJson = """{ "openapi": "3.2.0", "info": { "title": "X", "version": "1" } }"""
+        try {
+            parser.parseSchemaString(openapiJson, OpenApiParser.Format.JSON)
+        } catch (ex: IllegalArgumentException) {
+            assertTrue(ex.message?.contains("OpenAPI Object") == true)
+            return
+        }
+        throw AssertionError("Expected IllegalArgumentException for OpenAPI document")
     }
 
     @Test
@@ -751,6 +1173,96 @@ class OpenApiParserTest {
             """{ "openapi": "3.2.0", "info": { "title": "Auto JSON", "version": "1.0" } }"""
         )
         assertEquals("Auto JSON", autoJsonRoot.info.title)
+    }
+
+    @Test
+    fun `parse preserves explicit empty paths and webhooks`() {
+        val json = """
+            {
+              "openapi": "3.2.0",
+              "info": { "title": "Empty API", "version": "1.0.0" },
+              "paths": {},
+              "webhooks": {}
+            }
+        """.trimIndent()
+
+        val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+
+        assertTrue(definition.paths.isEmpty())
+        assertTrue(definition.webhooks.isEmpty())
+        assertTrue(definition.pathsExplicitEmpty)
+        assertTrue(definition.webhooksExplicitEmpty)
+    }
+
+    @Test
+    fun `parse tracks missing requestBody content`() {
+        val json = """
+            {
+              "openapi": "3.2.0",
+              "info": { "title": "Body", "version": "1.0" },
+              "paths": {
+                "/submit": {
+                  "post": {
+                    "operationId": "submit",
+                    "requestBody": {
+                      "description": "raw payload"
+                    },
+                    "responses": {
+                      "200": { "description": "ok" }
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val root = parser.parseString(json, OpenApiParser.Format.JSON)
+        val body = root.paths["/submit"]?.post?.requestBody
+        assertNotNull(body)
+        assertFalse(body?.contentPresent ?: true)
+        assertTrue(body?.content?.isEmpty() == true)
+    }
+
+    @Test
+    fun `parse resolves media type ref for content schemas`() {
+        val json = """
+            {
+              "openapi": "3.2.0",
+              "info": { "title": "Media Types", "version": "1.0.0" },
+              "components": {
+                "mediaTypes": {
+                  "PetJson": {
+                    "schema": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string" } }
+                    }
+                  }
+                }
+              },
+              "paths": {
+                "/pets": {
+                  "get": {
+                    "operationId": "getPets",
+                    "responses": {
+                      "200": {
+                        "description": "ok",
+                        "content": {
+                          "application/json": { "${"$"}ref": "#/components/mediaTypes/PetJson" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+        val media = definition.paths["/pets"]?.get?.responses?.get("200")?.content?.get("application/json")
+
+        assertNotNull(media)
+        assertEquals("#/components/mediaTypes/PetJson", media?.ref)
+        assertNotNull(media?.schema, "Expected resolved schema for media type ref")
     }
 
     @Test
@@ -932,5 +1444,334 @@ class OpenApiParserTest {
 
         assertEquals("Int", encodingHeader?.type)
         assertEquals("#/components/headers/TraceHeader", encodingHeader?.reference?.ref)
+    }
+
+    @Test
+    fun `selects most specific media type when deriving response type`() {
+        val json = """
+            {
+              "openapi": "3.2.0",
+              "info": { "title": "Media", "version": "1.0" },
+              "paths": {
+                "/items": {
+                  "get": {
+                    "operationId": "listItems",
+                    "responses": {
+                      "200": {
+                        "description": "ok",
+                        "content": {
+                          "application/*": { "schema": { "type": "string" } },
+                          "application/*+json": { "schema": { "type": "integer" } }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+        val responseType = definition.paths["/items"]
+            ?.get
+            ?.responses
+            ?.get("200")
+            ?.type
+
+        assertEquals("Int", responseType)
+    }
+
+    @Test
+    fun `infers schema-less binary response type from media type`() {
+        val json = """
+            {
+              "openapi": "3.2.0",
+              "info": { "title": "Binary", "version": "1.0" },
+              "paths": {
+                "/bin": {
+                  "get": {
+                    "operationId": "getBin",
+                    "responses": {
+                      "200": {
+                        "description": "ok",
+                        "content": {
+                          "application/octet-stream": {}
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+        val responseType = definition.paths["/bin"]
+            ?.get
+            ?.responses
+            ?.get("200")
+            ?.type
+
+        assertEquals("ByteArray", responseType)
+    }
+
+    @Test
+    fun `infers schema-less form request body type from media type`() {
+        val json = """
+            {
+              "openapi": "3.2.0",
+              "info": { "title": "Form", "version": "1.0" },
+              "paths": {
+                "/form": {
+                  "post": {
+                    "operationId": "submitForm",
+                    "requestBody": {
+                      "required": true,
+                      "content": {
+                        "application/x-www-form-urlencoded": {}
+                      }
+                    },
+                    "responses": { "200": { "description": "ok" } }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+        val requestBodyType = definition.paths["/form"]
+            ?.post
+            ?.requestBodyType
+
+        assertEquals("String", requestBodyType)
+    }
+
+    @Test
+    fun `infers list type from itemSchema content`() {
+        val json = """
+            {
+              "openapi": "3.2.0",
+              "info": { "title": "Stream", "version": "1.0" },
+              "paths": {
+                "/events": {
+                  "get": {
+                    "operationId": "streamEvents",
+                    "responses": {
+                      "200": {
+                        "description": "ok",
+                        "content": {
+                          "application/jsonl": { "itemSchema": { "type": "string" } }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+        val responseType = definition.paths["/events"]
+            ?.get
+            ?.responses
+            ?.get("200")
+            ?.type
+
+        assertEquals("List<String>", responseType)
+    }
+
+    @Test
+    fun `parse resolves component link refs with overrides`() {
+        val json = """
+            {
+              "openapi": "3.2.0",
+              "info": { "title": "Links", "version": "1.0" },
+              "paths": {
+                "/items": {
+                  "get": {
+                    "responses": {
+                      "200": {
+                        "description": "ok",
+                        "links": {
+                          "UserLink": {
+                            "${"$"}ref": "#/components/links/BaseLink",
+                            "description": "override desc"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "components": {
+                "links": {
+                  "BaseLink": {
+                    "operationId": "getUser",
+                    "parameters": { "id": "${"$"}response.body#/id" }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+        val link = definition.paths["/items"]?.get?.responses?.get("200")?.links?.get("UserLink")
+
+        assertNotNull(link)
+        assertEquals("getUser", link?.operationId)
+        assertEquals("override desc", link?.description)
+        assertEquals("#/components/links/BaseLink", link?.ref)
+    }
+
+    @Test
+    fun `parse resolves component example refs with overrides`() {
+        val json = """
+            {
+              "openapi": "3.2.0",
+              "info": { "title": "Examples", "version": "1.0" },
+              "paths": {
+                "/items": {
+                  "get": {
+                    "parameters": [
+                      {
+                        "name": "id",
+                        "in": "query",
+                        "schema": { "type": "string" },
+                        "examples": {
+                          "sample": {
+                            "${"$"}ref": "#/components/examples/IdExample",
+                            "summary": "override summary"
+                          }
+                        }
+                      }
+                    ],
+                    "responses": {
+                      "200": { "description": "ok" }
+                    }
+                  }
+                }
+              },
+              "components": {
+                "examples": {
+                  "IdExample": { "summary": "base", "dataValue": "abc-123" }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+        val example = definition.paths["/items"]?.get?.parameters?.firstOrNull()
+            ?.examples?.get("sample")
+
+        assertNotNull(example)
+        assertEquals("override summary", example?.summary)
+        assertEquals("abc-123", example?.dataValue)
+        assertEquals("#/components/examples/IdExample", example?.ref)
+    }
+
+    @Test
+    fun `parse resolves component refs within components`() {
+        val json = """
+            {
+              "openapi": "3.2.0",
+              "info": { "title": "Ref Components", "version": "1.0" },
+              "components": {
+                "parameters": {
+                  "Limit": {
+                    "name": "limit",
+                    "in": "query",
+                    "schema": { "type": "integer" }
+                  },
+                  "LimitRef": {
+                    "${"$"}ref": "#/components/parameters/Limit",
+                    "description": "override"
+                  }
+                },
+                "responses": {
+                  "Ok": { "description": "ok" },
+                  "OkRef": { "${"$"}ref": "#/components/responses/Ok" }
+                },
+                "requestBodies": {
+                  "BaseBody": {
+                    "content": { "application/json": { "schema": { "type": "string" } } }
+                  },
+                  "RefBody": {
+                    "${"$"}ref": "#/components/requestBodies/BaseBody",
+                    "description": "Body override"
+                  }
+                },
+                "securitySchemes": {
+                  "ApiKey": { "type": "apiKey", "name": "X-API-KEY", "in": "header" },
+                  "ApiKeyRef": { "${"$"}ref": "#/components/securitySchemes/ApiKey", "description": "Ref desc" }
+                },
+                "examples": {
+                  "BaseExample": { "dataValue": "base" },
+                  "RefExample": { "${"$"}ref": "#/components/examples/BaseExample", "summary": "override" }
+                },
+                "mediaTypes": {
+                  "JsonBase": { "schema": { "type": "string" } },
+                  "JsonRef": { "${"$"}ref": "#/components/mediaTypes/JsonBase" }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val root = parser.parseString(json, OpenApiParser.Format.JSON)
+        val components = root.components
+        assertNotNull(components)
+
+        val limitRef = components?.parameters?.get("LimitRef")
+        assertEquals("#/components/parameters/Limit", limitRef?.reference?.ref)
+        assertEquals("limit", limitRef?.name)
+        assertEquals("override", limitRef?.description)
+
+        val okRef = components?.responses?.get("OkRef")
+        assertEquals("#/components/responses/Ok", okRef?.reference?.ref)
+        assertEquals("ok", okRef?.description)
+
+        val bodyRef = components?.requestBodies?.get("RefBody")
+        assertEquals("#/components/requestBodies/BaseBody", bodyRef?.reference?.ref)
+        assertTrue(bodyRef?.content?.isNotEmpty() == true)
+        assertEquals("Body override", bodyRef?.description)
+
+        val schemeRef = components?.securitySchemes?.get("ApiKeyRef")
+        assertEquals("#/components/securitySchemes/ApiKey", schemeRef?.reference?.ref)
+        assertEquals("apiKey", schemeRef?.type)
+        assertEquals("header", schemeRef?.`in`)
+        assertEquals("Ref desc", schemeRef?.description)
+
+        val exampleRef = components?.examples?.get("RefExample")
+        assertEquals("#/components/examples/BaseExample", exampleRef?.ref)
+        assertEquals("base", exampleRef?.dataValue)
+        assertEquals("override", exampleRef?.summary)
+
+        val mediaRef = components?.mediaTypes?.get("JsonRef")
+        assertEquals("#/components/mediaTypes/JsonBase", mediaRef?.reference?.ref ?: mediaRef?.ref)
+        assertNotNull(mediaRef?.schema)
+    }
+
+    @Test
+    fun `parse missing operationId preserves omission`() {
+        val json = """
+            {
+              "openapi": "3.2.0",
+              "info": { "title": "NoOpId", "version": "1.0" },
+              "paths": {
+                "/pets": {
+                  "get": {
+                    "responses": {
+                      "200": { "description": "ok" }
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent()
+
+        val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+        val operation = definition.paths["/pets"]?.get
+        assertNotNull(operation)
+        assertFalse(operation!!.operationIdExplicit)
+        assertEquals("get_pets", operation.operationId)
     }
 }
