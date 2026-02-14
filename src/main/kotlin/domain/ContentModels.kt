@@ -179,6 +179,13 @@ data class RequestBody(
      */
     val content: Map<String, MediaTypeObject> = emptyMap(),
     /**
+     * Whether the `content` field was explicitly present on the OpenAPI document.
+     *
+     * This allows preserving the distinction between an omitted `content` field
+     * and an explicit empty map (`content: {}`) for round-trip fidelity.
+     */
+    val contentPresent: Boolean = true,
+    /**
      * Determines if the request body is required in the request.
      */
     val required: Boolean = false,
@@ -211,7 +218,12 @@ sealed interface Callback {
      */
     data class Inline(
         val expressions: Map<String, PathItem> = emptyMap(),
-        val extensions: Map<String, Any?> = emptyMap()
+        val extensions: Map<String, Any?> = emptyMap(),
+        /**
+         * Reference metadata when this inline callback was resolved from a `$ref`.
+         * When present, serializers SHOULD emit the `$ref` and ignore [expressions] for round-trip fidelity.
+         */
+        val reference: ReferenceObject? = null
     ) : Callback
 
     /**

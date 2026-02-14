@@ -19,6 +19,7 @@ import domain.ParameterLocation
 import domain.ParameterStyle
 import domain.RequestBody
 import domain.ReferenceObject
+import domain.SchemaDefinition
 import domain.SchemaProperty
 import domain.SecurityScheme
 import domain.Server
@@ -141,8 +142,8 @@ class NetworkParser {
         val psiFactory = PsiInfrastructure.createPsiFactory()
         val file = psiFactory.createFile("Analysis.kt", sourceCode)
         val endpoints = parseEndpoints(file)
-        val webhooks = extractWebhooks(file)
         val metadata = extractRootMetadata(file)
+        val webhooks = metadata.webhooks
         return NetworkParseResult(endpoints = endpoints, webhooks = webhooks, metadata = metadata)
     }
 
@@ -170,8 +171,22 @@ class NetworkParser {
             "@see",
             "@extensions",
             "@pathsExtensions",
+            "@pathsEmpty",
+            "@pathItems",
             "@webhooksExtensions",
+            "@webhooksEmpty",
             "@securitySchemes",
+            "@componentExamples",
+            "@componentLinks",
+            "@componentCallbacks",
+            "@componentParameters",
+            "@componentResponses",
+            "@componentRequestBodies",
+            "@componentHeaders",
+            "@componentPathItems",
+            "@componentMediaTypes",
+            "@componentSchemas",
+            "@componentsExtensions",
             "@webhooks"
         )
 
@@ -185,24 +200,7 @@ class NetworkParser {
     }
 
     private fun extractWebhooks(file: KtFile): Map<String, domain.PathItem> {
-        val tagLine = extractRootDocLines(file)
-            .firstOrNull { it.startsWith("@webhooks") }
-            ?: return emptyMap()
-
-        val json = tagLine.removePrefix("@webhooks").trim()
-        if (json.isEmpty()) return emptyMap()
-        val node = runCatching { jsonMapper.readTree(json) }.getOrNull() ?: return emptyMap()
-        if (!node.isObject) return emptyMap()
-
-        val wrapper = jsonMapper.createObjectNode()
-        wrapper.put("openapi", "3.2.0")
-        val info = jsonMapper.createObjectNode()
-        info.put("title", "Webhooks")
-        info.put("version", "0.0.0")
-        wrapper.set<JsonNode>("info", info)
-        wrapper.set<JsonNode>("webhooks", node)
-
-        return openApiParser.parseString(wrapper.toString(), OpenApiParser.Format.JSON).webhooks
+        return extractWebhooksLine(extractRootDocLines(file))
     }
 
     private fun extractRootMetadata(file: KtFile): OpenApiMetadata {
@@ -217,8 +215,23 @@ class NetworkParser {
         val externalDocs = extractExternalDocsLine(lines)
         val extensions = extractExtensionsLine(lines)
         val pathsExtensions = extractPathsExtensionsLine(lines)
+        val pathsExplicitEmpty = extractExplicitEmptyTag(lines, "@pathsEmpty")
+        val pathItems = extractPathItemsLine(lines)
+        val webhooks = extractWebhooksLine(lines)
         val webhooksExtensions = extractWebhooksExtensionsLine(lines)
+        val webhooksExplicitEmpty = extractExplicitEmptyTag(lines, "@webhooksEmpty")
         val securitySchemes = extractSecuritySchemesLine(lines)
+        val componentSchemas = extractComponentSchemasLine(lines)
+        val componentExamples = extractComponentExamplesLine(lines)
+        val componentLinks = extractComponentLinksLine(lines)
+        val componentCallbacks = extractComponentCallbacksLine(lines)
+        val componentParameters = extractComponentParametersLine(lines)
+        val componentResponses = extractComponentResponsesLine(lines)
+        val componentRequestBodies = extractComponentRequestBodiesLine(lines)
+        val componentHeaders = extractComponentHeadersLine(lines)
+        val componentPathItems = extractComponentPathItemsLine(lines)
+        val componentMediaTypes = extractComponentMediaTypesLine(lines)
+        val componentsExtensions = extractComponentsExtensionsLine(lines)
 
         return OpenApiMetadata(
             openapi = openapiMeta.openapi,
@@ -232,13 +245,29 @@ class NetworkParser {
             externalDocs = externalDocs,
             extensions = extensions,
             pathsExtensions = pathsExtensions,
+            pathsExplicitEmpty = pathsExplicitEmpty,
+            pathItems = pathItems,
+            webhooks = webhooks,
             webhooksExtensions = webhooksExtensions,
-            securitySchemes = securitySchemes
+            webhooksExplicitEmpty = webhooksExplicitEmpty,
+            securitySchemes = securitySchemes,
+            componentSchemas = componentSchemas,
+            componentExamples = componentExamples,
+            componentLinks = componentLinks,
+            componentCallbacks = componentCallbacks,
+            componentParameters = componentParameters,
+            componentResponses = componentResponses,
+            componentRequestBodies = componentRequestBodies,
+            componentHeaders = componentHeaders,
+            componentPathItems = componentPathItems,
+            componentMediaTypes = componentMediaTypes,
+            componentsExtensions = componentsExtensions
         )
     }
 
     private fun parseFunction(func: KtNamedFunction): EndpointDefinition? {
         val operationId = func.name ?: return null
+        val operationIdExplicit = !extractOperationIdOmitted(func)
 
         val callExpressions = func.collectDescendantsOfType<KtCallExpression>()
         val requestCall = callExpressions.find { call ->
@@ -416,6 +445,7 @@ class NetworkParser {
             method = method,
             customMethod = customMethod,
             operationId = operationId,
+            operationIdExplicit = operationIdExplicit,
             parameters = finalParams,
             requestBodyType = requestBodyType,
             requestBody = requestBody,
@@ -463,11 +493,40 @@ class NetworkParser {
             } else if (entry is org.jetbrains.kotlin.psi.KtSimpleNameStringTemplateEntry) {
                 sb.append("{${entry.expression?.text}}")
             } else if (entry is org.jetbrains.kotlin.psi.KtBlockStringTemplateEntry) {
-                val content = entry.expression?.text
-                sb.append("{$content}")
+                val content = entry.expression?.text.orEmpty()
+                val paramName = extractPathParamNameFromExpression(content)
+                sb.append("{${paramName ?: content}}")
             }
         }
         return sb.toString()
+    }
+
+    private fun extractPathParamNameFromExpression(expression: String): String? {
+        val trimmed = expression.trim()
+        if (trimmed.isEmpty()) return null
+
+        if (trimmed.startsWith("encodePathComponent(")) {
+            val inner = trimmed.removePrefix("encodePathComponent(").trim().removeSuffix(")")
+            val firstArg = inner.substringBefore(",").trim()
+            return extractPathParamNameFromExpression(firstArg)
+        }
+
+        if (trimmed.startsWith("serializeContentValue(")) {
+            val inner = trimmed.removePrefix("serializeContentValue(").trim().removeSuffix(")")
+            val firstArg = inner.substringBefore(",").trim()
+            return extractPathParamNameFromExpression(firstArg)
+        }
+
+        Regex("^([A-Za-z_][A-Za-z0-9_]*)\\.entries\\.joinToString\\(").find(trimmed)?.let {
+            return it.groupValues[1]
+        }
+
+        Regex("^([A-Za-z_][A-Za-z0-9_]*)\\.joinToString\\(").find(trimmed)?.let {
+            return it.groupValues[1]
+        }
+
+        val cleaned = trimmed.removeSuffix(".toString()").removeSurrounding("`")
+        return cleaned.takeIf { it.matches(Regex("^[A-Za-z_][A-Za-z0-9_]*$")) }
     }
 
     private fun extractPathParams(path: String): List<String> {
@@ -952,8 +1011,49 @@ class NetworkParser {
         return extractExtensionsTag(lines, "@pathsExtensions")
     }
 
+    private fun extractPathItemsLine(lines: List<String>): Map<String, domain.PathItem> {
+        val line = lines.firstOrNull { it.startsWith("@pathItems") } ?: return emptyMap()
+        val json = line.removePrefix("@pathItems").trim()
+        if (json.isEmpty()) return emptyMap()
+        val node = runCatching { jsonMapper.readTree(json) }.getOrNull() ?: return emptyMap()
+        if (!node.isObject) return emptyMap()
+
+        val wrapper = jsonMapper.createObjectNode()
+        wrapper.put("openapi", "3.2.0")
+        val info = wrapper.putObject("info")
+        info.put("title", "PathItems")
+        info.put("version", "0.0.0")
+        wrapper.set<JsonNode>("paths", node)
+
+        return openApiParser.parseString(jsonMapper.writeValueAsString(wrapper), OpenApiParser.Format.JSON).paths
+    }
+
+    private fun extractWebhooksLine(lines: List<String>): Map<String, domain.PathItem> {
+        val line = lines.firstOrNull { it.startsWith("@webhooks") } ?: return emptyMap()
+        val json = line.removePrefix("@webhooks").trim()
+        if (json.isEmpty()) return emptyMap()
+        val node = runCatching { jsonMapper.readTree(json) }.getOrNull() ?: return emptyMap()
+        if (!node.isObject) return emptyMap()
+
+        val wrapper = jsonMapper.createObjectNode()
+        wrapper.put("openapi", "3.2.0")
+        val info = wrapper.putObject("info")
+        info.put("title", "Webhooks")
+        info.put("version", "0.0.0")
+        wrapper.set<JsonNode>("webhooks", node)
+
+        return openApiParser.parseString(jsonMapper.writeValueAsString(wrapper), OpenApiParser.Format.JSON).webhooks
+    }
+
     private fun extractWebhooksExtensionsLine(lines: List<String>): Map<String, Any?> {
         return extractExtensionsTag(lines, "@webhooksExtensions")
+    }
+
+    private fun extractExplicitEmptyTag(lines: List<String>, tag: String): Boolean {
+        val line = lines.firstOrNull { it.startsWith(tag) } ?: return false
+        val raw = line.removePrefix(tag).trim()
+        val value = raw.ifBlank { null }
+        return parseBooleanTagValue(value) ?: false
     }
 
     private fun extractExtensionsTag(lines: List<String>, tag: String): Map<String, Any?> {
@@ -982,6 +1082,168 @@ class NetworkParser {
 
         val parsed = openApiParser.parseString(jsonMapper.writeValueAsString(root), OpenApiParser.Format.JSON)
         return parsed.components?.securitySchemes ?: emptyMap()
+    }
+
+    private fun extractComponentSchemasLine(lines: List<String>): Map<String, SchemaDefinition> {
+        val line = lines.firstOrNull { it.startsWith("@componentSchemas") } ?: return emptyMap()
+        val json = line.removePrefix("@componentSchemas").trim()
+        if (json.isEmpty()) return emptyMap()
+        val node = runCatching { jsonMapper.readTree(json) }.getOrNull() ?: return emptyMap()
+        if (!node.isObject) return emptyMap()
+
+        val root = jsonMapper.createObjectNode()
+        root.put("openapi", "3.2.0")
+        val info = root.putObject("info")
+        info.put("title", "Component Schemas")
+        info.put("version", "0.0.0")
+        val components = root.putObject("components")
+        components.set<JsonNode>("schemas", node)
+
+        val parsed = openApiParser.parseString(jsonMapper.writeValueAsString(root), OpenApiParser.Format.JSON)
+        return parsed.components?.schemas ?: emptyMap()
+    }
+
+    private fun extractComponentExamplesLine(lines: List<String>): Map<String, ExampleObject> {
+        val line = lines.firstOrNull { it.startsWith("@componentExamples") } ?: return emptyMap()
+        val json = line.removePrefix("@componentExamples").trim()
+        if (json.isEmpty()) return emptyMap()
+        val node = runCatching { jsonMapper.readTree(json) }.getOrNull() ?: return emptyMap()
+        if (!node.isObject) return emptyMap()
+        return node.fields().asSequence().associate { (name, raw) ->
+            name to parseExampleObjectNode(raw)
+        }
+    }
+
+    private fun extractComponentLinksLine(lines: List<String>): Map<String, Link> {
+        val line = lines.firstOrNull { it.startsWith("@componentLinks") } ?: return emptyMap()
+        val json = line.removePrefix("@componentLinks").trim()
+        if (json.isEmpty()) return emptyMap()
+        return parseLinksJson(json)
+    }
+
+    private fun extractComponentCallbacksLine(lines: List<String>): Map<String, Callback> {
+        val line = lines.firstOrNull { it.startsWith("@componentCallbacks") } ?: return emptyMap()
+        val json = line.removePrefix("@componentCallbacks").trim()
+        if (json.isEmpty()) return emptyMap()
+        return parseCallbacksJson(json)
+    }
+
+    private fun extractComponentParametersLine(lines: List<String>): Map<String, EndpointParameter> {
+        val line = lines.firstOrNull { it.startsWith("@componentParameters") } ?: return emptyMap()
+        val json = line.removePrefix("@componentParameters").trim()
+        if (json.isEmpty()) return emptyMap()
+        val node = runCatching { jsonMapper.readTree(json) }.getOrNull() ?: return emptyMap()
+        if (!node.isObject) return emptyMap()
+
+        val root = jsonMapper.createObjectNode()
+        root.put("openapi", "3.2.0")
+        val info = root.putObject("info")
+        info.put("title", "Component Parameters")
+        info.put("version", "0.0.0")
+        val components = root.putObject("components")
+        components.set<JsonNode>("parameters", node)
+
+        val parsed = openApiParser.parseString(jsonMapper.writeValueAsString(root), OpenApiParser.Format.JSON)
+        return parsed.components?.parameters ?: emptyMap()
+    }
+
+    private fun extractComponentResponsesLine(lines: List<String>): Map<String, EndpointResponse> {
+        val line = lines.firstOrNull { it.startsWith("@componentResponses") } ?: return emptyMap()
+        val json = line.removePrefix("@componentResponses").trim()
+        if (json.isEmpty()) return emptyMap()
+        val node = runCatching { jsonMapper.readTree(json) }.getOrNull() ?: return emptyMap()
+        if (!node.isObject) return emptyMap()
+
+        val root = jsonMapper.createObjectNode()
+        root.put("openapi", "3.2.0")
+        val info = root.putObject("info")
+        info.put("title", "Component Responses")
+        info.put("version", "0.0.0")
+        val components = root.putObject("components")
+        components.set<JsonNode>("responses", node)
+
+        val parsed = openApiParser.parseString(jsonMapper.writeValueAsString(root), OpenApiParser.Format.JSON)
+        return parsed.components?.responses ?: emptyMap()
+    }
+
+    private fun extractComponentRequestBodiesLine(lines: List<String>): Map<String, RequestBody> {
+        val line = lines.firstOrNull { it.startsWith("@componentRequestBodies") } ?: return emptyMap()
+        val json = line.removePrefix("@componentRequestBodies").trim()
+        if (json.isEmpty()) return emptyMap()
+        val node = runCatching { jsonMapper.readTree(json) }.getOrNull() ?: return emptyMap()
+        if (!node.isObject) return emptyMap()
+
+        val root = jsonMapper.createObjectNode()
+        root.put("openapi", "3.2.0")
+        val info = root.putObject("info")
+        info.put("title", "Component Request Bodies")
+        info.put("version", "0.0.0")
+        val components = root.putObject("components")
+        components.set<JsonNode>("requestBodies", node)
+
+        val parsed = openApiParser.parseString(jsonMapper.writeValueAsString(root), OpenApiParser.Format.JSON)
+        return parsed.components?.requestBodies ?: emptyMap()
+    }
+
+    private fun extractComponentHeadersLine(lines: List<String>): Map<String, Header> {
+        val line = lines.firstOrNull { it.startsWith("@componentHeaders") } ?: return emptyMap()
+        val json = line.removePrefix("@componentHeaders").trim()
+        if (json.isEmpty()) return emptyMap()
+        val node = runCatching { jsonMapper.readTree(json) }.getOrNull() ?: return emptyMap()
+        if (!node.isObject) return emptyMap()
+
+        val root = jsonMapper.createObjectNode()
+        root.put("openapi", "3.2.0")
+        val info = root.putObject("info")
+        info.put("title", "Component Headers")
+        info.put("version", "0.0.0")
+        val components = root.putObject("components")
+        components.set<JsonNode>("headers", node)
+
+        val parsed = openApiParser.parseString(jsonMapper.writeValueAsString(root), OpenApiParser.Format.JSON)
+        return parsed.components?.headers ?: emptyMap()
+    }
+
+    private fun extractComponentPathItemsLine(lines: List<String>): Map<String, domain.PathItem> {
+        val line = lines.firstOrNull { it.startsWith("@componentPathItems") } ?: return emptyMap()
+        val json = line.removePrefix("@componentPathItems").trim()
+        if (json.isEmpty()) return emptyMap()
+        val node = runCatching { jsonMapper.readTree(json) }.getOrNull() ?: return emptyMap()
+        if (!node.isObject) return emptyMap()
+
+        val root = jsonMapper.createObjectNode()
+        root.put("openapi", "3.2.0")
+        val info = root.putObject("info")
+        info.put("title", "Component Path Items")
+        info.put("version", "0.0.0")
+        val components = root.putObject("components")
+        components.set<JsonNode>("pathItems", node)
+
+        val parsed = openApiParser.parseString(jsonMapper.writeValueAsString(root), OpenApiParser.Format.JSON)
+        return parsed.components?.pathItems ?: emptyMap()
+    }
+
+    private fun extractComponentMediaTypesLine(lines: List<String>): Map<String, MediaTypeObject> {
+        val line = lines.firstOrNull { it.startsWith("@componentMediaTypes") } ?: return emptyMap()
+        val json = line.removePrefix("@componentMediaTypes").trim()
+        if (json.isEmpty()) return emptyMap()
+        val node = runCatching { jsonMapper.readTree(json) }.getOrNull() ?: return emptyMap()
+        if (!node.isObject) return emptyMap()
+
+        val root = jsonMapper.createObjectNode()
+        root.put("openapi", "3.2.0")
+        val info = root.putObject("info")
+        info.put("title", "Component Media Types")
+        info.put("version", "0.0.0")
+        val components = root.putObject("components")
+        components.set<JsonNode>("mediaTypes", node)
+
+        val parsed = openApiParser.parseString(jsonMapper.writeValueAsString(root), OpenApiParser.Format.JSON)
+        return parsed.components?.mediaTypes ?: emptyMap()
+    }
+
+    private fun extractComponentsExtensionsLine(lines: List<String>): Map<String, Any?> {
+        return extractExtensionsTag(lines, "@componentsExtensions")
     }
 
     private fun extractCallbacks(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, Callback> {
@@ -1054,14 +1316,17 @@ class NetworkParser {
     ): RequestBody {
         val overrideBody = overrideResult.body
         if (overrideBody.reference != null) return overrideBody
-        val baseBody = base ?: RequestBody()
-        val mergedContent = if (overrideBody.content.isEmpty()) baseBody.content else overrideBody.content
+        if (base == null) return overrideBody
+        val baseBody = base
+        val mergedContent = if (overrideBody.contentPresent) overrideBody.content else baseBody.content
+        val mergedContentPresent = if (overrideBody.contentPresent) true else baseBody.contentPresent
         val mergedRequired = if (overrideResult.requiredPresent) overrideBody.required else baseBody.required
         val mergedDescription = overrideBody.description ?: baseBody.description
         val mergedExtensions = if (overrideBody.extensions.isNotEmpty()) overrideBody.extensions else baseBody.extensions
         return baseBody.copy(
             description = mergedDescription,
             content = mergedContent,
+            contentPresent = mergedContentPresent,
             required = mergedRequired,
             reference = overrideBody.reference,
             extensions = mergedExtensions
@@ -1242,10 +1507,12 @@ class NetworkParser {
             return RequestBodyParseResult(RequestBody(reference = reference), obj.has("required"))
         }
         val requiredPresent = obj.has("required")
+        val hasContent = obj.has("content")
         return RequestBodyParseResult(
             body = RequestBody(
                 description = obj.text("description"),
                 content = parseContentNode(obj.get("content")),
+                contentPresent = hasContent,
                 required = obj.boolean("required") ?: false,
                 reference = null,
                 extensions = parseExtensions(obj)
@@ -1261,11 +1528,69 @@ class NetworkParser {
 
     private fun selectSchema(content: Map<String, MediaTypeObject>): SchemaProperty? {
         if (content.isEmpty()) return null
-        val preferred = content["application/json"] ?: content.values.first()
-        return preferred.schema
-            ?: preferred.itemSchema
-            ?: preferred.reference?.ref?.let { SchemaProperty(ref = it) }
+        val preferred = selectPreferredMediaTypeEntry(content).value
+        preferred.schema?.let { return it }
+        preferred.itemSchema?.let { return wrapItemSchemaAsArray(it) }
+        return preferred.reference?.ref?.let { SchemaProperty(ref = it) }
             ?: preferred.ref?.let { SchemaProperty(ref = it) }
+    }
+
+    private fun wrapItemSchemaAsArray(itemSchema: SchemaProperty): SchemaProperty {
+        return SchemaProperty(types = setOf("array"), items = itemSchema)
+    }
+
+    private data class MediaTypeScore(
+        val specificity: Int,
+        val jsonPreference: Int,
+        val length: Int,
+        val key: String
+    )
+
+    private fun selectPreferredMediaTypeEntry(
+        content: Map<String, MediaTypeObject>
+    ): Map.Entry<String, MediaTypeObject> {
+        if (content.isEmpty()) {
+            throw IllegalArgumentException("content map is empty")
+        }
+        val entries = content.entries.toList()
+        val scored = entries.map { entry ->
+            entry to mediaTypeScore(entry.key)
+        }
+        val comparator = Comparator<Pair<Map.Entry<String, MediaTypeObject>, MediaTypeScore>> { a, b ->
+            val left = a.second
+            val right = b.second
+            when {
+                left.specificity != right.specificity -> left.specificity.compareTo(right.specificity)
+                left.jsonPreference != right.jsonPreference -> left.jsonPreference.compareTo(right.jsonPreference)
+                left.length != right.length -> left.length.compareTo(right.length)
+                else -> right.key.compareTo(left.key)
+            }
+        }
+        return scored.maxWithOrNull(comparator)?.first ?: entries.first()
+    }
+
+    private fun mediaTypeScore(raw: String): MediaTypeScore {
+        val main = raw.trim().substringBefore(";").trim().lowercase()
+        val parts = main.split("/")
+        if (parts.size != 2) {
+            return MediaTypeScore(specificity = -1, jsonPreference = 0, length = main.length, key = main)
+        }
+        val type = parts[0]
+        val subtype = parts[1]
+        val typeScore = if (type == "*") 0 else 1
+        val subtypeScore = when {
+            subtype == "*" -> 0
+            subtype.startsWith("*+") -> 1
+            else -> 2
+        }
+        val specificity = typeScore * 10 + subtypeScore
+        val jsonPreference = if (subtype == "json" || subtype.endsWith("+json")) 1 else 0
+        return MediaTypeScore(
+            specificity = specificity,
+            jsonPreference = jsonPreference,
+            length = main.length,
+            key = main
+        )
     }
 
     private fun parseHeaderNode(node: JsonNode): Header {
@@ -1695,6 +2020,14 @@ class NetworkParser {
             .find { it.startsWith("@description") }
             ?: return null
         return descLine.removePrefix("@description").trim().ifEmpty { null }
+    }
+
+    private fun extractOperationIdOmitted(element: org.jetbrains.kotlin.psi.KtDeclaration): Boolean {
+        val docComment = element.docComment ?: return false
+        return docComment.text
+            .split("\n")
+            .map { cleanKDocLine(it) }
+            .any { it == "@operationIdOmitted" || it.startsWith("@operationIdOmitted ") }
     }
 
     private fun extractDeprecated(element: org.jetbrains.kotlin.psi.KtDeclaration): Boolean {

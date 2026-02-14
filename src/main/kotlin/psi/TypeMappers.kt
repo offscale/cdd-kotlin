@@ -8,6 +8,7 @@ import domain.SchemaProperty
  * - Multi-Type (e.g. ["string", "null"]) mappings.
  * - Map types via `additionalProperties`.
  * - Binary Content via `contentMediaType` / `contentEncoding` (replacing `format: binary`).
+ * - Infer types when `type` is omitted by inspecting JSON Schema keywords.
  */
 object TypeMappers {
 
@@ -19,36 +20,75 @@ object TypeMappers {
      * Resolves references via [ReferenceResolver].
      */
     fun mapType(prop: SchemaProperty): String {
-        prop.booleanSchema?.let { booleanValue ->
-            return if (booleanValue) "Any" else "Nothing"
-        }
-        if (prop.ref != null) {
-            val typeName = ReferenceResolver.resolveRefToType(prop.ref)
-            // If explicit type set is just null reference (impossible) or ref is primary
-            return typeName
-        }
+        return mapType(prop, null)
+    }
 
-        // Identify primary type (ignore "null" for type selection, it handled via nullability later)
-        val primaryType = prop.types.firstOrNull { it != "null" } ?: "string"
+    /**
+     * Maps an OpenAPI Schema Property to a Kotlin type string, with optional
+     * dynamic reference resolution support.
+     *
+     * @param dynamicRefResolver Optional resolver for `$dynamicRef` targets, scoped to the property.
+     */
+    fun mapType(
+        prop: SchemaProperty,
+        dynamicRefResolver: ((SchemaProperty, String) -> SchemaProperty?)?
+    ): String {
+        return mapTypeInternal(prop, dynamicRefResolver, LinkedHashSet())
+    }
 
-        return when (primaryType) {
-            "string" -> mapStringType(prop)
-            "integer" -> if (prop.format == "int64") "Long" else "Int"
-            "number" -> if (prop.format == "float") "Float" else "Double"
-            "boolean" -> "Boolean"
-            "array" -> {
-                val itemType = prop.items?.let { mapType(it) } ?: "Any"
-                "List<$itemType>"
+    private fun mapTypeInternal(
+        prop: SchemaProperty,
+        dynamicRefResolver: ((SchemaProperty, String) -> SchemaProperty?)?,
+        stack: MutableSet<SchemaProperty>
+    ): String {
+        if (!stack.add(prop)) return "Any"
+
+        try {
+            prop.booleanSchema?.let { booleanValue ->
+                return if (booleanValue) "Any" else "Nothing"
             }
-            "object" -> {
-                if (prop.additionalProperties != null) {
-                    val valueType = mapType(prop.additionalProperties)
-                    "Map<String, $valueType>"
-                } else {
-                    "Any"
+
+            prop.dynamicRef?.let { dynamicRef ->
+                val resolved = dynamicRefResolver?.invoke(prop, dynamicRef)
+                if (resolved != null && resolved !== prop) {
+                    return mapTypeInternal(resolved, dynamicRefResolver, stack)
                 }
             }
-            else -> "Any" // Fallback for unknown types
+
+            val ref = prop.ref ?: prop.dynamicRef
+            if (ref != null) {
+                val typeName = ReferenceResolver.resolveRefToType(ref)
+                return typeName
+            }
+
+            val effectiveTypes = if (prop.types.isNotEmpty()) prop.types else inferTypes(prop)
+
+            // Identify primary type (ignore "null" for type selection, it handled via nullability later)
+            val primaryType = effectiveTypes.firstOrNull { it != "null" }
+                ?: effectiveTypes.firstOrNull()
+                ?: "string"
+
+            return when (primaryType) {
+                "string" -> mapStringType(prop)
+                "integer" -> if (prop.format == "int64") "Long" else "Int"
+                "number" -> if (prop.format == "float") "Float" else "Double"
+                "boolean" -> "Boolean"
+                "array" -> {
+                    val itemType = prop.items?.let { mapTypeInternal(it, dynamicRefResolver, stack) } ?: "Any"
+                    "List<$itemType>"
+                }
+                "object" -> {
+                    if (prop.additionalProperties != null) {
+                        val valueType = mapTypeInternal(prop.additionalProperties, dynamicRefResolver, stack)
+                        "Map<String, $valueType>"
+                    } else {
+                        "Any"
+                    }
+                }
+                else -> "Any" // Fallback for unknown types
+            }
+        } finally {
+            stack.remove(prop)
         }
     }
 
@@ -75,6 +115,68 @@ object TypeMappers {
         }
     }
 
+    private fun inferTypes(prop: SchemaProperty): Set<String> {
+        if (prop.items != null || prop.prefixItems.isNotEmpty() || prop.contains != null ||
+            prop.minItems != null || prop.maxItems != null || prop.uniqueItems != null
+        ) {
+            return setOf("array")
+        }
+
+        if (prop.properties.isNotEmpty() || prop.additionalProperties != null ||
+            prop.patternProperties.isNotEmpty() || prop.propertyNames != null ||
+            prop.dependentSchemas.isNotEmpty() || prop.minProperties != null || prop.maxProperties != null ||
+            prop.required.isNotEmpty()
+        ) {
+            return setOf("object")
+        }
+
+        prop.constValue?.let { value ->
+            val type = inferTypeFromValue(value)
+            return if (type.isNullOrBlank()) emptySet() else setOf(type)
+        }
+
+        prop.enumValues?.let { values ->
+            val inferred = inferTypesFromEnum(values)
+            if (inferred.isNotEmpty()) return inferred
+        }
+
+        if (prop.minimum != null || prop.maximum != null || prop.multipleOf != null ||
+            prop.exclusiveMinimum != null || prop.exclusiveMaximum != null
+        ) {
+            return setOf("number")
+        }
+
+        if (prop.minLength != null || prop.maxLength != null || prop.pattern != null ||
+            prop.contentEncoding != null || prop.contentMediaType != null || prop.format != null
+        ) {
+            return setOf("string")
+        }
+
+        return emptySet()
+    }
+
+    private fun inferTypesFromEnum(values: List<Any?>): Set<String> {
+        if (values.isEmpty()) return emptySet()
+        val types = values.mapNotNull { inferTypeFromValue(it) }.toSet()
+        if (types.isEmpty()) return emptySet()
+        if (types.size == 1) return types
+        if (types.size == 2 && types.contains("null")) return types
+        return emptySet()
+    }
+
+    private fun inferTypeFromValue(value: Any?): String? {
+        return when (value) {
+            null -> "null"
+            is String -> "string"
+            is Int, is Long, is Short, is Byte -> "integer"
+            is Float, is Double -> "number"
+            is Boolean -> "boolean"
+            is Map<*, *> -> "object"
+            is List<*> -> "array"
+            else -> null
+        }
+    }
+
     /**
      * Maps a Kotlin type string (PSI representation) back to an OpenAPI Schema Property.
      * e.g. "List<String>?" -> types: ["array", "null"], items: { types: ["string"] }
@@ -94,6 +196,9 @@ object TypeMappers {
         var contentEncoding: String? = null
 
         when {
+            cleanType == "Any" -> {
+                return SchemaProperty(booleanSchema = true)
+            }
             cleanType == "String" -> types.add("string")
             cleanType == "Int" -> { types.add("integer"); format = "int32" }
             cleanType == "Long" -> { types.add("integer"); format = "int64" }

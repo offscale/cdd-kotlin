@@ -1,6 +1,7 @@
 package psi
 
 import domain.Callback
+import domain.EncodingObject
 import domain.EndpointDefinition
 import domain.EndpointParameter
 import domain.EndpointResponse
@@ -16,6 +17,7 @@ import domain.ParameterStyle
 import domain.PathItem
 import domain.ReferenceObject
 import domain.RequestBody
+import domain.SchemaDefinition
 import domain.SchemaProperty
 import domain.SecurityScheme
 import domain.Server
@@ -24,6 +26,7 @@ import domain.Tag
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
 import org.junit.jupiter.api.AfterAll
@@ -129,6 +132,137 @@ class NetworkGeneratorTest {
     }
 
     @Test
+    fun `generateApi encodes path parameters`() {
+        val endpoints = listOf(
+            EndpointDefinition(
+                path = "/pets/{petId}",
+                method = HttpMethod.GET,
+                operationId = "getPet",
+                parameters = listOf(
+                    EndpointParameter(
+                        name = "petId",
+                        type = "String",
+                        location = ParameterLocation.PATH,
+                        isRequired = true
+                    )
+                ),
+                responses = mapOf("200" to EndpointResponse("200", type = "String"))
+            )
+        )
+
+        val text = generator.generateApi("com.test", "PetApi", endpoints).text
+
+        assertTrue(text.contains("encodePathComponent(petId.toString(), false)"))
+        assertTrue(text.contains("/pets/"))
+    }
+
+    @Test
+    fun `generateApi allows reserved path parameters`() {
+        val endpoints = listOf(
+            EndpointDefinition(
+                path = "/records/{recordId}",
+                method = HttpMethod.GET,
+                operationId = "getRecord",
+                parameters = listOf(
+                    EndpointParameter(
+                        name = "recordId",
+                        type = "String",
+                        location = ParameterLocation.PATH,
+                        isRequired = true,
+                        allowReserved = true
+                    )
+                ),
+                responses = mapOf("200" to EndpointResponse("200", type = "String"))
+            )
+        )
+
+        val text = generator.generateApi("com.test", "RecordApi", endpoints).text
+
+        assertTrue(text.contains("encodePathComponent(recordId.toString(), true)"))
+    }
+
+    @Test
+    fun `generateApi serializes path parameters with content`() {
+        val endpoints = listOf(
+            EndpointDefinition(
+                path = "/filters/{filter}",
+                method = HttpMethod.GET,
+                operationId = "getFiltered",
+                parameters = listOf(
+                    EndpointParameter(
+                        name = "filter",
+                        type = "String",
+                        location = ParameterLocation.PATH,
+                        isRequired = true,
+                        content = mapOf(
+                            "application/json" to MediaTypeObject(
+                                schema = SchemaProperty(types = setOf("string"))
+                            )
+                        )
+                    )
+                ),
+                responses = mapOf("200" to EndpointResponse("200", type = "String"))
+            )
+        )
+
+        val text = generator.generateApi("com.test", "FilterApi", endpoints).text
+
+        assertTrue(text.contains("serializeContentValue(filter, \"application/json\")"))
+        assertTrue(text.contains("encodePathComponent(serializeContentValue(filter, \"application/json\"), false)"))
+    }
+
+    @Test
+    fun `generateApi rejects style with path content`() {
+        val endpoints = listOf(
+            EndpointDefinition(
+                path = "/filters/{filter}",
+                method = HttpMethod.GET,
+                operationId = "getFiltered",
+                parameters = listOf(
+                    EndpointParameter(
+                        name = "filter",
+                        type = "String",
+                        location = ParameterLocation.PATH,
+                        isRequired = true,
+                        style = ParameterStyle.MATRIX,
+                        content = mapOf(
+                            "application/json" to MediaTypeObject(
+                                schema = SchemaProperty(types = setOf("string"))
+                            )
+                        )
+                    )
+                ),
+                responses = mapOf("200" to EndpointResponse("200", type = "String"))
+            )
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            generator.generateApi("com.test", "FilterApi", endpoints)
+        }
+    }
+
+    @Test
+    fun `generateApi preserves empty requestBody content when flagged`() {
+        val endpoints = listOf(
+            EndpointDefinition(
+                path = "/raw",
+                method = HttpMethod.POST,
+                operationId = "rawPayload",
+                requestBody = RequestBody(
+                    description = "raw payload",
+                    contentPresent = true
+                ),
+                responses = mapOf("200" to EndpointResponse("200", type = "String"))
+            )
+        )
+
+        val text = generator.generateApi("com.test", "RawApi", endpoints).text
+
+        assertTrue(text.contains("@requestBody"), "Missing @requestBody KDoc tag")
+        assertTrue(text.contains("\"content\":{}"), "Expected explicit empty content in KDoc")
+    }
+
+    @Test
     fun `generateApi emits paramRef and responseRef tags`() {
         val paramRef = ReferenceObject(
             ref = "#/components/parameters/Limit",
@@ -198,6 +332,113 @@ class NetworkGeneratorTest {
     }
 
     @Test
+    fun `generateApi emits component metadata tags`() {
+        val callbackOperation = EndpointDefinition(
+            path = "/callbacks",
+            method = HttpMethod.POST,
+            operationId = "onEvent",
+            responses = mapOf(
+                "200" to EndpointResponse(statusCode = "200", description = "ok")
+            )
+        )
+        val metadata = OpenApiMetadata(
+            componentExamples = mapOf(
+                "Example1" to ExampleObject(summary = "example", value = mapOf("id" to 1))
+            ),
+            componentLinks = mapOf(
+                "GetUser" to Link(operationId = "getUser")
+            ),
+            componentCallbacks = mapOf(
+                "OnEvent" to Callback.Inline(
+                    expressions = mapOf("{\$request.body#/url}" to PathItem(post = callbackOperation))
+                )
+            ),
+            componentParameters = mapOf(
+                "Limit" to EndpointParameter(
+                    name = "limit",
+                    type = "Int",
+                    location = ParameterLocation.QUERY,
+                    schema = SchemaProperty(types = setOf("integer"))
+                )
+            ),
+            componentResponses = mapOf(
+                "NotFound" to EndpointResponse(statusCode = "NotFound", description = "missing")
+            ),
+            componentRequestBodies = mapOf(
+                "UserBody" to RequestBody(
+                    description = "user payload",
+                    content = mapOf(
+                        "application/json" to MediaTypeObject(schema = SchemaProperty(types = setOf("object")))
+                    )
+                )
+            ),
+            componentHeaders = mapOf(
+                "X-Rate-Limit" to Header(
+                    type = "Int",
+                    schema = SchemaProperty(types = setOf("integer"))
+                )
+            ),
+            componentPathItems = mapOf(
+                "UserPath" to PathItem(
+                    get = EndpointDefinition(
+                        path = "/users/{id}",
+                        method = HttpMethod.GET,
+                        operationId = "getUser",
+                        responses = mapOf("200" to EndpointResponse(statusCode = "200", description = "ok"))
+                    )
+                )
+            ),
+            componentMediaTypes = mapOf(
+                "application/json" to MediaTypeObject(schema = SchemaProperty(types = setOf("string")))
+            ),
+            componentSchemas = mapOf(
+                "Extra" to SchemaDefinition(name = "Extra", type = "object")
+            ),
+            componentsExtensions = mapOf(
+                "x-component-flag" to true
+            )
+        )
+        val endpoints = listOf(
+            EndpointDefinition(
+                path = "/users",
+                method = HttpMethod.GET,
+                operationId = "listUsers",
+                responses = mapOf("200" to EndpointResponse("200", type = "String"))
+            )
+        )
+
+        val text = generator.generateApi(
+            packageName = "com.test",
+            apiName = "MetadataApi",
+            endpoints = endpoints,
+            metadata = metadata
+        ).text
+
+        assertTrue(text.contains("@componentExamples"), "Missing @componentExamples KDoc tag")
+        assertTrue(text.contains("\"Example1\""), "Missing component example name")
+        assertTrue(text.contains("@componentLinks"), "Missing @componentLinks KDoc tag")
+        assertTrue(text.contains("\"GetUser\""), "Missing component link name")
+        assertTrue(text.contains("@componentCallbacks"), "Missing @componentCallbacks KDoc tag")
+        assertTrue(text.contains("\"OnEvent\""), "Missing component callback name")
+        assertTrue(text.contains("@componentParameters"), "Missing @componentParameters KDoc tag")
+        assertTrue(text.contains("\"Limit\""), "Missing component parameter name")
+        assertTrue(text.contains("@componentResponses"), "Missing @componentResponses KDoc tag")
+        assertTrue(text.contains("\"NotFound\""), "Missing component response name")
+        assertTrue(text.contains("@componentRequestBodies"), "Missing @componentRequestBodies KDoc tag")
+        assertTrue(text.contains("\"UserBody\""), "Missing component request body name")
+        assertTrue(text.contains("@componentHeaders"), "Missing @componentHeaders KDoc tag")
+        assertTrue(text.contains("\"X-Rate-Limit\""), "Missing component header name")
+        assertTrue(text.contains("@componentPathItems"), "Missing @componentPathItems KDoc tag")
+        assertTrue(text.contains("\"UserPath\""), "Missing component path item name")
+        assertTrue(text.contains("@componentMediaTypes"), "Missing @componentMediaTypes KDoc tag")
+        assertTrue(text.contains("\"application/json\""), "Missing component media type name")
+        assertTrue(text.contains("@componentSchemas"), "Missing @componentSchemas KDoc tag")
+        assertTrue(text.contains("\"Extra\""), "Missing component schema name")
+        assertTrue(text.contains("@componentsExtensions"), "Missing @componentsExtensions KDoc tag")
+        assertTrue(text.contains("\"x-component-flag\""), "Missing component extension key")
+    }
+
+    @Test
     fun `generateApi emits callbacks KDoc`() {
         val endpoints = listOf(
             EndpointDefinition(
@@ -261,7 +502,15 @@ class NetworkGeneratorTest {
             externalDocs = ExternalDocumentation("Docs", "https://docs.example.com"),
             extensions = mapOf("x-root" to true),
             pathsExtensions = mapOf("x-paths" to "paths-ext"),
+            pathsExplicitEmpty = true,
+            pathItems = mapOf(
+                "/pets" to PathItem(
+                    summary = "Pets",
+                    description = "All pets"
+                )
+            ),
             webhooksExtensions = mapOf("x-webhooks" to mapOf("flag" to true)),
+            webhooksExplicitEmpty = true,
             securitySchemes = mapOf(
                 "api_key" to SecurityScheme(
                     type = "apiKey",
@@ -298,8 +547,12 @@ class NetworkGeneratorTest {
         assertTrue(text.contains("\"x-root\":true"), "Missing root extension in @extensions")
         assertTrue(text.contains("@pathsExtensions"), "Missing @pathsExtensions KDoc tag")
         assertTrue(text.contains("\"x-paths\":\"paths-ext\""), "Missing paths extension in @pathsExtensions")
+        assertTrue(text.contains("@pathsEmpty"), "Missing @pathsEmpty KDoc tag")
+        assertTrue(text.contains("@pathItems"), "Missing @pathItems KDoc tag")
+        assertTrue(text.contains("\"/pets\""), "Missing path key in @pathItems")
         assertTrue(text.contains("@webhooksExtensions"), "Missing @webhooksExtensions KDoc tag")
         assertTrue(text.contains("\"x-webhooks\""), "Missing webhooks extension in @webhooksExtensions")
+        assertTrue(text.contains("@webhooksEmpty"), "Missing @webhooksEmpty KDoc tag")
         assertTrue(text.contains("@securitySchemes"), "Missing @securitySchemes KDoc tag")
         assertTrue(text.contains("\"apiKey\""), "Missing security scheme type in @securitySchemes")
     }
@@ -401,7 +654,7 @@ class NetworkGeneratorTest {
 
         val text = generator.generateApi("com.test", "UserApi", endpoints).text
 
-        assertTrue(text.contains("client.request(\"\$baseUrl/users/\$id\")"))
+        assertTrue(text.contains("client.request(\"\$baseUrl/users/${'$'}{encodePathComponent(id.toString(), false)}\")"))
     }
 
     @Test
@@ -421,7 +674,40 @@ class NetworkGeneratorTest {
 
         val text = generator.generateApi("com.test", "UserApi", endpoints).text
 
-        assertTrue(text.contains("client.request(\"https://override.example.com/users/\$id\")"))
+        assertTrue(
+            text.contains(
+                "client.request(\"https://override.example.com/users/${'$'}{encodePathComponent(id.toString(), false)}\")"
+            )
+        )
+        assertTrue(text.contains("@servers"), "Missing @servers KDoc tag")
+    }
+
+    @Test
+    fun `generateApi resolves operation server variables with defaults`() {
+        val endpoints = listOf(
+            EndpointDefinition(
+                path = "/status",
+                method = HttpMethod.GET,
+                operationId = "getStatus",
+                servers = listOf(
+                    Server(
+                        url = "https://{region}.example.com/{version}",
+                        variables = mapOf(
+                            "region" to ServerVariable(default = "us"),
+                            "version" to ServerVariable(default = "v1")
+                        )
+                    )
+                ),
+                responses = mapOf("200" to EndpointResponse("200", type = "String"))
+            )
+        )
+
+        val text = generator.generateApi("com.test", "ServerVarApi", endpoints).text
+
+        assertTrue(
+            text.contains("client.request(\"https://us.example.com/v1/status\")"),
+            "Server variables should resolve to defaults in operation-level override URLs"
+        )
         assertTrue(text.contains("@servers"), "Missing @servers KDoc tag")
     }
 
@@ -447,11 +733,47 @@ class NetworkGeneratorTest {
 
         val text = generator.generateApi("com.test", "VarsApi", endpoints, servers = servers).text
 
+        assertTrue(text.contains("data class ServerSpec"), "Missing ServerSpec data class")
         assertTrue(text.contains("data class ServerVariables"), "Missing ServerVariables data class")
         assertTrue(text.contains("val version: String = \"v1\""), "Missing default variable value")
         assertTrue(text.contains("fun resolveServerUrl"), "Missing resolveServerUrl helper")
         assertTrue(text.contains("fun defaultBaseUrl"), "Missing defaultBaseUrl helper")
-        assertTrue(text.contains("private val baseUrl: String = defaultBaseUrl()"), "Base URL should use defaultBaseUrl")
+        assertTrue(text.contains("serverIndex: Int = 0"), "Missing serverIndex parameter")
+        assertTrue(text.contains("serverName: String? = null"), "Missing serverName parameter")
+        assertTrue(
+            text.contains("private val baseUrl: String = defaultBaseUrl(serverIndex, serverName, serverVariables)"),
+            "Base URL should use defaultBaseUrl with server selection"
+        )
+    }
+
+    @Test
+    fun `generateApi emits enum typed server variables when enum is defined`() {
+        val endpoints = listOf(
+            EndpointDefinition(
+                path = "/status",
+                method = HttpMethod.GET,
+                operationId = "status",
+                responses = mapOf("200" to EndpointResponse("200", type = "String"))
+            )
+        )
+
+        val servers = listOf(
+            Server(
+                url = "https://{env}.example.com",
+                variables = mapOf(
+                    "env" to ServerVariable(
+                        default = "prod",
+                        enum = listOf("prod", "staging")
+                    )
+                )
+            )
+        )
+
+        val text = generator.generateApi("com.test", "EnvApi", endpoints, servers = servers).text
+
+        assertTrue(text.contains("enum class Env"), "Missing enum class for server variable")
+        assertTrue(text.contains("val env: Env = Env.PROD"), "Missing enum-typed server variable")
+        assertTrue(text.contains("\"env\" to env.value"), "ServerVariables.toMap should use enum values")
     }
 
     @Test
@@ -475,6 +797,85 @@ class NetworkGeneratorTest {
         assertTrue(text.contains("parameter(\"q\", q)"))
         assertTrue(text.contains("header(\"auth\", auth)"))
         assertTrue(text.contains("cookie(\"session\", session)"))
+    }
+
+    @Test
+    fun `generateApi serializes content parameters for query header and cookie`() {
+        val endpoints = listOf(
+            EndpointDefinition(
+                path = "/content",
+                method = HttpMethod.GET,
+                operationId = "contentParams",
+                parameters = listOf(
+                    EndpointParameter(
+                        name = "filters",
+                        type = "Filters",
+                        location = ParameterLocation.QUERY,
+                        content = mapOf(
+                            "application/json" to MediaTypeObject(
+                                schema = SchemaProperty(types = setOf("object"))
+                            )
+                        )
+                    ),
+                    EndpointParameter(
+                        name = "meta",
+                        type = "Meta",
+                        location = ParameterLocation.HEADER,
+                        content = mapOf(
+                            "application/json" to MediaTypeObject(
+                                schema = SchemaProperty(types = setOf("object"))
+                            )
+                        )
+                    ),
+                    EndpointParameter(
+                        name = "session",
+                        type = "String",
+                        location = ParameterLocation.COOKIE,
+                        content = mapOf(
+                            "text/plain" to MediaTypeObject(
+                                schema = SchemaProperty(types = setOf("string"))
+                            )
+                        )
+                    )
+                ),
+                responses = mapOf("200" to EndpointResponse("200", type = "Unit"))
+            )
+        )
+
+        val text = generator.generateApi("com.test", "ContentApi", endpoints).text
+
+        assertTrue(text.contains("parameter(\"filters\", serializeContentValue(filters, \"application/json\"))"))
+        assertTrue(text.contains("header(\"meta\", serializeContentValue(meta, \"application/json\"))"))
+        assertTrue(text.contains("cookie(\"session\", serializeContentValue(session, \"text/plain\"))"))
+    }
+
+    @Test
+    fun `generateApi rejects content parameters with style or explode`() {
+        val endpoints = listOf(
+            EndpointDefinition(
+                path = "/content",
+                method = HttpMethod.GET,
+                operationId = "invalidContentParams",
+                parameters = listOf(
+                    EndpointParameter(
+                        name = "filters",
+                        type = "Filters",
+                        location = ParameterLocation.QUERY,
+                        style = ParameterStyle.FORM,
+                        content = mapOf(
+                            "application/json" to MediaTypeObject(
+                                schema = SchemaProperty(types = setOf("object"))
+                            )
+                        )
+                    )
+                ),
+                responses = mapOf("200" to EndpointResponse("200", type = "Unit"))
+            )
+        )
+
+        assertThrows(IllegalArgumentException::class.java) {
+            generator.generateApi("com.test", "ContentApi", endpoints)
+        }
     }
 
     @Test
@@ -713,6 +1114,39 @@ class NetworkGeneratorTest {
     }
 
     @Test
+    fun `generateApi omits Content-Type from response headers`() {
+        val endpoints = listOf(
+            EndpointDefinition(
+                path = "/headers",
+                method = HttpMethod.GET,
+                operationId = "headers",
+                responses = mapOf(
+                    "200" to EndpointResponse(
+                        statusCode = "200",
+                        description = "ok",
+                        type = "String",
+                        headers = mapOf(
+                            "Content-Type" to Header(
+                                type = "String",
+                                schema = SchemaProperty(types = setOf("string"))
+                            ),
+                            "X-Trace" to Header(
+                                type = "String",
+                                schema = SchemaProperty(types = setOf("string"))
+                            )
+                        )
+                    )
+                )
+            )
+        )
+
+        val text = generator.generateApi("com.test", "ResponseHeaderApi", endpoints).text
+
+        assertTrue(text.contains("\"X-Trace\""))
+        assertTrue(!text.contains("\"Content-Type\""))
+    }
+
+    @Test
     fun `generateApi rejects query and querystring together`() {
         val endpoints = listOf(
             EndpointDefinition(
@@ -770,7 +1204,10 @@ class NetworkGeneratorTest {
         val text = generator.generateApi("com.style", "StyleApi", endpoints).text
 
         // Matrix Check
-        assertTrue(text.contains("client.request(\"\$baseUrl/users;id=\$id\")"), "Matrix path generation failed")
+        assertTrue(
+            text.contains("client.request(\"\$baseUrl/users;id=${'$'}{encodePathComponent(id.toString(), false)}\")"),
+            "Matrix path generation failed"
+        )
 
         // Query param lists
         assertTrue(text.contains("parameter(\"tags\", tags.joinToString(\",\"))"), "Tags joinToString comma failed")
@@ -792,7 +1229,7 @@ class NetworkGeneratorTest {
         )
         val text = generator.generateApi("com.lbl", "LabelApi", endpoints).text
         // Expect /files.$ext
-        assertTrue(text.contains("/files.\$ext"))
+        assertTrue(text.contains("/files.${'$'}{encodePathComponent(ext.toString(), false)}"))
     }
 
     @Test
@@ -831,9 +1268,9 @@ class NetworkGeneratorTest {
         val text = generator.generateApi("com.path", "PathApi", endpoints).text
 
         val expectedMatrix =
-            "client.request(\"\$baseUrl/items;ids=${'$'}{ids.joinToString(\";ids=\")}\")"
+            "client.request(\"\$baseUrl/items;ids=${'$'}{ids.joinToString(\";ids=\") { encodePathComponent(it.toString(), false) }}\")"
         val expectedObject =
-            "client.request(\"\$baseUrl/items/${'$'}{filter.entries.joinToString(\",\") { \"${'$'}{it.key}=${'$'}{it.value}\" }}\")"
+            "client.request(\"\$baseUrl/items/${'$'}{filter.entries.joinToString(\",\") { \"${'$'}{encodePathComponent(it.key.toString(), false)}=${'$'}{encodePathComponent(it.value.toString(), false)}\" }}\")"
 
         assertTrue(text.contains(expectedMatrix))
         assertTrue(text.contains(expectedObject))
@@ -906,8 +1343,32 @@ class NetworkGeneratorTest {
             )
         )
         val text = generator.generateApi("com.srv", "ServerApi", endpoints, servers).text
-        assertTrue(text.contains("private val baseUrl: String = \"https://api.v1.com\""))
-        assertTrue(text.contains("val SERVERS = listOf(\"https://api.v1.com\", \"https://staging.v1.com\")"))
+        assertTrue(text.contains("data class ServerSpec"), "Missing ServerSpec data class")
+        assertTrue(text.contains("serverIndex: Int = 0"), "Missing serverIndex parameter")
+        assertTrue(text.contains("serverName: String? = null"), "Missing serverName parameter")
+        assertTrue(
+            text.contains("private val baseUrl: String = defaultBaseUrl(serverIndex, serverName)"),
+            "Base URL should use defaultBaseUrl when multiple servers exist"
+        )
+        assertTrue(text.contains("val SERVERS = listOf("), "Missing SERVERS list")
+        assertTrue(text.contains("ServerSpec(url = \"https://api.v1.com\""), "Missing prod server entry")
+        assertTrue(text.contains("ServerSpec(url = \"https://staging.v1.com\""), "Missing staging server entry")
+    }
+
+    @Test
+    fun `generateApi defaults baseUrl to root when servers missing`() {
+        val endpoints = listOf(
+            EndpointDefinition(
+                path = "/ping",
+                method = HttpMethod.GET,
+                operationId = "ping"
+            )
+        )
+
+        val text = generator.generateApi("com.defaultsrv", "DefaultServerApi", endpoints).text
+
+        assertTrue(text.contains("private val baseUrl: String = \"/\""), "Base URL should default to '/' when servers are absent")
+        assertTrue(text.contains("client.request(\"${'$'}baseUrl/ping\")"), "Request should use default baseUrl")
     }
 
     @Test
@@ -934,6 +1395,29 @@ class NetworkGeneratorTest {
         assertTrue(text.contains("@tag system, public"))
         assertTrue(text.contains("@response 200 String Success"))
         assertTrue(text.contains("@response 404 Unit Not Found"))
+    }
+
+    @Test
+    fun `generateApi skips ContentType header for wildcard media types`() {
+        val endpoint = EndpointDefinition(
+            path = "/upload",
+            method = HttpMethod.POST,
+            operationId = "upload",
+            requestBody = RequestBody(
+                required = true,
+                content = mapOf(
+                    "text/*" to MediaTypeObject(schema = SchemaProperty("string"))
+                )
+            )
+        )
+
+        val text = generator.generateApi("com.wild", "WildcardApi", listOf(endpoint)).text
+
+        assertTrue(text.contains("setBody(body)"), "Body should still be set for wildcard content types")
+        assertTrue(
+            !text.contains("ContentType.parse(\"text/*\")"),
+            "Wildcard media types should not be passed to ContentType.parse"
+        )
     }
 
     @Test
@@ -1076,6 +1560,78 @@ class NetworkGeneratorTest {
         // Verify ApiKey via DefaultRequest
         assertTrue(text.contains("install(DefaultRequest) {"), "Missing DefaultRequest plugin")
         assertTrue(text.contains("header(\"X-API-KEY\", apiKeyAuth)"), "Missing header injection")
+    }
+
+    @Test
+    fun `generateApi supports oauth2 and openIdConnect security schemes`() {
+        val endpoints = listOf(
+            EndpointDefinition(
+                path = "/secure",
+                method = HttpMethod.GET,
+                operationId = "secureOp"
+            )
+        )
+        val schemes = mapOf(
+            "oauth2Auth" to SecurityScheme(type = "oauth2"),
+            "oidcAuth" to SecurityScheme(type = "openIdConnect", openIdConnectUrl = "https://example.com/.well-known")
+        )
+
+        val text = generator.generateApi("com.auth", "OauthApi", endpoints, emptyList(), schemes).text
+
+        assertTrue(text.contains("oauth2Auth: OAuthTokens? = null"), "Missing OAuth2 auth parameter")
+        assertTrue(text.contains("oidcAuth: OAuthTokens? = null"), "Missing OpenID Connect auth parameter")
+        assertTrue(text.contains("bearer {"), "Missing bearer block for OAuth2/OpenID Connect")
+        assertTrue(text.contains("BearerTokens(accessToken = oauth2Auth.accessToken"), "Missing OAuth2 bearer token loading")
+        assertTrue(text.contains("BearerTokens(accessToken = oidcAuth.accessToken"), "Missing OpenID Connect bearer token loading")
+    }
+
+    @Test
+    fun `generateApi emits OAuth flow scaffolding helpers`() {
+        val endpoints = listOf(
+            EndpointDefinition(
+                path = "/secure",
+                method = HttpMethod.GET,
+                operationId = "secureOp"
+            )
+        )
+        val schemes = mapOf(
+            "oauth2Auth" to SecurityScheme(type = "oauth2")
+        )
+
+        val text = generator.generateApi("com.auth", "OAuthHelpersApi", endpoints, emptyList(), schemes).text
+
+        assertTrue(text.contains("data class OAuthTokens"), "Missing OAuthTokens model")
+        assertTrue(text.contains("data class OAuthDeviceCodeResponse"), "Missing device code response model")
+        assertTrue(text.contains("data class Pkce"), "Missing PKCE model")
+        assertTrue(text.contains("fun createPkceVerifier"), "Missing PKCE verifier generator")
+        assertTrue(text.contains("fun buildAuthorizationUrl"), "Missing authorization URL builder")
+        assertTrue(text.contains("suspend fun exchangeAuthorizationCode"), "Missing authorization code exchange")
+        assertTrue(text.contains("suspend fun refreshToken"), "Missing token refresh")
+        assertTrue(text.contains("suspend fun requestDeviceCode"), "Missing device authorization request")
+        assertTrue(text.contains("suspend fun pollDeviceToken"), "Missing device token polling helper")
+    }
+
+    @Test
+    fun `generateApi supports mutualTLS security schemes`() {
+        val endpoints = listOf(
+            EndpointDefinition(
+                path = "/secure",
+                method = HttpMethod.GET,
+                operationId = "secureOp"
+            )
+        )
+        val schemes = mapOf(
+            "mutualTlsAuth" to SecurityScheme(type = "mutualTLS")
+        )
+
+        val text = generator.generateApi("com.auth", "MutualTlsApi", endpoints, emptyList(), schemes).text
+
+        assertTrue(text.contains("data class MutualTlsConfig"), "Missing MutualTlsConfig model")
+        assertTrue(text.contains("typealias MutualTlsConfigurer"), "Missing MutualTlsConfigurer hook")
+        assertTrue(text.contains("mutualTlsAuth: MutualTlsConfig? = null"), "Missing mutualTLS config parameter")
+        assertTrue(text.contains("mutualTlsConfigurer: MutualTlsConfigurer? = null"), "Missing mutualTLS configurer parameter")
+        assertTrue(text.contains("mutualTlsConfigurer?.let"), "Missing mutualTLS configurer invocation")
+        assertTrue(text.contains("configurer(this, mutualTlsAuth)"), "Missing mutualTLS config application")
     }
 
     @Test
@@ -1271,6 +1827,58 @@ class NetworkGeneratorTest {
     }
 
     @Test
+    fun `generateApi encodes sequential json request bodies`() {
+        val endpoint = EndpointDefinition(
+            path = "/stream",
+            method = HttpMethod.POST,
+            operationId = "streamEvents",
+            requestBody = RequestBody(
+                required = true,
+                content = mapOf(
+                    "application/x-ndjson" to MediaTypeObject(
+                        itemSchema = SchemaProperty(types = setOf("string"))
+                    )
+                )
+            ),
+            responses = mapOf(
+                "200" to EndpointResponse(statusCode = "200", type = "Unit")
+            )
+        )
+
+        val text = generator.generateApi("com.test", "SeqRequestApi", listOf(endpoint)).text
+
+        assertTrue(text.contains("contentType(ContentType.parse(\"application/x-ndjson\"))"))
+        assertTrue(text.contains("setBody(encodeSequentialJson(body, \"application/x-ndjson\"))"))
+        assertTrue(text.contains("encodeSequentialJson"))
+    }
+
+    @Test
+    fun `generateApi decodes sequential json responses`() {
+        val endpoint = EndpointDefinition(
+            path = "/stream",
+            method = HttpMethod.GET,
+            operationId = "streamEvents",
+            responses = mapOf(
+                "200" to EndpointResponse(
+                    statusCode = "200",
+                    content = mapOf(
+                        "application/jsonl" to MediaTypeObject(
+                            itemSchema = SchemaProperty(types = setOf("integer"))
+                        )
+                    )
+                )
+            )
+        )
+
+        val text = generator.generateApi("com.test", "SeqResponseApi", listOf(endpoint)).text
+
+        assertTrue(text.contains("suspend fun streamEvents(): Result<List<Int>>"))
+        assertTrue(text.contains("decodeSequentialJsonList<Int>(response.bodyAsText(), \"application/jsonl\")"))
+        assertTrue(text.contains("import io.ktor.client.statement.*"))
+        assertTrue(text.contains("import kotlinx.serialization.decodeFromString"))
+    }
+
+    @Test
     fun `generateApi selects first non-json request content type`() {
         val endpoint = EndpointDefinition(
             path = "/upload",
@@ -1293,6 +1901,200 @@ class NetworkGeneratorTest {
 
         assertTrue(text.contains("contentType(ContentType.parse(\"application/xml\"))"))
         assertTrue(text.contains("setBody(body)"))
+    }
+
+    @Test
+    fun `generateApi encodes form urlencoded request bodies`() {
+        val endpoint = EndpointDefinition(
+            path = "/submit-form",
+            method = HttpMethod.POST,
+            operationId = "submitForm",
+            requestBodyType = "FormPayload",
+            requestBody = RequestBody(
+                content = mapOf(
+                    "application/x-www-form-urlencoded" to MediaTypeObject(
+                        schema = SchemaProperty(types = setOf("object"))
+                    )
+                ),
+                required = true
+            ),
+            responses = mapOf(
+                "200" to EndpointResponse(statusCode = "200", type = "Unit")
+            )
+        )
+
+        val text = generator.generateApi("com.test", "FormApi", listOf(endpoint)).text
+
+        assertTrue(text.contains("import io.ktor.client.request.forms.*"))
+        assertTrue(text.contains("setBody(encodeFormBody(body"))
+        assertTrue(text.contains("FormDataContent"))
+        assertTrue(!text.contains("ContentType.parse(\"application/x-www-form-urlencoded\")"))
+    }
+
+    @Test
+    fun `generateApi honors form encoding style overrides`() {
+        val endpoint = EndpointDefinition(
+            path = "/submit-form",
+            method = HttpMethod.POST,
+            operationId = "submitFormEncoded",
+            requestBodyType = "FormPayload",
+            requestBody = RequestBody(
+                content = mapOf(
+                    "application/x-www-form-urlencoded" to MediaTypeObject(
+                        schema = SchemaProperty(types = setOf("object")),
+                        encoding = mapOf(
+                            "tags" to EncodingObject(
+                                style = ParameterStyle.SPACE_DELIMITED,
+                                explode = false,
+                                allowReserved = true
+                            ),
+                            "meta" to EncodingObject(
+                                style = ParameterStyle.DEEP_OBJECT
+                            )
+                        )
+                    )
+                ),
+                required = true
+            ),
+            responses = mapOf(
+                "200" to EndpointResponse(statusCode = "200", type = "Unit")
+            )
+        )
+
+        val text = generator.generateApi("com.test", "FormEncodingApi", listOf(endpoint)).text
+
+        assertTrue(text.contains("styles = mapOf("))
+        assertTrue(text.contains("\"tags\" to \"spaceDelimited\""))
+        assertTrue(text.contains("\"meta\" to \"deepObject\""))
+        assertTrue(text.contains("explode = mapOf(\"tags\" to false)"))
+        assertTrue(text.contains("allowReserved = mapOf(\"tags\" to true)"))
+        assertTrue(text.contains("TextContent("))
+    }
+
+    @Test
+    fun `generateApi encodes multipart form bodies with encoding content types`() {
+        val endpoint = EndpointDefinition(
+            path = "/upload",
+            method = HttpMethod.POST,
+            operationId = "uploadMultipart",
+            requestBodyType = "UploadPayload",
+            requestBody = RequestBody(
+                content = mapOf(
+                    "multipart/form-data" to MediaTypeObject(
+                        schema = SchemaProperty(types = setOf("object")),
+                        encoding = mapOf(
+                            "meta" to EncodingObject(contentType = "application/json")
+                        )
+                    )
+                ),
+                required = true
+            ),
+            responses = mapOf(
+                "200" to EndpointResponse(statusCode = "200", type = "Unit")
+            )
+        )
+
+        val text = generator.generateApi("com.test", "MultipartApi", listOf(endpoint)).text
+
+        assertTrue(text.contains("import io.ktor.client.request.forms.*"))
+        assertTrue(text.contains("setBody(encodeMultipartBody(body"))
+        assertTrue(text.contains("MultiPartFormDataContent"))
+        assertTrue(text.contains("mapOf(\"meta\" to \"application/json\")"))
+        assertTrue(text.contains("HttpHeaders.ContentType"))
+    }
+
+    @Test
+    fun `generateApi includes multipart encoding headers when example values are provided`() {
+        val endpoint = EndpointDefinition(
+            path = "/upload",
+            method = HttpMethod.POST,
+            operationId = "uploadMultipartWithHeaders",
+            requestBodyType = "UploadPayload",
+            requestBody = RequestBody(
+                content = mapOf(
+                    "multipart/form-data" to MediaTypeObject(
+                        schema = SchemaProperty(types = setOf("object")),
+                        encoding = mapOf(
+                            "meta" to EncodingObject(
+                                contentType = "application/json",
+                                headers = mapOf(
+                                    "X-Trace" to Header(
+                                        type = "String",
+                                        example = ExampleObject(value = "trace-123")
+                                    ),
+                                    "Content-Type" to Header(
+                                        type = "String",
+                                        example = ExampleObject(value = "ignored")
+                                    )
+                                )
+                            )
+                        )
+                    )
+                ),
+                required = true
+            ),
+            responses = mapOf(
+                "200" to EndpointResponse(statusCode = "200", type = "Unit")
+            )
+        )
+
+        val text = generator.generateApi("com.test", "MultipartHeaderApi", listOf(endpoint)).text
+
+        assertTrue(text.contains("headers = mapOf(\"meta\" to mapOf(\"X-Trace\" to \"trace-123\"))"))
+    }
+
+    @Test
+    fun `generateApi encodes positional multipart bodies`() {
+        val endpoint = EndpointDefinition(
+            path = "/mixed",
+            method = HttpMethod.POST,
+            operationId = "sendParts",
+            requestBody = RequestBody(
+                required = true,
+                content = mapOf(
+                    "multipart/mixed" to MediaTypeObject(
+                        schema = SchemaProperty(
+                            types = setOf("array"),
+                            items = SchemaProperty(types = setOf("string"))
+                        ),
+                        prefixEncoding = listOf(
+                            EncodingObject(contentType = "application/json"),
+                            EncodingObject(
+                                contentType = "image/png",
+                                headers = mapOf(
+                                    "X-Trace" to Header(
+                                        type = "String",
+                                        example = ExampleObject(dataValue = "trace")
+                                    )
+                                )
+                            )
+                        ),
+                        itemEncoding = EncodingObject(
+                            contentType = "text/plain",
+                            headers = mapOf(
+                                "X-Item" to Header(
+                                    type = "String",
+                                    example = ExampleObject(dataValue = "item")
+                                )
+                            )
+                        )
+                    )
+                )
+            ),
+            responses = mapOf(
+                "200" to EndpointResponse(statusCode = "200", type = "Unit")
+            )
+        )
+
+        val text = generator.generateApi("com.test", "MultipartPositionalApi", listOf(endpoint)).text
+
+        assertTrue(text.contains("suspend fun sendParts(body: List<String>): Result<Unit>"))
+        assertTrue(text.contains("contentType(ContentType.parse(\"multipart/mixed\"))"))
+        assertTrue(text.contains("setBody(encodeMultipartPositional(body"))
+        assertTrue(text.contains("prefixContentTypes = listOf(\"application/json\", \"image/png\")"))
+        assertTrue(text.contains("prefixHeaders = listOf(emptyMap(), mapOf(\"X-Trace\" to \"trace\"))"))
+        assertTrue(text.contains("itemContentType = \"text/plain\""))
+        assertTrue(text.contains("itemHeaders = mapOf(\"X-Item\" to \"item\")"))
     }
 
     @Test
@@ -1382,6 +2184,41 @@ class NetworkGeneratorTest {
     }
 
     @Test
+    fun `generateApi supports querystring content serialization`() {
+        val endpoint = EndpointDefinition(
+            path = "/search",
+            method = HttpMethod.GET,
+            operationId = "search",
+            parameters = listOf(
+                EndpointParameter(
+                    name = "selector",
+                    type = "Selector",
+                    location = ParameterLocation.QUERYSTRING,
+                    content = mapOf(
+                        "application/json" to MediaTypeObject(
+                            schema = SchemaProperty(types = setOf("object"))
+                        )
+                    )
+                )
+            ),
+            responses = mapOf(
+                "200" to EndpointResponse(statusCode = "200", description = "ok")
+            )
+        )
+
+        val file = generator.generateApi(
+            packageName = "com.example",
+            apiName = "QueryApi",
+            endpoints = listOf(endpoint)
+        )
+
+        val text = file.text
+        assertTrue(text.contains("encodeQueryStringContent(selector, \"application/json\")"))
+        assertTrue(text.contains("private inline fun <reified T> encodeQueryStringContent"))
+        assertTrue(text.contains("kotlinx.serialization.json"))
+    }
+
+    @Test
     fun `generateApi derives response type from content schema`() {
         val endpoint = EndpointDefinition(
             path = "/content",
@@ -1441,7 +2278,56 @@ class NetworkGeneratorTest {
 
         val text = generator.generateApi("com.test", "StreamApi", listOf(endpoint)).text
 
-        assertTrue(text.contains("Result<Int>"))
+        assertTrue(text.contains("Result<List<Int>>"))
+    }
+
+    @Test
+    fun `generateApi infers ByteArray for binary media types without schema`() {
+        val endpoint = EndpointDefinition(
+            path = "/binary",
+            method = HttpMethod.GET,
+            operationId = "getBinary",
+            responses = mapOf(
+                "200" to EndpointResponse(
+                    statusCode = "200",
+                    description = "ok",
+                    content = mapOf(
+                        "application/octet-stream" to MediaTypeObject()
+                    )
+                )
+            )
+        )
+
+        val text = generator.generateApi("com.test", "BinaryApi", listOf(endpoint)).text
+
+        assertTrue(text.contains("Result<ByteArray>"), "Expected ByteArray response type")
+        assertTrue(text.contains("response.body<ByteArray>()"), "Expected ByteArray response body decoding")
+    }
+
+    @Test
+    fun `generateApi infers String for form media types without schema`() {
+        val endpoint = EndpointDefinition(
+            path = "/form",
+            method = HttpMethod.POST,
+            operationId = "submitForm",
+            requestBody = RequestBody(
+                required = true,
+                content = mapOf(
+                    "application/x-www-form-urlencoded" to MediaTypeObject()
+                )
+            ),
+            responses = mapOf(
+                "200" to EndpointResponse(
+                    statusCode = "200",
+                    description = "ok"
+                )
+            )
+        )
+
+        val text = generator.generateApi("com.test", "FormApi", listOf(endpoint)).text
+
+        assertTrue(text.contains("suspend fun submitForm(body: String): Result<Unit>"))
+        assertTrue(text.contains("encodeFormBody(body"), "Expected form body encoding for schema-less form content")
     }
 
     @Test
@@ -1458,5 +2344,53 @@ class NetworkGeneratorTest {
         val signature = generator.generateMethodSignature(endpoint)
 
         assertEquals("suspend fun empty(): Result<Unit>", signature)
+    }
+
+    @Test
+    fun `generateApi selects most specific media type for request and response`() {
+        val endpoint = EndpointDefinition(
+            path = "/media",
+            method = HttpMethod.POST,
+            operationId = "sendMedia",
+            requestBody = RequestBody(
+                required = true,
+                content = mapOf(
+                    "application/*" to MediaTypeObject(schema = SchemaProperty(types = setOf("string"))),
+                    "application/json" to MediaTypeObject(schema = SchemaProperty(types = setOf("integer")))
+                )
+            ),
+            responses = mapOf(
+                "200" to EndpointResponse(
+                    statusCode = "200",
+                    description = "ok",
+                    content = mapOf(
+                        "text/*" to MediaTypeObject(schema = SchemaProperty(types = setOf("string"))),
+                        "text/plain" to MediaTypeObject(schema = SchemaProperty(types = setOf("integer")))
+                    )
+                )
+            )
+        )
+
+        val text = generator.generateApi("com.test", "MediaApi", listOf(endpoint)).text
+
+        assertTrue(text.contains("suspend fun sendMedia(body: Int): Result<Int>"))
+        assertTrue(text.contains("contentType(ContentType.parse(\"application/json\"))"))
+    }
+
+    @Test
+    fun `generateApi emits operationIdOmitted tag`() {
+        val endpoint = EndpointDefinition(
+            path = "/pets",
+            method = HttpMethod.GET,
+            operationId = "get_pets",
+            operationIdExplicit = false,
+            responses = mapOf("200" to EndpointResponse(statusCode = "200", description = "ok"))
+        )
+
+        val text = generator.generateApi("com.test", "PetsApi", listOf(endpoint)).text
+        assertTrue(text.contains("@operationIdOmitted"))
+
+        val parsed = NetworkParser().parseWithMetadata(text).endpoints.first()
+        assertFalse(parsed.operationIdExplicit)
     }
 }

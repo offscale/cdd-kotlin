@@ -34,6 +34,7 @@ import domain.Tag
 import domain.Xml
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -133,6 +134,103 @@ class OpenApiWriterTest {
     }
 
     @Test
+    fun `writeJson omits header style and explode when content is used`() {
+        val writer = OpenApiWriter()
+        val header = Header(
+            type = "string",
+            content = mapOf("text/plain" to MediaTypeObject(schema = SchemaProperty("string"))),
+            style = ParameterStyle.FORM,
+            explode = true
+        )
+        val response = EndpointResponse(
+            statusCode = "200",
+            description = "ok",
+            headers = mapOf("X-Test" to header)
+        )
+        val endpoint = EndpointDefinition(
+            path = "/headers",
+            method = HttpMethod.GET,
+            operationId = "headers",
+            responses = mapOf("200" to response)
+        )
+        val definition = OpenApiDefinition(
+            info = Info("Headers", "1.0"),
+            paths = mapOf("/headers" to PathItem(get = endpoint))
+        )
+
+        val json = writer.writeJson(definition)
+        val node = ObjectMapper(JsonFactory()).readTree(json)
+        val headerNode = node["paths"]["/headers"]["get"]["responses"]["200"]["headers"]["X-Test"]
+
+        assertTrue(!headerNode.has("style"))
+        assertTrue(!headerNode.has("explode"))
+        assertTrue(headerNode.has("content"))
+    }
+
+    @Test
+    fun `writeJson omits Content-Type response header`() {
+        val writer = OpenApiWriter()
+        val response = EndpointResponse(
+            statusCode = "200",
+            description = "ok",
+            headers = mapOf(
+                "Content-Type" to Header(
+                    type = "string",
+                    schema = SchemaProperty(types = setOf("string"))
+                ),
+                "X-Trace" to Header(
+                    type = "string",
+                    schema = SchemaProperty(types = setOf("string"))
+                )
+            )
+        )
+        val endpoint = EndpointDefinition(
+            path = "/headers",
+            method = HttpMethod.GET,
+            operationId = "headers",
+            responses = mapOf("200" to response)
+        )
+        val definition = OpenApiDefinition(
+            info = Info("Headers", "1.0"),
+            paths = mapOf("/headers" to PathItem(get = endpoint))
+        )
+
+        val json = writer.writeJson(definition)
+        val node = ObjectMapper(JsonFactory()).readTree(json)
+        val headersNode = node["paths"]["/headers"]["get"]["responses"]["200"]["headers"]
+
+        assertTrue(headersNode.has("X-Trace"))
+        assertTrue(!headersNode.has("Content-Type"))
+    }
+
+    @Test
+    fun `writeJson preserves explicit empty response content`() {
+        val writer = OpenApiWriter()
+        val response = EndpointResponse(
+            statusCode = "204",
+            description = "no content",
+            type = "Pet",
+            contentPresent = true
+        )
+        val endpoint = EndpointDefinition(
+            path = "/ping",
+            method = HttpMethod.GET,
+            operationId = "ping",
+            responses = mapOf("204" to response)
+        )
+        val definition = OpenApiDefinition(
+            info = Info("Ping", "1.0"),
+            paths = mapOf("/ping" to PathItem(get = endpoint))
+        )
+
+        val json = writer.writeJson(definition)
+        val node = ObjectMapper(JsonFactory()).readTree(json)
+        val contentNode = node["paths"]["/ping"]["get"]["responses"]["204"]["content"]
+        assertTrue(contentNode.isObject)
+        assertEquals(0, contentNode.size())
+    }
+
+    @Test
     fun `writeJson preserves schema property ref siblings`() {
         val writer = OpenApiWriter()
         val definition = OpenApiDefinition(
@@ -191,6 +289,25 @@ class OpenApiWriterTest {
         assertEquals(1, props["level"]["enum"][0].asInt())
         assertEquals(true, props["flag"]["enum"][0].asBoolean())
         assertEquals("fast", props["config"]["enum"][0]["mode"].asText())
+    }
+
+    @Test
+    fun `writeJson emits explicit empty paths and webhooks`() {
+        val definition = OpenApiDefinition(
+            info = Info("Empty API", "1.0.0"),
+            paths = emptyMap(),
+            webhooks = emptyMap(),
+            pathsExplicitEmpty = true,
+            webhooksExplicitEmpty = true
+        )
+
+        val json = OpenApiWriter().writeJson(definition)
+        val node = ObjectMapper(JsonFactory()).readTree(json)
+
+        assertTrue(node.has("paths"), "Expected paths to be present when explicit empty")
+        assertTrue(node.has("webhooks"), "Expected webhooks to be present when explicit empty")
+        assertEquals(0, node["paths"].size())
+        assertEquals(0, node["webhooks"].size())
     }
 
     @Test
@@ -340,6 +457,55 @@ class OpenApiWriterTest {
         assertTrue(examplesNode.isArray)
         assertEquals(2, examplesNode.size())
         assertEquals("alpha", examplesNode[0].asText())
+    }
+
+    @Test
+    fun `writeJson uses self as base for component refs`() {
+        val writer = OpenApiWriter()
+        val petSchema = SchemaDefinition(
+            name = "Pet",
+            type = "object",
+            oneOf = listOf("Cat")
+        )
+        val catSchema = SchemaDefinition(name = "Cat", type = "object")
+        val requestBodySchema = SchemaDefinition(name = "PetCreate", type = "object")
+        val response = EndpointResponse(
+            statusCode = "204",
+            description = "No content",
+            type = "Pet"
+        )
+        val operation = EndpointDefinition(
+            path = "/pets",
+            method = HttpMethod.GET,
+            operationId = "listPets",
+            requestBodyType = "PetCreate",
+            responses = mapOf("204" to response)
+        )
+
+        val definition = OpenApiDefinition(
+            info = Info("Self", "1.0.0"),
+            self = "https://example.com/openapi",
+            paths = mapOf("/pets" to PathItem(get = operation)),
+            components = Components(
+                schemas = mapOf(
+                    "Pet" to petSchema,
+                    "Cat" to catSchema,
+                    "PetCreate" to requestBodySchema
+                )
+            )
+        )
+
+        val json = writer.writeJson(definition)
+        val node = ObjectMapper(JsonFactory()).readTree(json)
+
+        val petOneOfRef = node["components"]["schemas"]["Pet"]["oneOf"][0]["${'$'}ref"].asText()
+        assertEquals("https://example.com/openapi#/components/schemas/Cat", petOneOfRef)
+
+        val requestBodyRef = node["paths"]["/pets"]["get"]["requestBody"]["content"]["application/json"]["schema"]["${'$'}ref"].asText()
+        assertEquals("https://example.com/openapi#/components/schemas/PetCreate", requestBodyRef)
+
+        val responseRef = node["paths"]["/pets"]["get"]["responses"]["204"]["content"]["application/json"]["schema"]["${'$'}ref"].asText()
+        assertEquals("https://example.com/openapi#/components/schemas/Pet", responseRef)
     }
 
     private fun buildFullDefinition(): OpenApiDefinition {
@@ -838,5 +1004,102 @@ class OpenApiWriterTest {
             self = "https://example.com/openapi",
             extensions = mapOf("x-root" to "root-ext")
         )
+    }
+
+    @Test
+    fun `writeJson preserves path item ref siblings`() {
+        val writer = OpenApiWriter()
+        val definition = OpenApiDefinition(
+            info = Info("Ref API", "1.0"),
+            paths = mapOf(
+                "/ref" to PathItem(
+                    ref = "#/components/pathItems/UsersPath",
+                    summary = "Ref summary",
+                    parameters = listOf(
+                        EndpointParameter(
+                            name = "refParam",
+                            type = "String",
+                            location = ParameterLocation.QUERY,
+                            schema = SchemaProperty("string")
+                        )
+                    )
+                )
+            )
+        )
+
+        val json = writer.writeJson(definition)
+        val node = ObjectMapper(JsonFactory()).readTree(json)
+        val refNode = node["paths"]["/ref"]
+
+        assertEquals("#/components/pathItems/UsersPath", refNode["${'$'}ref"].asText())
+        assertEquals("Ref summary", refNode["summary"].asText())
+        assertEquals("refParam", refNode["parameters"][0]["name"].asText())
+        assertEquals("query", refNode["parameters"][0]["in"].asText())
+    }
+
+    @Test
+    fun `writeSchema outputs schema document`() {
+        val schema = SchemaProperty(types = setOf("string"), minLength = 2)
+        val json = OpenApiWriter().writeSchema(schema)
+        assertTrue(json.contains("\"type\""))
+        assertTrue(json.contains("\"string\""))
+        assertTrue(json.contains("\"minLength\""))
+        assertTrue(!json.contains("\"openapi\""))
+    }
+
+    @Test
+    fun `writeDocument outputs OpenAPI document`() {
+        val definition = OpenApiDefinition(
+            info = Info("Doc", "1.0"),
+            paths = emptyMap()
+        )
+        val json = OpenApiWriter().writeDocument(OpenApiDocument.OpenApi(definition))
+        assertTrue(json.contains("\"openapi\""))
+        assertTrue(json.contains("\"info\""))
+    }
+
+    @Test
+    fun `write omits requestBody content when content was absent`() {
+        val endpoint = EndpointDefinition(
+            path = "/submit",
+            method = HttpMethod.POST,
+            operationId = "submit",
+            requestBody = RequestBody(
+                description = "raw payload",
+                contentPresent = false
+            ),
+            responses = mapOf("200" to EndpointResponse(statusCode = "200", description = "ok"))
+        )
+        val definition = OpenApiDefinition(
+            info = Info(title = "Body", version = "1.0"),
+            paths = mapOf("/submit" to PathItem(post = endpoint))
+        )
+
+        val json = OpenApiWriter().writeJson(definition)
+        val root = ObjectMapper(JsonFactory()).readTree(json)
+        val requestBodyNode = root["paths"]["/submit"]["post"]["requestBody"]
+        assertNotNull(requestBodyNode)
+        assertNull(requestBodyNode["content"])
+    }
+
+    @Test
+    fun `write omits operationId when not explicit`() {
+        val endpoint = EndpointDefinition(
+            path = "/pets",
+            method = HttpMethod.GET,
+            operationId = "get_pets",
+            operationIdExplicit = false,
+            responses = mapOf("200" to EndpointResponse(statusCode = "200", description = "ok"))
+        )
+        val definition = OpenApiDefinition(
+            info = Info(title = "Pets", version = "1.0"),
+            paths = mapOf("/pets" to PathItem(get = endpoint))
+        )
+
+        val json = OpenApiWriter().writeJson(definition)
+        val root = ObjectMapper(JsonFactory()).readTree(json)
+        val opNode = root["paths"]["/pets"]["get"]
+        assertNotNull(opNode)
+        assertNull(opNode["operationId"])
     }
 }

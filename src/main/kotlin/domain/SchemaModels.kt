@@ -41,8 +41,17 @@ data class SchemaDefinition(
      * The type of schema.
      * Data types in the OAS are based on the types defined by the JSON Schema Validation Specification Draft 2020-12:
      * "null", "boolean", "object", "array", "number", "string", or "integer".
+     *
+     * Defaults to "object" so boolean schemas can be constructed without specifying a dummy type.
+     * When [booleanSchema] is set, this field is ignored during serialization.
      */
-    val type: String,
+    val type: String = "object",
+
+    /**
+     * Whether the `type` keyword was explicitly present in the source document.
+     * When false, serializers should omit `type` unless [types] is explicitly provided.
+     */
+    val typeExplicit: Boolean = true,
 
     /**
      * Canonical identifier for the schema.

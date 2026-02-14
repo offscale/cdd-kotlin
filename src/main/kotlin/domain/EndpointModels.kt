@@ -264,6 +264,14 @@ data class EndpointResponse(
     val content: Map<String, MediaTypeObject> = emptyMap(),
 
     /**
+     * Whether the `content` field was explicitly present on the OpenAPI document.
+     *
+     * This preserves the distinction between an omitted `content` field
+     * and an explicit empty map (`content: {}`) for round-trip fidelity.
+     */
+    val contentPresent: Boolean = false,
+
+    /**
      * The Kotlin class name of the response payload, or null if no content is returned (Unit).
      * This abstracts the `content` map for simplified code generation.
      * Legacy-friendly for Swagger 2.0 / OAS 3.0 style generators.
@@ -373,6 +381,12 @@ data class EndpointDefinition(
      * Tools and libraries MAY use the operationId to uniquely identify an operation.
      */
     val operationId: String,
+
+    /**
+     * Whether `operationId` was explicitly present in the OpenAPI document.
+     * When false, serializers SHOULD omit `operationId` to preserve spec-legal omission.
+     */
+    val operationIdExplicit: Boolean = true,
 
     /**
      * A list of parameters that are applicable for this operation.

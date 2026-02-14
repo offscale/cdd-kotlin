@@ -12,6 +12,9 @@ class TypeMappersTest {
         val refProp = SchemaProperty(types = setOf("object"), ref = "#/components/schemas/User")
         assertEquals("User", TypeMappers.mapType(refProp))
 
+        val dynamicRefProp = SchemaProperty(types = setOf("object"), dynamicRef = "#/components/schemas/Pet")
+        assertEquals("Pet", TypeMappers.mapType(dynamicRefProp))
+
         val anySchema = SchemaProperty(booleanSchema = true)
         assertEquals("Any", TypeMappers.mapType(anySchema))
 
@@ -44,6 +47,33 @@ class TypeMappersTest {
     }
 
     @Test
+    fun `mapType infers types when schema type is omitted`() {
+        val objectProp = SchemaProperty(
+            properties = mapOf("id" to SchemaProperty(type = "string"))
+        )
+        assertEquals("Any", TypeMappers.mapType(objectProp))
+
+        val mapProp = SchemaProperty(
+            additionalProperties = SchemaProperty(type = "string")
+        )
+        assertEquals("Map<String, String>", TypeMappers.mapType(mapProp))
+
+        val arrayProp = SchemaProperty(
+            items = SchemaProperty(type = "string")
+        )
+        assertEquals("List<String>", TypeMappers.mapType(arrayProp))
+
+        val numericProp = SchemaProperty(minimum = 1.0)
+        assertEquals("Double", TypeMappers.mapType(numericProp))
+
+        val enumBoolProp = SchemaProperty(enumValues = listOf(true, false))
+        assertEquals("Boolean", TypeMappers.mapType(enumBoolProp))
+
+        val constStringProp = SchemaProperty(constValue = "fixed")
+        assertEquals("String", TypeMappers.mapType(constStringProp))
+    }
+
+    @Test
     fun `kotlinToSchemaProperty maps core Kotlin types`() {
         assertEquals(setOf("string"), TypeMappers.kotlinToSchemaProperty("String").types)
         assertEquals("int32", TypeMappers.kotlinToSchemaProperty("Int").format)
@@ -57,6 +87,10 @@ class TypeMappersTest {
 
         val bytes = TypeMappers.kotlinToSchemaProperty("ByteArray")
         assertEquals("base64", bytes.contentEncoding)
+
+        val anySchema = TypeMappers.kotlinToSchemaProperty("Any")
+        assertEquals(true, anySchema.booleanSchema)
+        assertTrue(anySchema.types.isEmpty())
 
         val listNullable = TypeMappers.kotlinToSchemaProperty("List<String>?")
         assertTrue(listNullable.types.contains("array"))

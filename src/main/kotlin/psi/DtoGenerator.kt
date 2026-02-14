@@ -2,8 +2,11 @@ package psi
 
 import com.fasterxml.jackson.core.JsonFactory
 import com.fasterxml.jackson.databind.ObjectMapper
+import domain.DynamicAnchorContext
+import domain.DynamicAnchorScope
 import domain.SchemaDefinition
 import domain.SchemaProperty
+import domain.buildDynamicAnchorContext
 import org.jetbrains.kotlin.psi.KtFile
 
 /**
@@ -40,6 +43,8 @@ class DtoGenerator {
             return buildRefAliasSource(packageName, definition, ref)
         }
 
+        val dynamicContext = buildDynamicAnchorContext(definition)
+
         // 1. Enum Generation
         if (!definition.enumValues.isNullOrEmpty()) {
             val enumValues = definition.enumValues!!
@@ -50,7 +55,7 @@ class DtoGenerator {
             // Non-string enums cannot be represented as Kotlin enum classes.
             // Prefer a typealias to the base type and preserve values via KDoc tags.
             if (definition.primaryType != "object" || definition.properties.isEmpty()) {
-                return buildAliasSource(packageName, definition)
+                return buildAliasSource(packageName, definition, dynamicContext)
             }
         }
 
@@ -58,31 +63,35 @@ class DtoGenerator {
         if (definition.oneOf.isNotEmpty() || definition.anyOf.isNotEmpty() ||
             definition.oneOfSchemas.isNotEmpty() || definition.anyOfSchemas.isNotEmpty()
         ) {
-            return buildSealedInterfaceSource(packageName, definition)
+            return buildSealedInterfaceSource(packageName, definition, dynamicContext)
         }
 
         // 3. Primitive / Array Aliases
         if (definition.primaryType != "object" && definition.properties.isEmpty()) {
-            return buildAliasSource(packageName, definition)
+            return buildAliasSource(packageName, definition, dynamicContext)
         }
 
         // 4. Map/Dynamic Object Alias (additionalProperties only)
         if (definition.primaryType == "object" && definition.properties.isEmpty() && definition.additionalProperties != null) {
-            return buildMapAliasSource(packageName, definition)
+            return buildMapAliasSource(packageName, definition, dynamicContext)
         }
 
         // 5. Standard Data Class
-        return buildDataClassSource(packageName, definition)
+        return buildDataClassSource(packageName, definition, dynamicContext)
     }
 
-    private fun buildAliasSource(packageName: String, definition: SchemaDefinition): String {
+    private fun buildAliasSource(
+        packageName: String,
+        definition: SchemaDefinition,
+        dynamicContext: DynamicAnchorContext
+    ): String {
         val imports = mutableSetOf<String>()
         addTypeImports(imports, definition)
 
         val kdoc = buildClassKDoc(definition)
         val deprecatedAnnotation = buildDeprecatedAnnotation(definition.deprecated)
-        val prop = schemaToProperty(definition)
-        val baseType = TypeMappers.mapType(prop)
+        val prop = dynamicContext.root
+        val baseType = TypeMappers.mapType(prop, dynamicContext.scope::resolveDynamicRef)
         val isNullable = prop.types.contains("null")
         val kotlinType = if (isNullable) "$baseType?" else baseType
 
@@ -122,13 +131,20 @@ class DtoGenerator {
         """.trimIndent()
     }
 
-    private fun buildMapAliasSource(packageName: String, definition: SchemaDefinition): String {
+    private fun buildMapAliasSource(
+        packageName: String,
+        definition: SchemaDefinition,
+        dynamicContext: DynamicAnchorContext
+    ): String {
         val imports = mutableSetOf<String>()
         addTypeImports(imports, definition)
 
         val kdoc = buildClassKDoc(definition)
         val deprecatedAnnotation = buildDeprecatedAnnotation(definition.deprecated)
-        val valueType = TypeMappers.mapType(definition.additionalProperties!!)
+        val valueType = TypeMappers.mapType(
+            definition.additionalProperties!!,
+            dynamicContext.scope::resolveDynamicRef
+        )
 
         return """
             package $packageName
@@ -140,7 +156,11 @@ class DtoGenerator {
         """.trimIndent()
     }
 
-    private fun buildSealedInterfaceSource(packageName: String, definition: SchemaDefinition): String {
+    private fun buildSealedInterfaceSource(
+        packageName: String,
+        definition: SchemaDefinition,
+        dynamicContext: DynamicAnchorContext
+    ): String {
         val imports = mutableSetOf(
             "kotlinx.serialization.Serializable",
             "kotlinx.serialization.JsonClassDiscriminator",
@@ -158,7 +178,7 @@ class DtoGenerator {
         }
 
         val propertyLines = definition.properties.map { (name, prop) ->
-            val kotlinType = resolveKotlinType(name, prop, definition.required)
+            val kotlinType = resolveKotlinType(name, prop, definition.required, dynamicContext.scope)
             val desc = buildPropertyKDoc(prop)
             val deprecatedPropAnnotation = buildDeprecatedAnnotation(prop.deprecated, indent = "    ")
             "$desc$deprecatedPropAnnotation    val $name: $kotlinType"
@@ -177,7 +197,11 @@ class DtoGenerator {
         """.trimIndent()
     }
 
-    private fun buildDataClassSource(packageName: String, definition: SchemaDefinition): String {
+    private fun buildDataClassSource(
+        packageName: String,
+        definition: SchemaDefinition,
+        dynamicContext: DynamicAnchorContext
+    ): String {
         val imports = mutableSetOf<String>()
         imports.add("kotlinx.serialization.Serializable")
         imports.add("kotlinx.serialization.SerialName")
@@ -191,7 +215,7 @@ class DtoGenerator {
         }
 
         val propertyLines = definition.properties.map { (name, prop) ->
-            val kotlinType = resolveKotlinType(name, prop, definition.required)
+            val kotlinType = resolveKotlinType(name, prop, definition.required, dynamicContext.scope)
             val defaultVal = if (kotlinType.endsWith("?")) " = null" else ""
 
             val desc = buildPropertyKDoc(prop)
@@ -243,8 +267,13 @@ class DtoGenerator {
         """.trimIndent()
     }
 
-    private fun resolveKotlinType(name: String, prop: SchemaProperty, requiredList: List<String>): String {
-        val baseType = TypeMappers.mapType(prop)
+    private fun resolveKotlinType(
+        name: String,
+        prop: SchemaProperty,
+        requiredList: List<String>,
+        dynamicScope: DynamicAnchorScope
+    ): String {
+        val baseType = TypeMappers.mapType(prop, dynamicScope::resolveDynamicRef)
 
         // Nullability Logic:
         // 1. If "null" is in types -> Nullable (OAS 3.2)
@@ -329,6 +358,14 @@ class DtoGenerator {
         val hasUnevaluatedItems = definition.unevaluatedItems != null
         val hasContentSchema = definition.contentSchema != null
         val hasCustomKeywords = definition.customKeywords.isNotEmpty()
+        val hasAdditionalProperties = definition.additionalProperties != null
+        val hasOneOf = definition.oneOf.isNotEmpty() || definition.oneOfSchemas.isNotEmpty()
+        val hasAnyOf = definition.anyOf.isNotEmpty() || definition.anyOfSchemas.isNotEmpty()
+        val hasAllOf = definition.allOf.isNotEmpty() || definition.allOfSchemas.isNotEmpty()
+        val hasNot = definition.not != null
+        val hasIf = definition.ifSchema != null
+        val hasThen = definition.thenSchema != null
+        val hasElse = definition.elseSchema != null
 
         if (!hasDesc && !hasExtDocs && !hasExample && !hasExamples && !hasExamplesList && !hasEnum && !hasMediaType && !hasEncoding &&
             !hasTitle && !hasDefault && !hasConst && !hasDeprecated && !hasReadOnly && !hasWriteOnly &&
@@ -339,7 +376,8 @@ class DtoGenerator {
             !hasMinContains && !hasMaxContains && !hasContains && !hasPrefixItems && !hasDiscriminator && !hasXml &&
             !hasComment && !hasPatternProperties && !hasPropertyNames &&
             !hasDependentRequired && !hasDependentSchemas &&
-            !hasUnevaluatedProperties && !hasUnevaluatedItems && !hasContentSchema && !hasCustomKeywords
+            !hasUnevaluatedProperties && !hasUnevaluatedItems && !hasContentSchema && !hasCustomKeywords &&
+            !hasAdditionalProperties && !hasOneOf && !hasAnyOf && !hasAllOf && !hasNot && !hasIf && !hasThen && !hasElse
         ) return ""
 
         val sb = StringBuilder("/**\n")
@@ -433,6 +471,30 @@ class DtoGenerator {
         if (hasContentSchema) {
             appendLine("@contentSchema ${renderSchema(definition.contentSchema!!)}")
         }
+        if (hasAdditionalProperties) {
+            appendLine("@additionalProperties ${renderSchema(definition.additionalProperties!!)}")
+        }
+        if (hasOneOf) {
+            appendLine("@oneOf ${renderSchemaComposition(definition.oneOf, definition.oneOfSchemas)}")
+        }
+        if (hasAnyOf) {
+            appendLine("@anyOf ${renderSchemaComposition(definition.anyOf, definition.anyOfSchemas)}")
+        }
+        if (hasAllOf) {
+            appendLine("@allOf ${renderSchemaComposition(definition.allOf, definition.allOfSchemas)}")
+        }
+        if (hasNot) {
+            appendLine("@not ${renderSchema(definition.not!!)}")
+        }
+        if (hasIf) {
+            appendLine("@if ${renderSchema(definition.ifSchema!!)}")
+        }
+        if (hasThen) {
+            appendLine("@then ${renderSchema(definition.thenSchema!!)}")
+        }
+        if (hasElse) {
+            appendLine("@else ${renderSchema(definition.elseSchema!!)}")
+        }
         if (hasCustomKeywords) {
             appendLine("@keywords ${renderCustomKeywords(definition.customKeywords)}")
         }
@@ -455,57 +517,6 @@ class DtoGenerator {
 
         sb.append(" */\n")
         return sb.toString()
-    }
-
-    private fun schemaToProperty(definition: SchemaDefinition): SchemaProperty {
-        val effectiveTypes = definition.effectiveTypes
-        return SchemaProperty(
-            booleanSchema = definition.booleanSchema,
-            types = effectiveTypes,
-            format = definition.format,
-            contentMediaType = definition.contentMediaType,
-            contentEncoding = definition.contentEncoding,
-            minLength = definition.minLength,
-            maxLength = definition.maxLength,
-            pattern = definition.pattern,
-            minimum = definition.minimum,
-            maximum = definition.maximum,
-            multipleOf = definition.multipleOf,
-            exclusiveMinimum = definition.exclusiveMinimum,
-            exclusiveMaximum = definition.exclusiveMaximum,
-            minItems = definition.minItems,
-            maxItems = definition.maxItems,
-            uniqueItems = definition.uniqueItems,
-            minProperties = definition.minProperties,
-            maxProperties = definition.maxProperties,
-            items = definition.items,
-            additionalProperties = definition.additionalProperties,
-            ref = definition.ref,
-            dynamicRef = definition.dynamicRef,
-            description = definition.description,
-            title = definition.title,
-            defaultValue = definition.defaultValue,
-            constValue = definition.constValue,
-            enumValues = definition.enumValues,
-            deprecated = definition.deprecated,
-            readOnly = definition.readOnly,
-            writeOnly = definition.writeOnly,
-            externalDocs = definition.externalDocs,
-            discriminator = definition.discriminator,
-            example = definition.example,
-            xml = definition.xml,
-            prefixItems = definition.prefixItems,
-            contains = definition.contains,
-            patternProperties = definition.patternProperties,
-            propertyNames = definition.propertyNames,
-            dependentRequired = definition.dependentRequired,
-            dependentSchemas = definition.dependentSchemas,
-            unevaluatedProperties = definition.unevaluatedProperties,
-            unevaluatedItems = definition.unevaluatedItems,
-            contentSchema = definition.contentSchema,
-            customKeywords = definition.customKeywords,
-            defs = definition.defs
-        )
     }
 
     private fun buildPropertyKDoc(prop: SchemaProperty): String {
@@ -556,6 +567,14 @@ class DtoGenerator {
         val hasUnevaluatedItems = prop.unevaluatedItems != null
         val hasContentSchema = prop.contentSchema != null
         val hasCustomKeywords = prop.customKeywords.isNotEmpty()
+        val hasAdditionalProperties = prop.additionalProperties != null
+        val hasOneOf = prop.oneOf.isNotEmpty()
+        val hasAnyOf = prop.anyOf.isNotEmpty()
+        val hasAllOf = prop.allOf.isNotEmpty()
+        val hasNot = prop.not != null
+        val hasIf = prop.ifSchema != null
+        val hasThen = prop.thenSchema != null
+        val hasElse = prop.elseSchema != null
 
         if (!hasDesc && !hasExample && !hasExamples && !hasEnum && !hasExtDocs && !hasDiscriminator &&
             !hasMediaType && !hasEncoding && !hasTitle && !hasDefault && !hasConst &&
@@ -567,7 +586,8 @@ class DtoGenerator {
             !hasMinContains && !hasMaxContains && !hasContains && !hasPrefixItems && !hasXml &&
             !hasComment && !hasPatternProperties && !hasPropertyNames &&
             !hasDependentRequired && !hasDependentSchemas &&
-            !hasUnevaluatedProperties && !hasUnevaluatedItems && !hasContentSchema && !hasCustomKeywords
+            !hasUnevaluatedProperties && !hasUnevaluatedItems && !hasContentSchema && !hasCustomKeywords &&
+            !hasAdditionalProperties && !hasOneOf && !hasAnyOf && !hasAllOf && !hasNot && !hasIf && !hasThen && !hasElse
         ) return ""
 
         val sb = StringBuilder("    /**\n")
@@ -643,6 +663,30 @@ class DtoGenerator {
         }
         if (hasContentSchema) {
             appendLine("@contentSchema ${renderSchema(prop.contentSchema!!)}")
+        }
+        if (hasAdditionalProperties) {
+            appendLine("@additionalProperties ${renderSchema(prop.additionalProperties!!)}")
+        }
+        if (hasOneOf) {
+            appendLine("@oneOf ${renderSchemaList(prop.oneOf)}")
+        }
+        if (hasAnyOf) {
+            appendLine("@anyOf ${renderSchemaList(prop.anyOf)}")
+        }
+        if (hasAllOf) {
+            appendLine("@allOf ${renderSchemaList(prop.allOf)}")
+        }
+        if (hasNot) {
+            appendLine("@not ${renderSchema(prop.not!!)}")
+        }
+        if (hasIf) {
+            appendLine("@if ${renderSchema(prop.ifSchema!!)}")
+        }
+        if (hasThen) {
+            appendLine("@then ${renderSchema(prop.thenSchema!!)}")
+        }
+        if (hasElse) {
+            appendLine("@else ${renderSchema(prop.elseSchema!!)}")
         }
         if (hasCustomKeywords) {
             appendLine("@keywords ${renderCustomKeywords(prop.customKeywords)}")
@@ -730,12 +774,30 @@ class DtoGenerator {
         return jsonMapper.writeValueAsString(converted)
     }
 
+    private fun renderSchemaComposition(
+        refs: List<String>,
+        inlines: List<SchemaProperty>
+    ): String {
+        val entries = mutableListOf<Any>()
+        refs.forEach { token ->
+            val ref = if (looksLikeRef(token)) token else "#/components/schemas/$token"
+            entries.add(mapOf("\$ref" to ref))
+        }
+        entries.addAll(inlines.map { schemaPropertyToDocValue(it) })
+        return jsonMapper.writeValueAsString(entries)
+    }
+
     private fun renderStringListMap(map: Map<String, List<String>>): String {
         return jsonMapper.writeValueAsString(map)
     }
 
     private fun renderCustomKeywords(map: Map<String, Any?>): String {
         return jsonMapper.writeValueAsString(map)
+    }
+
+    private fun looksLikeRef(token: String): Boolean {
+        return token.startsWith("#") || token.startsWith("./") ||
+            token.contains("/") || token.endsWith(".json") || token.endsWith(".yaml")
     }
 
     private fun schemaPropertyToDocValue(schema: SchemaProperty): Any {

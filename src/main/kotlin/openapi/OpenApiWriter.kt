@@ -64,6 +64,26 @@ class OpenApiWriter(
     }
 
     /**
+     * Writes an OpenAPI Description document (OpenAPI Object or Schema Object) to a string.
+     */
+    fun writeDocument(document: OpenApiDocument, format: Format = Format.JSON, fileName: String? = null): String {
+        val resolved = resolveFormat(format, fileName)
+        val mapper = if (resolved == Format.JSON) jsonMapper else yamlMapper
+        val tree = when (document) {
+            is OpenApiDocument.OpenApi -> openApiToMap(document.definition)
+            is OpenApiDocument.Schema -> schemaRootToValue(document.schema)
+        }
+        return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(tree)
+    }
+
+    /**
+     * Writes a standalone Schema Object document to a string.
+     */
+    fun writeSchema(schema: SchemaProperty, format: Format = Format.JSON, fileName: String? = null): String {
+        return writeDocument(OpenApiDocument.Schema(schema), format, fileName)
+    }
+
+    /**
      * Writes the OpenAPI definition to JSON.
      */
     fun writeJson(definition: OpenApiDefinition): String = write(definition, Format.JSON)
@@ -81,6 +101,14 @@ class OpenApiWriter(
         file.writeText(content)
     }
 
+    /**
+     * Writes an OpenAPI Description document to a file.
+     */
+    fun writeDocumentToFile(document: OpenApiDocument, file: File, format: Format = Format.AUTO) {
+        val content = writeDocument(document, format, file.name)
+        file.writeText(content)
+    }
+
     private fun resolveFormat(format: Format, fileName: String?): Format {
         if (format != Format.AUTO) return format
         val ext = fileName?.substringAfterLast('.', "")?.lowercase().orEmpty()
@@ -92,20 +120,21 @@ class OpenApiWriter(
     }
 
     private fun openApiToMap(definition: OpenApiDefinition): Map<String, Any?> {
+        val refBase = normalizeSelfRefBase(definition.self)
         val map = linkedMapOf<String, Any?>()
         map["openapi"] = definition.openapi
         map["info"] = infoToMap(definition.info)
         map.putIfNotNull("jsonSchemaDialect", definition.jsonSchemaDialect)
         map.putIfNotEmpty("servers", definition.servers.map { serverToMap(it) })
-        val pathsMap = pathsToMap(definition.paths, definition.pathsExtensions)
-        if (pathsMap.isNotEmpty()) {
+        val pathsMap = pathsToMap(definition.paths, definition.pathsExtensions, refBase)
+        if (pathsMap.isNotEmpty() || definition.pathsExplicitEmpty) {
             map["paths"] = pathsMap
         }
-        val webhooksMap = pathsToMap(definition.webhooks, definition.webhooksExtensions)
-        if (webhooksMap.isNotEmpty()) {
+        val webhooksMap = pathsToMap(definition.webhooks, definition.webhooksExtensions, refBase)
+        if (webhooksMap.isNotEmpty() || definition.webhooksExplicitEmpty) {
             map["webhooks"] = webhooksMap
         }
-        definition.components?.let { map["components"] = componentsToMap(it) }
+        definition.components?.let { map["components"] = componentsToMap(it, refBase) }
         securityToValue(definition.security, definition.securityExplicitEmpty)?.let { map["security"] = it }
         map.putIfNotEmpty("tags", definition.tags.map { tagToMap(it) })
         definition.externalDocs?.let { map["externalDocs"] = externalDocsToMap(it) }
@@ -170,23 +199,22 @@ class OpenApiWriter(
         return map
     }
 
-    private fun pathItemToMap(item: PathItem): Map<String, Any?> {
-        item.ref?.let { return mapOf("\$ref" to it) }
-
+    private fun pathItemToMap(item: PathItem, refBase: String?): Map<String, Any?> {
         val map = linkedMapOf<String, Any?>()
+        item.ref?.let { map["\$ref"] = it }
         map.putIfNotNull("summary", item.summary)
         map.putIfNotNull("description", item.description)
-        item.get?.let { map["get"] = operationToMap(it) }
-        item.put?.let { map["put"] = operationToMap(it) }
-        item.post?.let { map["post"] = operationToMap(it) }
-        item.delete?.let { map["delete"] = operationToMap(it) }
-        item.options?.let { map["options"] = operationToMap(it) }
-        item.head?.let { map["head"] = operationToMap(it) }
-        item.patch?.let { map["patch"] = operationToMap(it) }
-        item.trace?.let { map["trace"] = operationToMap(it) }
-        item.query?.let { map["query"] = operationToMap(it) }
+        item.get?.let { map["get"] = operationToMap(it, refBase) }
+        item.put?.let { map["put"] = operationToMap(it, refBase) }
+        item.post?.let { map["post"] = operationToMap(it, refBase) }
+        item.delete?.let { map["delete"] = operationToMap(it, refBase) }
+        item.options?.let { map["options"] = operationToMap(it, refBase) }
+        item.head?.let { map["head"] = operationToMap(it, refBase) }
+        item.patch?.let { map["patch"] = operationToMap(it, refBase) }
+        item.trace?.let { map["trace"] = operationToMap(it, refBase) }
+        item.query?.let { map["query"] = operationToMap(it, refBase) }
         if (item.additionalOperations.isNotEmpty()) {
-            map["additionalOperations"] = item.additionalOperations.mapValues { operationToMap(it.value) }
+            map["additionalOperations"] = item.additionalOperations.mapValues { operationToMap(it.value, refBase) }
         }
         map.putIfNotEmpty("parameters", item.parameters.map { parameterToMap(it) })
         map.putIfNotEmpty("servers", item.servers.map { serverToMap(it) })
@@ -194,13 +222,15 @@ class OpenApiWriter(
         return map
     }
 
-    private fun operationToMap(operation: EndpointDefinition): Map<String, Any?> {
+    private fun operationToMap(operation: EndpointDefinition, refBase: String?): Map<String, Any?> {
         val map = linkedMapOf<String, Any?>()
         map.putIfNotEmpty("tags", operation.tags)
         map.putIfNotNull("summary", operation.summary)
         map.putIfNotNull("description", operation.description)
         operation.externalDocs?.let { map["externalDocs"] = externalDocsToMap(it) }
-        map["operationId"] = operation.operationId
+        if (operation.operationIdExplicit) {
+            map["operationId"] = operation.operationId
+        }
         map.putIfNotEmpty("parameters", operation.parameters.map { parameterToMap(it) })
         operation.requestBody?.let { map["requestBody"] = requestBodyToMap(it) }
         if (operation.requestBody == null && operation.requestBodyType != null) {
@@ -208,7 +238,7 @@ class OpenApiWriter(
                 RequestBody(
                     content = mapOf(
                         "application/json" to MediaTypeObject(
-                            schema = SchemaProperty(ref = "#/components/schemas/${operation.requestBodyType}")
+                            schema = SchemaProperty(ref = componentRef(refBase, "schemas", operation.requestBodyType))
                         )
                     ),
                     required = true
@@ -216,9 +246,9 @@ class OpenApiWriter(
             )
         }
         if (operation.responses.isNotEmpty()) {
-            map["responses"] = operation.responses.mapValues { responseToMap(it.value) }
+            map["responses"] = operation.responses.mapValues { responseToMap(it.value, refBase) }
         }
-        map.putIfNotEmpty("callbacks", callbacksToMap(operation.callbacks))
+        map.putIfNotEmpty("callbacks", callbacksToMap(operation.callbacks, refBase))
         map.putIfTrue("deprecated", operation.deprecated)
         securityToValue(operation.security, operation.securityExplicitEmpty)?.let { map["security"] = it }
         map.putIfNotEmpty("servers", operation.servers.map { serverToMap(it) })
@@ -226,18 +256,19 @@ class OpenApiWriter(
         return map
     }
 
-    private fun callbacksToMap(callbacks: Map<String, Callback>): Map<String, Any?> {
+    private fun callbacksToMap(callbacks: Map<String, Callback>, refBase: String? = null): Map<String, Any?> {
         if (callbacks.isEmpty()) return emptyMap()
-        return callbacks.mapValues { (_, cb) -> callbackToMap(cb) }
+        return callbacks.mapValues { (_, cb) -> callbackToMap(cb, refBase) }
     }
 
-    private fun callbackToMap(callback: Callback): Map<String, Any?> {
+    private fun callbackToMap(callback: Callback, refBase: String?): Map<String, Any?> {
         return when (callback) {
             is Callback.Reference -> referenceToMap(callback.reference)
             is Callback.Inline -> {
+                callback.reference?.let { return referenceToMap(it) }
                 val map = linkedMapOf<String, Any?>()
                 callback.expressions.forEach { (expression, pathItem) ->
-                    map[expression] = pathItemToMap(pathItem)
+                    map[expression] = pathItemToMap(pathItem, refBase)
                 }
                 map.putExtensions(callback.extensions)
                 map
@@ -274,26 +305,29 @@ class OpenApiWriter(
         body.reference?.let { return referenceToMap(it) }
         val map = linkedMapOf<String, Any?>()
         map.putIfNotNull("description", body.description)
-        map["content"] = contentToMap(body.content)
+        if (body.content.isNotEmpty() || body.contentPresent) {
+            map["content"] = contentToMap(body.content)
+        }
         map.putIfTrue("required", body.required)
         map.putExtensions(body.extensions)
         return map
     }
 
-    private fun responseToMap(response: EndpointResponse): Map<String, Any?> {
+    private fun responseToMap(response: EndpointResponse, refBase: String?): Map<String, Any?> {
         response.reference?.let { return referenceToMap(it) }
         val map = linkedMapOf<String, Any?>()
         map.putIfNotNull("summary", response.summary)
         map.putIfNotNull("description", response.description)
-        map.putIfNotEmpty("headers", response.headers.mapValues { headerToMap(it.value) })
+        val headers = response.headers.filterKeys { !it.equals("Content-Type", ignoreCase = true) }
+        map.putIfNotEmpty("headers", headers.mapValues { headerToMap(it.value) })
 
-        if (response.content.isNotEmpty()) {
+        if (response.content.isNotEmpty() || response.contentPresent) {
             map["content"] = contentToMap(response.content)
         } else if (response.type != null) {
             map["content"] = contentToMap(
                 mapOf(
                     "application/json" to MediaTypeObject(
-                        schema = SchemaProperty(ref = "#/components/schemas/${response.type}")
+                        schema = SchemaProperty(ref = componentRef(refBase, "schemas", response.type))
                     )
                 )
             )
@@ -310,13 +344,13 @@ class OpenApiWriter(
         map.putIfNotNull("description", header.description)
         map.putIfTrue("required", header.required)
         map.putIfTrue("deprecated", header.deprecated)
-        map.putIfNotNull("style", header.style?.let { parameterStyle(it) })
-        map.putIfNotNull("explode", header.explode)
 
         if (header.content.isNotEmpty()) {
             map["content"] = contentToMap(header.content)
         } else if (header.schema != null) {
             map["schema"] = schemaPropertyToMap(header.schema)
+            map.putIfNotNull("style", header.style?.let { parameterStyle(it) })
+            map.putIfNotNull("explode", header.explode)
         }
 
         header.example?.let { exampleValue(it) }?.let { map["example"] = it }
@@ -377,29 +411,30 @@ class OpenApiWriter(
         return map
     }
 
-    private fun componentsToMap(components: Components): Map<String, Any?> {
+    private fun componentsToMap(components: Components, refBase: String?): Map<String, Any?> {
         val map = linkedMapOf<String, Any?>()
-        map.putIfNotEmpty("schemas", components.schemas.mapValues { schemaToMap(it.value) })
-        map.putIfNotEmpty("responses", components.responses.mapValues { responseToMap(it.value) })
+        map.putIfNotEmpty("schemas", components.schemas.mapValues { schemaToMap(it.value, refBase) })
+        map.putIfNotEmpty("responses", components.responses.mapValues { responseToMap(it.value, refBase) })
         map.putIfNotEmpty("parameters", components.parameters.mapValues { parameterToMap(it.value) })
         map.putIfNotEmpty("requestBodies", components.requestBodies.mapValues { requestBodyToMap(it.value) })
         map.putIfNotEmpty("headers", components.headers.mapValues { headerToMap(it.value) })
         map.putIfNotEmpty("securitySchemes", components.securitySchemes.mapValues { securitySchemeToMap(it.value) })
         map.putIfNotEmpty("examples", exampleMapToMap(components.examples))
         map.putIfNotEmpty("links", components.links.mapValues { linkToMap(it.value) })
-        map.putIfNotEmpty("callbacks", callbacksToMap(components.callbacks))
-        map.putIfNotEmpty("pathItems", components.pathItems.mapValues { pathItemToMap(it.value) })
+        map.putIfNotEmpty("callbacks", callbacksToMap(components.callbacks, refBase))
+        map.putIfNotEmpty("pathItems", components.pathItems.mapValues { pathItemToMap(it.value, refBase) })
         map.putIfNotEmpty("mediaTypes", components.mediaTypes.mapValues { mediaTypeToMap(it.value) })
         map.putExtensions(components.extensions)
         return map
     }
 
-    private fun schemaToMap(schema: SchemaDefinition): Any {
+    private fun schemaToMap(schema: SchemaDefinition, refBase: String?): Any {
         schema.booleanSchema?.let { return it }
         val map = linkedMapOf<String, Any?>()
         schema.ref?.let { map["\$ref"] = it }
         schema.dynamicRef?.let { map["\$dynamicRef"] = it }
-        val typeValue = typeValue(schema.types, schema.type)
+        val typeFallback = if (schema.typeExplicit) schema.type else null
+        val typeValue = typeValue(schema.types, typeFallback)
         typeValue?.let { map["type"] = it }
 
         map.putIfNotNull("\$id", schema.schemaId)
@@ -457,9 +492,9 @@ class OpenApiWriter(
         schema.unevaluatedProperties?.let { map["unevaluatedProperties"] = schemaPropertyToMap(it) }
         schema.unevaluatedItems?.let { map["unevaluatedItems"] = schemaPropertyToMap(it) }
         schema.contentSchema?.let { map["contentSchema"] = schemaPropertyToMap(it) }
-        map.putIfNotEmpty("oneOf", schemaCompositionToMaps(schema.oneOf, schema.oneOfSchemas))
-        map.putIfNotEmpty("anyOf", schemaCompositionToMaps(schema.anyOf, schema.anyOfSchemas))
-        map.putIfNotEmpty("allOf", schemaCompositionToMaps(schema.allOf, schema.allOfSchemas))
+        map.putIfNotEmpty("oneOf", schemaCompositionToMaps(schema.oneOf, schema.oneOfSchemas, refBase))
+        map.putIfNotEmpty("anyOf", schemaCompositionToMaps(schema.anyOf, schema.anyOfSchemas, refBase))
+        map.putIfNotEmpty("allOf", schemaCompositionToMaps(schema.allOf, schema.allOfSchemas, refBase))
         schema.not?.let { map["not"] = schemaPropertyToMap(it) }
         schema.ifSchema?.let { map["if"] = schemaPropertyToMap(it) }
         schema.thenSchema?.let { map["then"] = schemaPropertyToMap(it) }
@@ -549,6 +584,10 @@ class OpenApiWriter(
         map.putCustomKeywords(schema.customKeywords)
         map.putExtensions(schema.extensions)
         return map
+    }
+
+    private fun schemaRootToValue(schema: SchemaProperty): Any {
+        return schemaPropertyToMap(schema)
     }
 
     private fun referenceToMap(reference: ReferenceObject): Map<String, Any?> {
@@ -681,21 +720,22 @@ class OpenApiWriter(
         return fallback
     }
 
-    private fun schemaRefListToMaps(refs: List<String>): List<Map<String, Any?>> {
+    private fun schemaRefListToMaps(refs: List<String>, refBase: String?): List<Map<String, Any?>> {
         if (refs.isEmpty()) return emptyList()
         return refs.map { token ->
-            val ref = if (looksLikeRef(token)) token else "#/components/schemas/$token"
+            val ref = if (looksLikeRef(token)) token else componentRef(refBase, "schemas", token)
             mapOf("\$ref" to ref)
         }
     }
 
     private fun schemaCompositionToMaps(
         refs: List<String>,
-        inlines: List<SchemaProperty>
+        inlines: List<SchemaProperty>,
+        refBase: String?
     ): List<Any> {
         if (refs.isEmpty() && inlines.isEmpty()) return emptyList()
         val entries = mutableListOf<Any>()
-        entries.addAll(schemaRefListToMaps(refs))
+        entries.addAll(schemaRefListToMaps(refs, refBase))
         entries.addAll(inlines.map { schemaPropertyToMap(it) })
         return entries
     }
@@ -706,12 +746,13 @@ class OpenApiWriter(
 
     private fun pathsToMap(
         paths: Map<String, PathItem>,
-        extensions: Map<String, Any?>
+        extensions: Map<String, Any?>,
+        refBase: String?
     ): Map<String, Any?> {
         if (paths.isEmpty() && extensions.isEmpty()) return emptyMap()
         val map = linkedMapOf<String, Any?>()
         paths.forEach { (path, item) ->
-            map[path] = pathItemToMap(item)
+            map[path] = pathItemToMap(item, refBase)
         }
         extensions.forEach { (key, value) ->
             if (key.startsWith("x-")) {
@@ -719,6 +760,23 @@ class OpenApiWriter(
             }
         }
         return map
+    }
+
+    private fun normalizeSelfRefBase(self: String?): String? {
+        val value = self?.trim().orEmpty()
+        if (value.isBlank()) return null
+        return value.substringBefore("#")
+    }
+
+    private fun componentRef(base: String?, component: String, name: String): String {
+        val encoded = encodeJsonPointerSegment(name)
+        val suffix = "#/components/$component/$encoded"
+        val prefix = base?.trimEnd('#')?.trimEnd()
+        return if (prefix.isNullOrEmpty()) suffix else "$prefix$suffix"
+    }
+
+    private fun encodeJsonPointerSegment(value: String): String {
+        return value.replace("~", "~0").replace("/", "~1")
     }
 
     private fun parameterLocation(location: ParameterLocation): String {

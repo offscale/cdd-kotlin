@@ -37,6 +37,7 @@ import domain.Xml
 import psi.ReferenceResolver
 import psi.TypeMappers
 import java.io.File
+import java.net.URI
 
 /**
  * Parses OpenAPI 3.2 JSON/YAML documents into the domain IR models.
@@ -58,6 +59,7 @@ class OpenApiParser(
         "\$comment",
         "\$defs",
         "type",
+        "nullable",
         "format",
         "contentMediaType",
         "contentEncoding",
@@ -110,6 +112,61 @@ class OpenApiParser(
         "unevaluatedItems",
         "contentSchema"
     )
+
+    private var currentSelfBase: String? = null
+    private var currentRegistry: OpenApiDocumentRegistry? = null
+
+    private inline fun <T> withSelfBase(
+        self: String?,
+        baseUri: String?,
+        registry: OpenApiDocumentRegistry?,
+        block: () -> T
+    ): T {
+        val previous = currentSelfBase
+        val previousRegistry = currentRegistry
+        currentSelfBase = resolveSelfBase(self, baseUri)
+        currentRegistry = registry
+        return try {
+            block()
+        } finally {
+            currentSelfBase = previous
+            currentRegistry = previousRegistry
+        }
+    }
+
+    private fun normalizeSelfBase(value: String?): String? {
+        val trimmed = value?.trim().orEmpty()
+        if (trimmed.isBlank()) return null
+        return trimmed.substringBefore("#")
+    }
+
+    private fun resolveSelfBase(self: String?, baseUri: String?): String? {
+        val normalizedSelf = normalizeSelfBase(self)
+        if (!normalizedSelf.isNullOrBlank()) {
+            val normalizedBase = normalizeSelfBase(baseUri)
+            if (normalizedBase.isNullOrBlank() || isAbsoluteUri(normalizedSelf)) {
+                return normalizedSelf
+            }
+            return resolveAgainstBase(normalizedBase, normalizedSelf)
+        }
+        return normalizeSelfBase(baseUri)
+    }
+
+    private fun isAbsoluteUri(value: String): Boolean {
+        return try {
+            URI(value).isAbsolute
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun isSelfBaseMatch(refBase: String, contextBase: String? = currentSelfBase): Boolean {
+        val selfBase = contextBase?.trimEnd('#').orEmpty()
+        if (selfBase.isBlank()) return true
+        if (refBase.isBlank()) return true
+        val normalizedRefBase = refBase.trimEnd('#')
+        return normalizedRefBase == selfBase
+    }
     /**
      * Supported input formats for OpenAPI sources.
      */
@@ -127,12 +184,19 @@ class OpenApiParser(
      *
      * @param source Raw JSON or YAML content.
      * @param formatHint Optional format hint for parsing.
+     * @param baseUri Optional base URI for resolving relative $ref values and relative `$self` bases.
+     * @param registry Optional registry for resolving external $ref targets without network access.
      * @return Parsed [OpenApiDefinition].
      */
-    fun parseString(source: String, formatHint: Format = Format.AUTO): OpenApiDefinition {
+    fun parseString(
+        source: String,
+        formatHint: Format = Format.AUTO,
+        baseUri: String? = null,
+        registry: OpenApiDocumentRegistry? = null
+    ): OpenApiDefinition {
         val format = resolveFormat(source, formatHint, null)
         val root = readTree(source, format)
-        return parseOpenApi(root)
+        return parseOpenApi(root, baseUri, registry)
     }
 
     /**
@@ -140,13 +204,87 @@ class OpenApiParser(
      *
      * @param file OpenAPI JSON/YAML file.
      * @param formatHint Optional format hint for parsing.
+     * @param baseUri Optional base URI for resolving relative $ref values and relative `$self` bases.
+     * @param registry Optional registry for resolving external $ref targets without network access.
      * @return Parsed [OpenApiDefinition].
      */
-    fun parseFile(file: File, formatHint: Format = Format.AUTO): OpenApiDefinition {
+    fun parseFile(
+        file: File,
+        formatHint: Format = Format.AUTO,
+        baseUri: String? = null,
+        registry: OpenApiDocumentRegistry? = null
+    ): OpenApiDefinition {
         val content = file.readText()
         val format = resolveFormat(content, formatHint, file.name)
         val root = readTree(content, format)
-        return parseOpenApi(root)
+        return parseOpenApi(root, baseUri, registry)
+    }
+
+    /**
+     * Parses a raw document string into either an OpenAPI document or a Schema document.
+     *
+     * If the root contains an `openapi` field, it is treated as an OpenAPI Object.
+     * Otherwise, the root is parsed as a Schema Object (boolean or object).
+     */
+    fun parseDocumentString(
+        source: String,
+        formatHint: Format = Format.AUTO,
+        baseUri: String? = null,
+        registry: OpenApiDocumentRegistry? = null
+    ): OpenApiDocument {
+        val format = resolveFormat(source, formatHint, null)
+        val root = readTree(source, format)
+        return parseDocument(root, baseUri, registry)
+    }
+
+    /**
+     * Parses a document from a file into either an OpenAPI document or a Schema document.
+     *
+     * @param baseUri Optional base URI for resolving relative $ref values and relative `$self` bases.
+     * @param registry Optional registry for resolving external $ref targets without network access.
+     */
+    fun parseDocumentFile(
+        file: File,
+        formatHint: Format = Format.AUTO,
+        baseUri: String? = null,
+        registry: OpenApiDocumentRegistry? = null
+    ): OpenApiDocument {
+        val content = file.readText()
+        val format = resolveFormat(content, formatHint, file.name)
+        val root = readTree(content, format)
+        return parseDocument(root, baseUri, registry)
+    }
+
+    /**
+     * Parses a raw document string as a Schema Object, throwing if it is not a Schema document.
+     */
+    fun parseSchemaString(
+        source: String,
+        formatHint: Format = Format.AUTO,
+        baseUri: String? = null,
+        registry: OpenApiDocumentRegistry? = null
+    ): SchemaProperty {
+        return when (val doc = parseDocumentString(source, formatHint, baseUri, registry)) {
+            is OpenApiDocument.Schema -> doc.schema
+            is OpenApiDocument.OpenApi ->
+                throw IllegalArgumentException("Document is an OpenAPI Object, not a Schema Object")
+        }
+    }
+
+    /**
+     * Parses a file as a Schema Object, throwing if it is not a Schema document.
+     */
+    fun parseSchemaFile(
+        file: File,
+        formatHint: Format = Format.AUTO,
+        baseUri: String? = null,
+        registry: OpenApiDocumentRegistry? = null
+    ): SchemaProperty {
+        return when (val doc = parseDocumentFile(file, formatHint, baseUri, registry)) {
+            is OpenApiDocument.Schema -> doc.schema
+            is OpenApiDocument.OpenApi ->
+                throw IllegalArgumentException("Document is an OpenAPI Object, not a Schema Object")
+        }
     }
 
     private fun resolveFormat(source: String, hint: Format, fileName: String?): Format {
@@ -163,28 +301,57 @@ class OpenApiParser(
         return mapper.readTree(source)
     }
 
-    private fun parseOpenApi(root: JsonNode): OpenApiDefinition {
-        val components = parseComponents(root.get("components"))
-        val pathsResult = parsePaths(root.get("paths"), components)
-        val webhooksResult = parsePaths(root.get("webhooks"), components)
-        val securityResult = parseSecurityRequirements(root.get("security"))
-        return OpenApiDefinition(
-            openapi = root.text("openapi") ?: "3.2.0",
-            info = parseInfo(root.get("info")) ?: Info(title = "Unknown", version = "0.0.0"),
-            jsonSchemaDialect = root.text("jsonSchemaDialect"),
-            servers = parseServers(root.get("servers")),
-            paths = pathsResult.items,
-            pathsExtensions = pathsResult.extensions,
-            webhooks = webhooksResult.items,
-            webhooksExtensions = webhooksResult.extensions,
-            components = components,
-            security = securityResult.requirements,
-            securityExplicitEmpty = securityResult.explicitEmpty,
-            tags = parseTags(root.get("tags")),
-            externalDocs = parseExternalDocs(root.get("externalDocs")),
-            self = root.text("\$self"),
-            extensions = parseExtensions(root)
-        )
+    private fun parseDocument(
+        root: JsonNode,
+        baseUri: String?,
+        registry: OpenApiDocumentRegistry?
+    ): OpenApiDocument {
+        val obj = root.asObject()
+        return if (obj != null && obj.has("openapi")) {
+            OpenApiDocument.OpenApi(parseOpenApi(root, baseUri, registry))
+        } else {
+            OpenApiDocument.Schema(parseSchemaRoot(root))
+        }
+    }
+
+    private fun parseSchemaRoot(root: JsonNode): SchemaProperty {
+        if (!root.isObject && !root.isBoolean) {
+            throw IllegalArgumentException("Schema document root must be an object or boolean")
+        }
+        return parseSchemaProperty(root)
+    }
+
+    private fun parseOpenApi(
+        root: JsonNode,
+        baseUri: String?,
+        registry: OpenApiDocumentRegistry?
+    ): OpenApiDefinition {
+        val self = root.text("\$self")
+        return withSelfBase(self, baseUri, registry) {
+            val components = parseComponents(root.get("components"))
+            val pathsResult = parsePaths(root.get("paths"), components)
+            val webhooksResult = parsePaths(root.get("webhooks"), components)
+            val securityResult = parseSecurityRequirements(root.get("security"))
+            OpenApiDefinition(
+                openapi = root.text("openapi") ?: "3.2.0",
+                info = parseInfo(root.get("info")) ?: Info(title = "Unknown", version = "0.0.0"),
+                jsonSchemaDialect = root.text("jsonSchemaDialect"),
+                servers = parseServers(root.get("servers")),
+                paths = pathsResult.items,
+                pathsExtensions = pathsResult.extensions,
+                pathsExplicitEmpty = pathsResult.explicitEmpty,
+                webhooks = webhooksResult.items,
+                webhooksExtensions = webhooksResult.extensions,
+                webhooksExplicitEmpty = webhooksResult.explicitEmpty,
+                components = components,
+                security = securityResult.requirements,
+                securityExplicitEmpty = securityResult.explicitEmpty,
+                tags = parseTags(root.get("tags")),
+                externalDocs = parseExternalDocs(root.get("externalDocs")),
+                self = self,
+                extensions = parseExtensions(root)
+            )
+        }
     }
 
     private fun parseInfo(node: JsonNode?): Info? {
@@ -251,11 +418,13 @@ class OpenApiParser(
 
     private data class PathsParseResult(
         val items: Map<String, PathItem>,
-        val extensions: Map<String, Any?>
+        val extensions: Map<String, Any?>,
+        val explicitEmpty: Boolean
     )
 
     private fun parsePaths(node: JsonNode?, components: Components?): PathsParseResult {
-        val obj = node.asObject() ?: return PathsParseResult(emptyMap(), emptyMap())
+        val obj = node.asObject() ?: return PathsParseResult(emptyMap(), emptyMap(), false)
+        val explicitEmpty = obj.size() == 0
         val items = LinkedHashMap<String, PathItem>()
         val extensions = LinkedHashMap<String, Any?>()
         obj.fields().forEach { (path, raw) ->
@@ -265,18 +434,18 @@ class OpenApiParser(
                 items[path] = parsePathItem(path, raw, components)
             }
         }
-        return PathsParseResult(items, extensions)
+        return PathsParseResult(items, extensions, explicitEmpty)
     }
 
     private fun parsePathItem(path: String, node: JsonNode, components: Components?): PathItem {
         val obj = node.asObject() ?: return PathItem()
         val ref = obj.text("\$ref")
-        if (ref != null) return PathItem(ref = ref)
 
         val additionalOpsFromField = parseAdditionalOperations(obj.get("additionalOperations"), path, components)
         val additionalOpsFromLoose = parseAdditionalOperationFields(obj, path, components)
 
         return PathItem(
+            ref = ref,
             summary = obj.text("summary"),
             description = obj.text("description"),
             get = parseOperationIfPresent(path, "get", HttpMethod.GET, obj.get("get"), components),
@@ -344,7 +513,9 @@ class OpenApiParser(
         node: JsonNode,
         components: Components?
     ): EndpointDefinition {
-        val operationId = node.text("operationId") ?: defaultOperationId(methodToken, path)
+        val operationIdNode = node.get("operationId")
+        val operationIdExplicit = operationIdNode != null && !operationIdNode.isNull
+        val operationId = operationIdNode?.textValue() ?: defaultOperationId(methodToken, path)
         val requestBody = parseRequestBody(node.get("requestBody"), components)
         val responses = parseResponses(node.get("responses"), components)
         val requestBodyType = selectSchema(requestBody?.content, components)?.let { TypeMappers.mapType(it) }
@@ -355,6 +526,7 @@ class OpenApiParser(
             method = method,
             customMethod = if (method == HttpMethod.CUSTOM) methodToken else null,
             operationId = operationId,
+            operationIdExplicit = operationIdExplicit,
             parameters = parseParameters(node.get("parameters"), components),
             requestBodyType = requestBodyType,
             requestBody = requestBody,
@@ -388,7 +560,11 @@ class OpenApiParser(
                 summary = obj.text("summary"),
                 description = obj.text("description")
             )
-            return Callback.Reference(reference)
+            val resolved = components?.let { resolveCallbackComponentRef(Callback.Reference(reference), it) }
+            return when (resolved) {
+                is Callback.Inline -> resolved.copy(reference = reference)
+                else -> Callback.Reference(reference)
+            }
         }
 
         val extensions = parseExtensions(obj)
@@ -456,7 +632,7 @@ class OpenApiParser(
             explode = obj?.boolean("explode"),
             allowReserved = obj?.boolean("allowReserved"),
             example = obj?.get("example")?.let { ExampleObject(value = nodeToValue(it)) },
-            examples = parseExampleMap(obj?.get("examples")),
+            examples = parseExampleMap(obj?.get("examples"), components),
             extensions = parseExtensions(obj)
         )
     }
@@ -479,9 +655,11 @@ class OpenApiParser(
                 reference = reference
             )
         }
+        val hasContent = obj.has("content")
         return RequestBody(
             description = obj.text("description"),
             content = parseContentMap(obj.get("content"), components),
+            contentPresent = hasContent,
             required = obj.boolean("required") ?: false,
             extensions = parseExtensions(obj)
         )
@@ -517,6 +695,7 @@ class OpenApiParser(
             )
         }
 
+        val contentPresent = obj?.has("content") == true
         val content = parseContentMap(obj?.get("content"), components)
         val type = selectSchema(content, components)?.let { TypeMappers.mapType(it) }
 
@@ -526,8 +705,9 @@ class OpenApiParser(
             description = obj?.text("description"),
             headers = parseHeaders(obj?.get("headers"), components),
             content = content,
+            contentPresent = contentPresent,
             type = type,
-            links = parseLinks(obj?.get("links")),
+            links = parseLinks(obj?.get("links"), components),
             extensions = parseExtensions(obj)
         )
     }
@@ -572,21 +752,21 @@ class OpenApiParser(
             required = obj?.boolean("required") ?: false,
             deprecated = obj?.boolean("deprecated") ?: false,
             example = obj?.get("example")?.let { ExampleObject(value = nodeToValue(it)) },
-            examples = parseExampleMap(obj?.get("examples")),
+            examples = parseExampleMap(obj?.get("examples"), components),
             style = parseParameterStyle(obj?.text("style")) ?: ParameterStyle.SIMPLE,
             explode = obj?.boolean("explode") ?: false,
             extensions = parseExtensions(obj)
         )
     }
 
-    private fun parseLinks(node: JsonNode?): Map<String, Link> {
+    private fun parseLinks(node: JsonNode?, components: Components?): Map<String, Link> {
         val obj = node.asObject() ?: return emptyMap()
         return obj.fields().asSequence().associate { (name, raw) ->
-            name to parseLink(raw)
+            name to parseLink(raw, components)
         }
     }
 
-    private fun parseLink(node: JsonNode): Link {
+    private fun parseLink(node: JsonNode, components: Components?): Link {
         val obj = node.asObject() ?: return Link()
         val ref = obj.text("\$ref")
         if (ref != null) {
@@ -595,7 +775,12 @@ class OpenApiParser(
                 summary = obj.text("summary"),
                 description = obj.text("description")
             )
-            return Link(
+            val resolved = resolveLinkRef(ref, components)
+            return resolved?.copy(
+                ref = ref,
+                reference = reference,
+                description = reference.description ?: resolved.description
+            ) ?: Link(
                 ref = ref,
                 reference = reference,
                 description = obj.text("description")
@@ -633,14 +818,15 @@ class OpenApiParser(
                 summary = obj.text("summary"),
                 description = obj.text("description")
             )
-            return MediaTypeObject(ref = ref, reference = reference)
+            val resolved = resolveMediaTypeRef(ref, components)
+            return resolved?.copy(ref = ref, reference = reference) ?: MediaTypeObject(ref = ref, reference = reference)
         }
 
         return MediaTypeObject(
             schema = obj.get("schema")?.let { parseSchemaProperty(it) },
             itemSchema = obj.get("itemSchema")?.let { parseSchemaProperty(it) },
             example = obj.get("example")?.let { ExampleObject(value = nodeToValue(it)) },
-            examples = parseExampleMap(obj.get("examples")),
+            examples = parseExampleMap(obj.get("examples"), components),
             encoding = parseEncodingMap(obj.get("encoding"), components),
             prefixEncoding = parseEncodingArray(obj.get("prefixEncoding"), components),
             itemEncoding = obj.get("itemEncoding")?.let { parseEncodingObject(it, components) },
@@ -684,21 +870,32 @@ class OpenApiParser(
         )
     }
 
-    private fun parseExampleMap(node: JsonNode?): Map<String, ExampleObject> {
+    private fun parseExampleMap(node: JsonNode?, components: Components?): Map<String, ExampleObject> {
         val obj = node.asObject() ?: return emptyMap()
         return obj.fields().asSequence().associate { (name, raw) ->
-            name to parseExampleObject(raw)
+            name to parseExampleObject(raw, components)
         }
     }
 
-    private fun parseExampleObject(node: JsonNode): ExampleObject {
+    private fun parseExampleObject(node: JsonNode, components: Components?): ExampleObject {
         val obj = node.asObject() ?: return ExampleObject(value = nodeToValue(node))
         val ref = obj.text("\$ref")
         if (ref != null) {
-            return ExampleObject(
+            val reference = ReferenceObject(
                 ref = ref,
                 summary = obj.text("summary"),
                 description = obj.text("description")
+            )
+            val resolved = resolveExampleRef(ref, components)
+            return ExampleObject(
+                ref = ref,
+                summary = reference.summary ?: resolved?.summary,
+                description = reference.description ?: resolved?.description,
+                dataValue = resolved?.dataValue,
+                serializedValue = resolved?.serializedValue,
+                externalValue = resolved?.externalValue,
+                value = resolved?.value,
+                extensions = resolved?.extensions ?: emptyMap()
             )
         }
         return ExampleObject(
@@ -716,20 +913,279 @@ class OpenApiParser(
         val obj = node.asObject() ?: return null
         val headers = parseComponentHeaders(obj.get("headers"))
         val partialComponents = Components(headers = headers)
-        return Components(
+        val components = Components(
             schemas = parseSchemas(obj.get("schemas")),
             responses = parseComponentResponses(obj.get("responses")),
             parameters = parseComponentParameters(obj.get("parameters")),
             requestBodies = parseComponentRequestBodies(obj.get("requestBodies")),
             headers = headers,
             securitySchemes = parseSecuritySchemes(obj.get("securitySchemes")),
-            examples = parseExampleMap(obj.get("examples")),
-            links = parseLinks(obj.get("links")),
+            examples = parseExampleMap(obj.get("examples"), null),
+            links = parseLinks(obj.get("links"), null),
             callbacks = parseCallbacks(obj.get("callbacks"), null),
             pathItems = parsePathItems(obj.get("pathItems")),
             mediaTypes = parseContentMap(obj.get("mediaTypes"), partialComponents),
             extensions = parseExtensions(obj)
         )
+        return resolveComponentRefs(components)
+    }
+
+    private fun resolveComponentRefs(components: Components): Components {
+        val resolvedParameters = components.parameters.mapValues { (_, param) ->
+            resolveParameterComponentRef(param, components)
+        }
+        val resolvedResponses = components.responses.mapValues { (_, response) ->
+            resolveResponseComponentRef(response, components)
+        }
+        val resolvedRequestBodies = components.requestBodies.mapValues { (_, body) ->
+            resolveRequestBodyComponentRef(body, components)
+        }
+        val resolvedHeaders = components.headers.mapValues { (_, header) ->
+            resolveHeaderComponentRef(header, components)
+        }
+        val resolvedLinks = components.links.mapValues { (_, link) ->
+            resolveLinkComponentRef(link, components)
+        }
+        val resolvedExamples = components.examples.mapValues { (_, example) ->
+            resolveExampleComponentRef(example, components)
+        }
+        val resolvedMediaTypes = components.mediaTypes.mapValues { (_, media) ->
+            resolveMediaTypeComponentRef(media, components)
+        }
+        val resolvedSecuritySchemes = components.securitySchemes.mapValues { (_, scheme) ->
+            resolveSecuritySchemeComponentRef(scheme, components)
+        }
+        val resolvedCallbacks = components.callbacks.mapValues { (_, callback) ->
+            resolveCallbackComponentRef(callback, components)
+        }
+
+        return components.copy(
+            parameters = resolvedParameters,
+            responses = resolvedResponses,
+            requestBodies = resolvedRequestBodies,
+            headers = resolvedHeaders,
+            links = resolvedLinks,
+            examples = resolvedExamples,
+            mediaTypes = resolvedMediaTypes,
+            securitySchemes = resolvedSecuritySchemes,
+            callbacks = resolvedCallbacks
+        )
+    }
+
+    private fun resolveParameterComponentRef(
+        param: EndpointParameter,
+        components: Components,
+        visited: MutableSet<String> = mutableSetOf(),
+        contextBase: String? = currentSelfBase
+    ): EndpointParameter {
+        val ref = param.reference?.ref ?: return param
+        val lookup = resolveComponentLookup(ref, "parameters", components, contextBase) ?: return param
+        val visitKey = "parameters:${lookup.base ?: "local"}:${lookup.key}"
+        if (!visited.add(visitKey)) return param
+        val target = lookup.components.parameters[lookup.key] ?: return param
+        val resolved = resolveParameterComponentRef(target, lookup.components, visited, lookup.base)
+        val reference = param.reference ?: ReferenceObject(ref = ref)
+        val mergedDescription = reference.description ?: param.description ?: resolved.description
+        val mergedExtensions = mergeExtensions(resolved.extensions, param.extensions)
+        return resolved.copy(
+            description = mergedDescription,
+            reference = reference,
+            extensions = mergedExtensions
+        )
+    }
+
+    private fun resolveResponseComponentRef(
+        response: EndpointResponse,
+        components: Components,
+        visited: MutableSet<String> = mutableSetOf(),
+        contextBase: String? = currentSelfBase
+    ): EndpointResponse {
+        val ref = response.reference?.ref ?: return response
+        val lookup = resolveComponentLookup(ref, "responses", components, contextBase) ?: return response
+        val visitKey = "responses:${lookup.base ?: "local"}:${lookup.key}"
+        if (!visited.add(visitKey)) return response
+        val target = lookup.components.responses[lookup.key] ?: return response
+        val resolved = resolveResponseComponentRef(target, lookup.components, visited, lookup.base)
+        val reference = response.reference ?: ReferenceObject(ref = ref)
+        val mergedSummary = reference.summary ?: response.summary ?: resolved.summary
+        val placeholderDescription = "ref:$ref"
+        val responseDescription = response.description?.takeUnless { it == placeholderDescription }
+        val mergedDescription = reference.description ?: responseDescription ?: resolved.description
+        val mergedExtensions = mergeExtensions(resolved.extensions, response.extensions)
+        return resolved.copy(
+            statusCode = response.statusCode,
+            summary = mergedSummary,
+            description = mergedDescription,
+            reference = reference,
+            extensions = mergedExtensions
+        )
+    }
+
+    private fun resolveRequestBodyComponentRef(
+        body: RequestBody,
+        components: Components,
+        visited: MutableSet<String> = mutableSetOf(),
+        contextBase: String? = currentSelfBase
+    ): RequestBody {
+        val ref = body.reference?.ref ?: return body
+        val lookup = resolveComponentLookup(ref, "requestBodies", components, contextBase) ?: return body
+        val visitKey = "requestBodies:${lookup.base ?: "local"}:${lookup.key}"
+        if (!visited.add(visitKey)) return body
+        val target = lookup.components.requestBodies[lookup.key] ?: return body
+        val resolved = resolveRequestBodyComponentRef(target, lookup.components, visited, lookup.base)
+        val reference = body.reference ?: ReferenceObject(ref = ref)
+        val mergedDescription = reference.description ?: body.description ?: resolved.description
+        val mergedExtensions = mergeExtensions(resolved.extensions, body.extensions)
+        return resolved.copy(
+            description = mergedDescription,
+            reference = reference,
+            extensions = mergedExtensions
+        )
+    }
+
+    private fun resolveHeaderComponentRef(
+        header: Header,
+        components: Components,
+        visited: MutableSet<String> = mutableSetOf(),
+        contextBase: String? = currentSelfBase
+    ): Header {
+        val ref = header.reference?.ref ?: return header
+        val lookup = resolveComponentLookup(ref, "headers", components, contextBase) ?: return header
+        val visitKey = "headers:${lookup.base ?: "local"}:${lookup.key}"
+        if (!visited.add(visitKey)) return header
+        val target = lookup.components.headers[lookup.key] ?: return header
+        val resolved = resolveHeaderComponentRef(target, lookup.components, visited, lookup.base)
+        val reference = header.reference ?: ReferenceObject(ref = ref)
+        val mergedDescription = reference.description ?: header.description ?: resolved.description
+        val mergedExtensions = mergeExtensions(resolved.extensions, header.extensions)
+        return resolved.copy(
+            description = mergedDescription,
+            reference = reference,
+            extensions = mergedExtensions
+        )
+    }
+
+    private fun resolveLinkComponentRef(
+        link: Link,
+        components: Components,
+        visited: MutableSet<String> = mutableSetOf(),
+        contextBase: String? = currentSelfBase
+    ): Link {
+        val ref = link.reference?.ref ?: link.ref ?: return link
+        val lookup = resolveComponentLookup(ref, "links", components, contextBase) ?: return link
+        val visitKey = "links:${lookup.base ?: "local"}:${lookup.key}"
+        if (!visited.add(visitKey)) return link
+        val target = lookup.components.links[lookup.key] ?: return link
+        val resolved = resolveLinkComponentRef(target, lookup.components, visited, lookup.base)
+        val reference = link.reference ?: ReferenceObject(ref = ref)
+        val mergedDescription = reference.description ?: link.description ?: resolved.description
+        val mergedExtensions = mergeExtensions(resolved.extensions, link.extensions)
+        return resolved.copy(
+            ref = ref,
+            reference = reference,
+            description = mergedDescription,
+            extensions = mergedExtensions
+        )
+    }
+
+    private fun resolveExampleComponentRef(
+        example: ExampleObject,
+        components: Components,
+        visited: MutableSet<String> = mutableSetOf(),
+        contextBase: String? = currentSelfBase
+    ): ExampleObject {
+        val ref = example.ref ?: return example
+        val lookup = resolveComponentLookup(ref, "examples", components, contextBase) ?: return example
+        val visitKey = "examples:${lookup.base ?: "local"}:${lookup.key}"
+        if (!visited.add(visitKey)) return example
+        val target = lookup.components.examples[lookup.key] ?: return example
+        val resolved = resolveExampleComponentRef(target, lookup.components, visited, lookup.base)
+        val mergedSummary = example.summary ?: resolved.summary
+        val mergedDescription = example.description ?: resolved.description
+        val mergedExtensions = mergeExtensions(resolved.extensions, example.extensions)
+        return resolved.copy(
+            ref = ref,
+            summary = mergedSummary,
+            description = mergedDescription,
+            extensions = mergedExtensions
+        )
+    }
+
+    private fun resolveMediaTypeComponentRef(
+        media: MediaTypeObject,
+        components: Components,
+        visited: MutableSet<String> = mutableSetOf(),
+        contextBase: String? = currentSelfBase
+    ): MediaTypeObject {
+        val ref = media.reference?.ref ?: media.ref ?: return media
+        val lookup = resolveComponentLookup(ref, "mediaTypes", components, contextBase) ?: return media
+        val visitKey = "mediaTypes:${lookup.base ?: "local"}:${lookup.key}"
+        if (!visited.add(visitKey)) return media
+        val target = lookup.components.mediaTypes[lookup.key] ?: return media
+        val resolved = resolveMediaTypeComponentRef(target, lookup.components, visited, lookup.base)
+        val reference = media.reference ?: ReferenceObject(ref = ref)
+        val mergedExtensions = mergeExtensions(resolved.extensions, media.extensions)
+        return resolved.copy(
+            ref = ref,
+            reference = reference,
+            extensions = mergedExtensions
+        )
+    }
+
+    private fun resolveCallbackComponentRef(
+        callback: Callback,
+        components: Components,
+        visited: MutableSet<String> = mutableSetOf(),
+        contextBase: String? = currentSelfBase
+    ): Callback {
+        return when (callback) {
+            is Callback.Inline -> callback
+            is Callback.Reference -> {
+                val ref = callback.reference.ref
+                val lookup = resolveComponentLookup(ref, "callbacks", components, contextBase) ?: return callback
+                val visitKey = "callbacks:${lookup.base ?: "local"}:${lookup.key}"
+                if (!visited.add(visitKey)) return callback
+                val target = lookup.components.callbacks[lookup.key] ?: return callback
+                val resolved = resolveCallbackComponentRef(target, lookup.components, visited, lookup.base)
+                when (resolved) {
+                    is Callback.Inline -> resolved.copy(reference = callback.reference)
+                    is Callback.Reference -> callback
+                }
+            }
+        }
+    }
+
+    private fun resolveSecuritySchemeComponentRef(
+        scheme: SecurityScheme,
+        components: Components,
+        visited: MutableSet<String> = mutableSetOf(),
+        contextBase: String? = currentSelfBase
+    ): SecurityScheme {
+        val ref = scheme.reference?.ref ?: return scheme
+        val lookup = resolveComponentLookup(ref, "securitySchemes", components, contextBase) ?: return scheme
+        val visitKey = "securitySchemes:${lookup.base ?: "local"}:${lookup.key}"
+        if (!visited.add(visitKey)) return scheme
+        val target = lookup.components.securitySchemes[lookup.key] ?: return scheme
+        val resolved = resolveSecuritySchemeComponentRef(target, lookup.components, visited, lookup.base)
+        val reference = scheme.reference ?: ReferenceObject(ref = ref)
+        val mergedDescription = reference.description ?: scheme.description ?: resolved.description
+        val mergedExtensions = mergeExtensions(resolved.extensions, scheme.extensions)
+        return resolved.copy(
+            description = mergedDescription,
+            reference = reference,
+            extensions = mergedExtensions
+        )
+    }
+
+    private fun mergeExtensions(
+        base: Map<String, Any?>,
+        overrides: Map<String, Any?>
+    ): Map<String, Any?> {
+        if (base.isEmpty() && overrides.isEmpty()) return emptyMap()
+        val merged = LinkedHashMap<String, Any?>()
+        merged.putAll(base)
+        merged.putAll(overrides)
+        return merged
     }
 
     private fun parseSchemas(node: JsonNode?): Map<String, SchemaDefinition> {
@@ -744,12 +1200,16 @@ class OpenApiParser(
             return SchemaDefinition(
                 name = name,
                 booleanSchema = node.booleanValue(),
-                type = "object"
+                type = "object",
+                typeExplicit = false
             )
         }
         val obj = node.asObject()
-        val types = parseTypes(obj)
-        val resolvedType = resolveSchemaType(types, obj)
+        val typeExplicit = obj?.has("type") == true
+        val rawTypes = parseTypes(obj)
+        val legacyNullable = isLegacyNullable(obj)
+        val resolvedType = resolveSchemaType(rawTypes, obj)
+        val types = applyLegacyNullable(rawTypes, resolvedType, legacyNullable)
         val examples = parseSchemaExamples(obj?.get("examples"))
         val examplesList = parseSchemaExamplesList(obj?.get("examples"))
         val customKeywords = parseCustomSchemaKeywords(obj)
@@ -760,6 +1220,7 @@ class OpenApiParser(
             dynamicRef = obj?.text("\$dynamicRef"),
             booleanSchema = null,
             type = resolvedType,
+            typeExplicit = typeExplicit,
             schemaId = obj?.text("\$id"),
             schemaDialect = obj?.text("\$schema"),
             anchor = obj?.text("\$anchor"),
@@ -856,12 +1317,16 @@ class OpenApiParser(
         val ref = obj?.text("\$ref")
         val dynamicRef = obj?.text("\$dynamicRef")
         val customKeywords = parseCustomSchemaKeywords(obj)
+        val rawTypes = parseTypes(obj)
+        val legacyNullable = isLegacyNullable(obj)
+        val inferredType = if (rawTypes.isEmpty() && legacyNullable) resolveSchemaType(rawTypes, obj) else null
+        val types = applyLegacyNullable(rawTypes, inferredType, legacyNullable)
 
         return SchemaProperty(
             booleanSchema = null,
             ref = ref,
             dynamicRef = dynamicRef,
-            types = parseTypes(obj),
+            types = types,
             schemaId = obj?.text("\$id"),
             schemaDialect = obj?.text("\$schema"),
             anchor = obj?.text("\$anchor"),
@@ -1154,14 +1619,79 @@ class OpenApiParser(
         }
     }
 
+    private fun isLegacyNullable(obj: JsonNode?): Boolean {
+        return obj?.boolean("nullable") == true || obj?.boolean("x-nullable") == true
+    }
+
+    private fun applyLegacyNullable(
+        rawTypes: Set<String>,
+        fallbackType: String?,
+        legacyNullable: Boolean
+    ): Set<String> {
+        if (!legacyNullable) return rawTypes
+        val baseTypes = if (rawTypes.isNotEmpty()) {
+            rawTypes
+        } else {
+            fallbackType?.let { setOf(it) } ?: emptySet()
+        }
+        if (baseTypes.contains("null")) return baseTypes
+        return if (baseTypes.isEmpty()) setOf("null") else baseTypes + "null"
+    }
+
     private fun resolveSchemaType(types: Set<String>, obj: JsonNode?): String {
         if (types.isNotEmpty()) {
             return types.firstOrNull { it != "null" } ?: types.first()
         }
-        if (obj?.has("properties") == true || obj?.has("additionalProperties") == true) return "object"
-        if (obj?.has("items") == true) return "array"
-        if (obj?.has("enum") == true) return "string"
+        if (obj == null) return "object"
+
+        inferEnumType(obj.get("enum"))?.let { return it }
+
+        if (obj.has("items") || obj.has("prefixItems") || obj.has("contains") ||
+            obj.has("minItems") || obj.has("maxItems") || obj.has("uniqueItems")
+        ) {
+            return "array"
+        }
+
+        if (obj.has("properties") || obj.has("additionalProperties") || obj.has("patternProperties") ||
+            obj.has("propertyNames") || obj.has("dependentSchemas") || obj.has("required") ||
+            obj.has("minProperties") || obj.has("maxProperties")
+        ) {
+            return "object"
+        }
+
+        if (obj.has("minimum") || obj.has("maximum") || obj.has("multipleOf") ||
+            obj.has("exclusiveMinimum") || obj.has("exclusiveMaximum")
+        ) {
+            return "number"
+        }
+
+        if (obj.has("minLength") || obj.has("maxLength") || obj.has("pattern") ||
+            obj.has("contentEncoding") || obj.has("contentMediaType") || obj.has("format")
+        ) {
+            return "string"
+        }
+
         return "object"
+    }
+
+    private fun inferEnumType(node: JsonNode?): String? {
+        val array = node?.asArray() ?: return null
+        if (array.isEmpty()) return null
+        val types = array.mapNotNull { item ->
+            when {
+                item.isTextual -> "string"
+                item.isNumber -> "number"
+                item.isBoolean -> "boolean"
+                item.isNull -> "null"
+                item.isArray -> "array"
+                item.isObject -> "object"
+                else -> null
+            }
+        }.toSet()
+        if (types.isEmpty()) return null
+        if (types.size == 1) return types.first()
+        if (types.size == 2 && types.contains("null")) return types.first { it != "null" }
+        return null
     }
 
     private fun parseSchemaRefs(node: JsonNode?): List<String> {
@@ -1176,48 +1706,247 @@ class OpenApiParser(
         components: Components?
     ): SchemaProperty? {
         if (content == null || content.isEmpty()) return null
-        val preferred = content["application/json"] ?: content.values.first()
-        val direct = preferred.schema ?: preferred.itemSchema
-        if (direct != null) return direct
+        val preferredEntry = selectPreferredMediaTypeEntry(content)
+        val preferred = preferredEntry.value
+        preferred.schema?.let { return it }
+        preferred.itemSchema?.let { return wrapItemSchemaAsArray(it) }
         val ref = preferred.reference?.ref ?: preferred.ref
         if (ref != null) {
             val resolved = resolveMediaTypeRef(ref, components)
             if (resolved != null) {
-                return resolved.schema ?: resolved.itemSchema
+                resolved.schema?.let { return it }
+                resolved.itemSchema?.let { return wrapItemSchemaAsArray(it) }
             }
             return SchemaProperty(ref = ref)
         }
-        return null
+        return inferSchemaFromMediaType(preferredEntry.key)
     }
 
+    private fun wrapItemSchemaAsArray(itemSchema: SchemaProperty): SchemaProperty {
+        return SchemaProperty(types = setOf("array"), items = itemSchema)
+    }
+
+    private fun inferSchemaFromMediaType(mediaTypeKey: String): SchemaProperty? {
+        if (!isConcreteMediaType(mediaTypeKey)) return null
+        val normalized = normalizeMediaTypeKey(mediaTypeKey)
+        return when {
+            isJsonMediaTypeKey(normalized) -> SchemaProperty(booleanSchema = true)
+            isTextMediaTypeKey(normalized) -> SchemaProperty(types = setOf("string"))
+            else -> SchemaProperty(types = setOf("string"), contentMediaType = normalized)
+        }
+    }
+
+    private fun normalizeMediaTypeKey(value: String): String {
+        return value.substringBefore(";").trim().lowercase()
+    }
+
+    private fun isConcreteMediaType(value: String): Boolean {
+        val main = value.trim().substringBefore(";").trim()
+        val parts = main.split("/")
+        if (parts.size != 2) return false
+        val type = parts[0]
+        val subtype = parts[1]
+        if (type == "*") return false
+        if (subtype.contains("*")) return false
+        return true
+    }
+
+    private fun isJsonMediaTypeKey(value: String): Boolean {
+        val normalized = normalizeMediaTypeKey(value)
+        return normalized == "application/json" || normalized.endsWith("+json")
+    }
+
+    private fun isTextMediaTypeKey(value: String): Boolean {
+        val normalized = normalizeMediaTypeKey(value)
+        return normalized.startsWith("text/") ||
+            normalized == "application/xml" ||
+            normalized == "text/xml" ||
+            normalized.endsWith("+xml") ||
+            normalized == "application/x-www-form-urlencoded" ||
+            normalized == "multipart/form-data"
+    }
+
+    private fun selectPreferredMediaTypeEntry(
+        content: Map<String, MediaTypeObject>
+    ): Map.Entry<String, MediaTypeObject> {
+        if (content.isEmpty()) {
+            throw IllegalArgumentException("content map is empty")
+        }
+        val entries = content.entries.toList()
+        val scored = entries.map { entry ->
+            entry to mediaTypeScore(entry.key)
+        }
+        val comparator = Comparator<Pair<Map.Entry<String, MediaTypeObject>, MediaTypeScore>> { a, b ->
+            val left = a.second
+            val right = b.second
+            when {
+                left.specificity != right.specificity -> left.specificity.compareTo(right.specificity)
+                left.jsonPreference != right.jsonPreference -> left.jsonPreference.compareTo(right.jsonPreference)
+                left.length != right.length -> left.length.compareTo(right.length)
+                else -> right.key.compareTo(left.key)
+            }
+        }
+        return scored.maxWithOrNull(comparator)?.first ?: entries.first()
+    }
+
+    private fun mediaTypeScore(raw: String): MediaTypeScore {
+        val main = raw.trim().substringBefore(";").trim().lowercase()
+        val parts = main.split("/")
+        if (parts.size != 2) {
+            return MediaTypeScore(specificity = -1, jsonPreference = 0, length = main.length, key = main)
+        }
+        val type = parts[0]
+        val subtype = parts[1]
+        val typeScore = if (type == "*") 0 else 1
+        val subtypeScore = when {
+            subtype == "*" -> 0
+            subtype.startsWith("*+") -> 1
+            else -> 2
+        }
+        val specificity = typeScore * 10 + subtypeScore
+        val jsonPreference = if (subtype == "json" || subtype.endsWith("+json")) 1 else 0
+        return MediaTypeScore(
+            specificity = specificity,
+            jsonPreference = jsonPreference,
+            length = main.length,
+            key = main
+        )
+    }
+
+    private data class MediaTypeScore(
+        val specificity: Int,
+        val jsonPreference: Int,
+        val length: Int,
+        val key: String
+    )
+
+    private data class ComponentRef(val base: String?, val key: String)
+
+    private data class ComponentLookup(
+        val key: String,
+        val components: Components,
+        val base: String?
+    )
+
     private fun resolveParameterRef(ref: String, components: Components?): EndpointParameter? {
-        val key = ref.substringAfter("#/components/parameters/", "")
-        if (key.isBlank()) return null
-        return components?.parameters?.get(key)
+        val lookup = resolveComponentLookup(ref, "parameters", components) ?: return null
+        return lookup.components.parameters[lookup.key]
     }
 
     private fun resolveMediaTypeRef(ref: String, components: Components?): MediaTypeObject? {
-        val key = ref.substringAfter("#/components/mediaTypes/", "")
-        if (key.isBlank()) return null
-        return components?.mediaTypes?.get(key)
+        val lookup = resolveComponentLookup(ref, "mediaTypes", components) ?: return null
+        return lookup.components.mediaTypes[lookup.key]
     }
 
     private fun resolveResponseRef(ref: String, components: Components?): EndpointResponse? {
-        val key = ref.substringAfter("#/components/responses/", "")
-        if (key.isBlank()) return null
-        return components?.responses?.get(key)
+        val lookup = resolveComponentLookup(ref, "responses", components) ?: return null
+        return lookup.components.responses[lookup.key]
     }
 
     private fun resolveRequestBodyRef(ref: String, components: Components?): RequestBody? {
-        val key = ref.substringAfter("#/components/requestBodies/", "")
-        if (key.isBlank()) return null
-        return components?.requestBodies?.get(key)
+        val lookup = resolveComponentLookup(ref, "requestBodies", components) ?: return null
+        return lookup.components.requestBodies[lookup.key]
     }
 
     private fun resolveHeaderRef(ref: String, components: Components?): Header? {
-        val key = ref.substringAfter("#/components/headers/", "")
-        if (key.isBlank()) return null
-        return components?.headers?.get(key)
+        val lookup = resolveComponentLookup(ref, "headers", components) ?: return null
+        return lookup.components.headers[lookup.key]
+    }
+
+    private fun resolveLinkRef(ref: String, components: Components?): Link? {
+        val lookup = resolveComponentLookup(ref, "links", components) ?: return null
+        return lookup.components.links[lookup.key]
+    }
+
+    private fun resolveExampleRef(ref: String, components: Components?): ExampleObject? {
+        val lookup = resolveComponentLookup(ref, "examples", components) ?: return null
+        return lookup.components.examples[lookup.key]
+    }
+
+    private fun resolveComponentLookup(
+        ref: String,
+        component: String,
+        localComponents: Components?,
+        contextBase: String? = currentSelfBase
+    ): ComponentLookup? {
+        val componentRef = extractComponentRef(ref, component, contextBase) ?: return null
+        val baseMatches = componentRef.base != null && isSelfBaseMatch(componentRef.base, contextBase)
+        val resolvedComponents = when {
+            componentRef.base == null -> localComponents
+            baseMatches && localComponents != null -> localComponents
+            else -> currentRegistry?.resolveOpenApi(componentRef.base)?.components
+        } ?: return null
+        val effectiveBase = componentRef.base ?: normalizeSelfBase(contextBase) ?: contextBase
+        return ComponentLookup(componentRef.key, resolvedComponents, effectiveBase)
+    }
+
+    private fun extractComponentRef(
+        ref: String,
+        component: String,
+        contextBase: String?
+    ): ComponentRef? {
+        val marker = "#/components/$component/"
+        val index = ref.indexOf(marker)
+        if (index < 0) return null
+        val refBase = ref.substring(0, index)
+        val raw = ref.substring(index + marker.length)
+        if (raw.isBlank() || raw.contains("/")) return null
+        val key = decodeJsonPointer(raw)
+        val base = resolveReferenceBase(refBase, contextBase)
+        return ComponentRef(base = base, key = key)
+    }
+
+    private fun resolveReferenceBase(refBase: String, contextBase: String?): String? {
+        val normalized = normalizeSelfBase(refBase)
+        if (normalized.isNullOrBlank()) {
+            return normalizeSelfBase(contextBase) ?: contextBase
+        }
+        val resolved = contextBase?.let { resolveAgainstBase(it, normalized) } ?: normalized
+        return normalizeSelfBase(resolved) ?: resolved
+    }
+
+    private fun resolveAgainstBase(base: String, ref: String): String {
+        return try {
+            URI(base).resolve(ref).toString()
+        } catch (_: Exception) {
+            ref
+        }
+    }
+
+    private fun decodeJsonPointer(value: String): String {
+        val unescaped = value.replace("~1", "/").replace("~0", "~")
+        return percentDecode(unescaped)
+    }
+
+    private fun percentDecode(value: String): String {
+        if (!value.contains("%")) return value
+        val bytes = ByteArray(value.length)
+        var byteCount = 0
+        var i = 0
+        while (i < value.length) {
+            val ch = value[i]
+            if (ch == '%' && i + 2 < value.length) {
+                val hi = hexToInt(value[i + 1])
+                val lo = hexToInt(value[i + 2])
+                if (hi >= 0 && lo >= 0) {
+                    bytes[byteCount++] = ((hi shl 4) + lo).toByte()
+                    i += 3
+                    continue
+                }
+            }
+            bytes[byteCount++] = ch.code.toByte()
+            i += 1
+        }
+        return bytes.copyOf(byteCount).toString(Charsets.UTF_8)
+    }
+
+    private fun hexToInt(ch: Char): Int {
+        return when (ch) {
+            in '0'..'9' -> ch.code - '0'.code
+            in 'a'..'f' -> ch.code - 'a'.code + 10
+            in 'A'..'F' -> ch.code - 'A'.code + 10
+            else -> -1
+        }
     }
 
     private fun parseServerObject(node: JsonNode): Server? {

@@ -102,11 +102,19 @@ class DtoParser {
         val classes = file.collectDescendantsOfType<KtClass>()
         val aliases = file.collectDescendantsOfType<KtTypeAlias>()
 
+        val sealedInterfaces = classes.filter { it.isInterface() && it.isSealed() }
+        val sealedNames = sealedInterfaces.mapNotNull { it.name }.toSet()
+        val sealedSubtypeIndex = buildSealedSubtypeIndex(classes, sealedNames)
+
         val classSchemas = classes.mapNotNull { ktClass ->
             when {
                 ktClass.isEnum() -> parseEnum(ktClass)
                 ktClass.isData() -> parseDataClass(ktClass)
-                ktClass.isInterface() && ktClass.isSealed() -> parseSealedInterface(ktClass)
+                ktClass.isInterface() && ktClass.isSealed() -> {
+                    val name = ktClass.name
+                    val subtypes = if (name == null) emptyList() else sealedSubtypeIndex[name].orEmpty()
+                    parseSealedInterface(ktClass, subtypes)
+                }
                 else -> null
             }
         }
@@ -171,6 +179,14 @@ class DtoParser {
         val unevaluatedProperties = extractSchemaTag(alias, "unevaluatedProperties")
         val unevaluatedItems = extractSchemaTag(alias, "unevaluatedItems")
         val contentSchema = extractSchemaTag(alias, "contentSchema")
+        val additionalPropertiesTag = extractSchemaTag(alias, "additionalProperties")
+        val oneOfTag = extractCompositionTag(alias, "oneOf")
+        val anyOfTag = extractCompositionTag(alias, "anyOf")
+        val allOfTag = extractCompositionTag(alias, "allOf")
+        val notSchema = extractSchemaTag(alias, "not")
+        val ifSchema = extractSchemaTag(alias, "if")
+        val thenSchema = extractSchemaTag(alias, "then")
+        val elseSchema = extractSchemaTag(alias, "else")
         val xml = extractXml(alias)
         val customKeywords = extractCustomKeywords(alias)
 
@@ -185,7 +201,7 @@ class DtoParser {
                 dynamicAnchor = dynamicAnchor,
                 dynamicRef = dynamicRef,
                 defs = defs,
-                additionalProperties = schemaProp.additionalProperties,
+                additionalProperties = additionalPropertiesTag ?: schemaProp.additionalProperties,
                 description = description,
                 title = title,
                 defaultValue = defaultValue,
@@ -221,6 +237,16 @@ class DtoParser {
                 unevaluatedItems = unevaluatedItems,
                 contentSchema = contentSchema,
                 customKeywords = customKeywords,
+                oneOf = oneOfTag.refs,
+                oneOfSchemas = oneOfTag.schemas,
+                anyOf = anyOfTag.refs,
+                anyOfSchemas = anyOfTag.schemas,
+                allOf = allOfTag.refs,
+                allOfSchemas = allOfTag.schemas,
+                not = notSchema,
+                ifSchema = ifSchema,
+                thenSchema = thenSchema,
+                elseSchema = elseSchema,
                 externalDocs = externalDocs,
                 example = example,
                 examples = examples,
@@ -239,6 +265,7 @@ class DtoParser {
                 dynamicRef = dynamicRef,
                 defs = defs,
                 items = schemaProp.items,
+                additionalProperties = additionalPropertiesTag,
                 description = description,
                 title = title,
                 defaultValue = defaultValue,
@@ -274,6 +301,16 @@ class DtoParser {
                 unevaluatedItems = unevaluatedItems,
                 contentSchema = contentSchema,
                 customKeywords = customKeywords,
+                oneOf = oneOfTag.refs,
+                oneOfSchemas = oneOfTag.schemas,
+                anyOf = anyOfTag.refs,
+                anyOfSchemas = anyOfTag.schemas,
+                allOf = allOfTag.refs,
+                allOfSchemas = allOfTag.schemas,
+                not = notSchema,
+                ifSchema = ifSchema,
+                thenSchema = thenSchema,
+                elseSchema = elseSchema,
                 externalDocs = externalDocs,
                 example = example,
                 examples = examples,
@@ -292,6 +329,7 @@ class DtoParser {
                 dynamicAnchor = dynamicAnchor,
                 dynamicRef = dynamicRef,
                 defs = defs,
+                additionalProperties = additionalPropertiesTag ?: schemaProp.additionalProperties,
                 contentMediaType = contentMediaType ?: schemaProp.contentMediaType,
                 contentEncoding = contentEncoding ?: schemaProp.contentEncoding,
                 description = description,
@@ -327,6 +365,16 @@ class DtoParser {
                 unevaluatedItems = unevaluatedItems,
                 contentSchema = contentSchema,
                 customKeywords = customKeywords,
+                oneOf = oneOfTag.refs,
+                oneOfSchemas = oneOfTag.schemas,
+                anyOf = anyOfTag.refs,
+                anyOfSchemas = anyOfTag.schemas,
+                allOf = allOfTag.refs,
+                allOfSchemas = allOfTag.schemas,
+                not = notSchema,
+                ifSchema = ifSchema,
+                thenSchema = thenSchema,
+                elseSchema = elseSchema,
                 externalDocs = externalDocs,
                 example = example,
                 examples = examples,
@@ -383,6 +431,14 @@ class DtoParser {
         val unevaluatedProperties = extractSchemaTag(ktClass, "unevaluatedProperties")
         val unevaluatedItems = extractSchemaTag(ktClass, "unevaluatedItems")
         val contentSchema = extractSchemaTag(ktClass, "contentSchema")
+        val additionalProperties = extractSchemaTag(ktClass, "additionalProperties")
+        val oneOfTag = extractCompositionTag(ktClass, "oneOf")
+        val anyOfTag = extractCompositionTag(ktClass, "anyOf")
+        val allOfTag = extractCompositionTag(ktClass, "allOf")
+        val notSchema = extractSchemaTag(ktClass, "not")
+        val ifSchema = extractSchemaTag(ktClass, "if")
+        val thenSchema = extractSchemaTag(ktClass, "then")
+        val elseSchema = extractSchemaTag(ktClass, "else")
         val xml = extractXml(ktClass)
         val customKeywords = extractCustomKeywords(ktClass)
 
@@ -447,6 +503,17 @@ class DtoParser {
             unevaluatedItems = unevaluatedItems,
             contentSchema = contentSchema,
             customKeywords = customKeywords,
+            additionalProperties = additionalProperties,
+            oneOf = oneOfTag.refs,
+            oneOfSchemas = oneOfTag.schemas,
+            anyOf = anyOfTag.refs,
+            anyOfSchemas = anyOfTag.schemas,
+            allOf = allOfTag.refs,
+            allOfSchemas = allOfTag.schemas,
+            not = notSchema,
+            ifSchema = ifSchema,
+            thenSchema = thenSchema,
+            elseSchema = elseSchema,
             externalDocs = externalDocs,
             example = example,
             examples = examples,
@@ -455,7 +522,7 @@ class DtoParser {
         )
     }
 
-    private fun parseSealedInterface(ktClass: KtClass): SchemaDefinition {
+    private fun parseSealedInterface(ktClass: KtClass, subtypes: List<SealedSubtype>): SchemaDefinition {
         val name = ktClass.name ?: "UnknownInterface"
         val description = extractDoc(ktClass)
         val externalDocs = extractExternalDocs(ktClass)
@@ -501,6 +568,14 @@ class DtoParser {
         val unevaluatedProperties = extractSchemaTag(ktClass, "unevaluatedProperties")
         val unevaluatedItems = extractSchemaTag(ktClass, "unevaluatedItems")
         val contentSchema = extractSchemaTag(ktClass, "contentSchema")
+        val additionalProperties = extractSchemaTag(ktClass, "additionalProperties")
+        val oneOfTag = extractCompositionTag(ktClass, "oneOf")
+        val anyOfTag = extractCompositionTag(ktClass, "anyOf")
+        val allOfTag = extractCompositionTag(ktClass, "allOf")
+        val notSchema = extractSchemaTag(ktClass, "not")
+        val ifSchema = extractSchemaTag(ktClass, "if")
+        val thenSchema = extractSchemaTag(ktClass, "then")
+        val elseSchema = extractSchemaTag(ktClass, "else")
         val xml = extractXml(ktClass)
         val customKeywords = extractCustomKeywords(ktClass)
 
@@ -524,15 +599,42 @@ class DtoParser {
             else -> null
         }
 
+        val inferredOneOf = if (oneOfTag.refs.isEmpty() && oneOfTag.schemas.isEmpty()) {
+            subtypes.map { "#/components/schemas/${it.kotlinName}" }
+        } else {
+            emptyList()
+        }
+
+        val inferredMapping = subtypes
+            .mapNotNull { subtype ->
+                subtype.serialName?.let { serial ->
+                    serial to "#/components/schemas/${subtype.kotlinName}"
+                }
+            }
+            .toMap()
+
+        val mergedDiscriminator = mergeDiscriminatorMappings(discriminatorObj, inferredMapping)
+        val oneOfRefs = if (inferredOneOf.isNotEmpty()) inferredOneOf else oneOfTag.refs
+        val oneOfSchemas = if (inferredOneOf.isNotEmpty()) emptyList() else oneOfTag.schemas
+
         val properties = mutableMapOf<String, domain.SchemaProperty>()
         val requiredFields = mutableListOf<String>()
 
         ktClass.getProperties().forEach { prop ->
             val kotlinType = prop.typeReference?.text ?: "String"
             val rawName = prop.name ?: "unknown"
+            val jsonName = extractSerialNameAnnotation(prop) ?: rawName
 
             val baseProp = TypeMappers.kotlinToSchemaProperty(kotlinType)
             val (example, examples) = extractExamples(prop)
+            val additionalPropertiesTag = extractSchemaTag(prop, "additionalProperties")
+            val oneOfProps = extractSchemaListTag(prop, "oneOf")
+            val anyOfProps = extractSchemaListTag(prop, "anyOf")
+            val allOfProps = extractSchemaListTag(prop, "allOf")
+            val notProp = extractSchemaTag(prop, "not")
+            val ifProp = extractSchemaTag(prop, "if")
+            val thenProp = extractSchemaTag(prop, "then")
+            val elseProp = extractSchemaTag(prop, "else")
             val schemaProp = baseProp.copy(
                 description = extractDoc(prop),
                 example = example,
@@ -576,17 +678,25 @@ class DtoParser {
                 unevaluatedProperties = extractSchemaTag(prop, "unevaluatedProperties"),
                 unevaluatedItems = extractSchemaTag(prop, "unevaluatedItems"),
                 contentSchema = extractSchemaTag(prop, "contentSchema"),
+                additionalProperties = additionalPropertiesTag ?: baseProp.additionalProperties,
+                oneOf = oneOfProps,
+                anyOf = anyOfProps,
+                allOf = allOfProps,
+                not = notProp,
+                ifSchema = ifProp,
+                thenSchema = thenProp,
+                elseSchema = elseProp,
                 customKeywords = extractCustomKeywords(prop),
                 deprecated = hasTag(prop, "deprecated") || hasAnnotation(prop, "Deprecated"),
                 readOnly = hasTag(prop, "readOnly"),
                 writeOnly = hasTag(prop, "writeOnly"),
                 xml = extractXml(prop)
             )
-            properties[rawName] = schemaProp
+            properties[jsonName] = schemaProp
 
             // If not nullable, add to required
             if (!kotlinType.contains("?")) {
-                requiredFields.add(rawName)
+                requiredFields.add(jsonName)
             }
         }
 
@@ -636,9 +746,19 @@ class DtoParser {
             unevaluatedItems = unevaluatedItems,
             contentSchema = contentSchema,
             customKeywords = customKeywords,
+            additionalProperties = additionalProperties,
             externalDocs = externalDocs,
-            discriminator = discriminatorObj,
-            oneOf = emptyList(),
+            discriminator = mergedDiscriminator,
+            oneOf = oneOfRefs,
+            oneOfSchemas = oneOfSchemas,
+            anyOf = anyOfTag.refs,
+            anyOfSchemas = anyOfTag.schemas,
+            allOf = allOfTag.refs,
+            allOfSchemas = allOfTag.schemas,
+            not = notSchema,
+            ifSchema = ifSchema,
+            thenSchema = thenSchema,
+            elseSchema = elseSchema,
             example = example,
             examples = examples,
             examplesList = examplesList,
@@ -692,6 +812,14 @@ class DtoParser {
         val unevaluatedProperties = extractSchemaTag(ktClass, "unevaluatedProperties")
         val unevaluatedItems = extractSchemaTag(ktClass, "unevaluatedItems")
         val contentSchema = extractSchemaTag(ktClass, "contentSchema")
+        val additionalProperties = extractSchemaTag(ktClass, "additionalProperties")
+        val oneOfTag = extractCompositionTag(ktClass, "oneOf")
+        val anyOfTag = extractCompositionTag(ktClass, "anyOf")
+        val allOfTag = extractCompositionTag(ktClass, "allOf")
+        val notSchema = extractSchemaTag(ktClass, "not")
+        val ifSchema = extractSchemaTag(ktClass, "if")
+        val thenSchema = extractSchemaTag(ktClass, "then")
+        val elseSchema = extractSchemaTag(ktClass, "else")
         val xml = extractXml(ktClass)
         val discriminator = extractDiscriminator(ktClass)
         val customKeywords = extractCustomKeywords(ktClass)
@@ -719,6 +847,14 @@ class DtoParser {
 
             val baseProp = TypeMappers.kotlinToSchemaProperty(kotlinType)
             val (example, examples) = extractExamples(param)
+            val additionalPropertiesTag = extractSchemaTag(param, "additionalProperties")
+            val oneOfProps = extractSchemaListTag(param, "oneOf")
+            val anyOfProps = extractSchemaListTag(param, "anyOf")
+            val allOfProps = extractSchemaListTag(param, "allOf")
+            val notProp = extractSchemaTag(param, "not")
+            val ifProp = extractSchemaTag(param, "if")
+            val thenProp = extractSchemaTag(param, "then")
+            val elseProp = extractSchemaTag(param, "else")
             val schemaProp = baseProp.copy(
                 description = extractDoc(param),
                 example = example,
@@ -762,6 +898,14 @@ class DtoParser {
                 unevaluatedProperties = extractSchemaTag(param, "unevaluatedProperties"),
                 unevaluatedItems = extractSchemaTag(param, "unevaluatedItems"),
                 contentSchema = extractSchemaTag(param, "contentSchema"),
+                additionalProperties = additionalPropertiesTag ?: baseProp.additionalProperties,
+                oneOf = oneOfProps,
+                anyOf = anyOfProps,
+                allOf = allOfProps,
+                not = notProp,
+                ifSchema = ifProp,
+                thenSchema = thenProp,
+                elseSchema = elseProp,
                 customKeywords = extractCustomKeywords(param),
                 deprecated = hasTag(param, "deprecated") || hasAnnotation(param, "Deprecated"),
                 readOnly = hasTag(param, "readOnly"),
@@ -779,6 +923,7 @@ class DtoParser {
         val superTypes = ktClass.superTypeListEntries
             .map { it.text }
             .filter { it != "Any" && it != "Serializable" }
+        val mergedAllOf = (superTypes + allOfTag.refs).distinct()
 
         return SchemaDefinition(
             name = name,
@@ -827,13 +972,78 @@ class DtoParser {
             unevaluatedItems = unevaluatedItems,
             contentSchema = contentSchema,
             customKeywords = customKeywords,
-            allOf = superTypes,
+            allOf = mergedAllOf,
+            allOfSchemas = allOfTag.schemas,
+            oneOf = oneOfTag.refs,
+            oneOfSchemas = oneOfTag.schemas,
+            anyOf = anyOfTag.refs,
+            anyOfSchemas = anyOfTag.schemas,
+            not = notSchema,
+            ifSchema = ifSchema,
+            thenSchema = thenSchema,
+            elseSchema = elseSchema,
+            additionalProperties = additionalProperties,
             example = example,
             examples = examples,
             examplesList = examplesList,
             xml = xml,
             discriminator = discriminator
         )
+    }
+
+    private data class SealedSubtype(
+        val kotlinName: String,
+        val serialName: String?
+    )
+
+    private fun buildSealedSubtypeIndex(
+        classes: List<KtClass>,
+        sealedInterfaceNames: Set<String>
+    ): Map<String, List<SealedSubtype>> {
+        if (sealedInterfaceNames.isEmpty()) return emptyMap()
+        val index = mutableMapOf<String, MutableList<SealedSubtype>>()
+        classes.forEach { candidate ->
+            val subtypeName = candidate.name ?: return@forEach
+            candidate.superTypeListEntries.forEach { entry ->
+                val typeText = entry.typeAsUserType?.referencedName ?: entry.typeReference?.text
+                val simpleName = extractSimpleTypeName(typeText) ?: return@forEach
+                if (simpleName !in sealedInterfaceNames || simpleName == subtypeName) return@forEach
+                val serialName = extractSerialNameAnnotation(candidate)
+                index.getOrPut(simpleName) { mutableListOf() }
+                    .add(SealedSubtype(subtypeName, serialName))
+            }
+        }
+        return index.mapValues { (_, values) ->
+            values.distinctBy { it.kotlinName }.sortedBy { it.kotlinName }
+        }
+    }
+
+    private fun extractSimpleTypeName(typeText: String?): String? {
+        if (typeText.isNullOrBlank()) return null
+        val withoutGenerics = typeText.substringBefore("<").trim()
+        val withoutNullable = withoutGenerics.removeSuffix("?").trim()
+        return withoutNullable.substringAfterLast(".").ifBlank { null }
+    }
+
+    private fun extractSerialNameAnnotation(owner: KtModifierListOwner): String? {
+        val serialNameEntry = owner.annotationEntries.find {
+            it.shortName?.asString() == "SerialName"
+        } ?: return null
+        val arg = serialNameEntry.valueArgumentList?.arguments?.firstOrNull()
+        val expression = arg?.getArgumentExpression() as? KtStringTemplateExpression
+        return expression?.entries?.firstOrNull()?.text
+    }
+
+    private fun mergeDiscriminatorMappings(
+        discriminator: domain.Discriminator?,
+        inferredMapping: Map<String, String>
+    ): domain.Discriminator? {
+        if (discriminator == null || inferredMapping.isEmpty()) return discriminator
+        val merged = inferredMapping.toMutableMap()
+        discriminator.mapping.forEach { (key, value) ->
+            merged[key] = value
+        }
+        return discriminator.copy(mapping = merged)
     }
 
     private fun extractDoc(element: org.jetbrains.kotlin.psi.KtDeclaration): String? {
@@ -912,6 +1122,36 @@ class DtoParser {
         return map.entries
             .filter { it.key is String }
             .associate { (key, value) -> key as String to value }
+    }
+
+    private data class CompositionTagResult(
+        val refs: List<String>,
+        val schemas: List<SchemaProperty>
+    )
+
+    private fun extractCompositionTag(
+        element: org.jetbrains.kotlin.psi.KtDeclaration,
+        tag: String
+    ): CompositionTagResult {
+        val raw = extractTagValue(element, tag) ?: return CompositionTagResult(emptyList(), emptyList())
+        val node = runCatching { jsonMapper.readTree(raw) }.getOrNull() ?: return CompositionTagResult(emptyList(), emptyList())
+        if (!node.isArray) return CompositionTagResult(emptyList(), emptyList())
+
+        val refs = mutableListOf<String>()
+        val schemas = mutableListOf<SchemaProperty>()
+
+        node.forEach { item ->
+            when {
+                item.isTextual -> refs.add(item.textValue())
+                item.isObject && item.has("\$ref") -> {
+                    val ref = item.get("\$ref")?.textValue()
+                    if (!ref.isNullOrBlank()) refs.add(ref)
+                }
+                else -> schemas.add(parseSchemaPropertyNode(item))
+            }
+        }
+
+        return CompositionTagResult(refs, schemas)
     }
 
     private fun extractSchemaTag(element: org.jetbrains.kotlin.psi.KtDeclaration, tag: String): SchemaProperty? {
