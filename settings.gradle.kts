@@ -1,10 +1,12 @@
-rootProject.name = "cdd-kotlin"
-pluginManagement {
-    repositories {
-        mavenCentral()
-        gradlePluginPortal()
-    }
-}
+rootProject.name = "cdd-kotlin" 
+pluginManagement { 
+    repositories { 
+        mavenCentral() 
+        gradlePluginPortal() 
+    } 
+} 
 
-// Toolchain resolver plugin removed to keep compatibility with older Gradle runtimes.
-// If you need automatic toolchain downloads, re-enable the foojay-resolver plugin.
+plugins { 
+    // Re-enabled Toolchain resolver to automatically download requested JDK 21 on runners
+    id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0" 
+}
