@@ -1,0 +1,48 @@
+name: Kotlin Integration
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  kotlin-integration:
+    runs-on: ubuntu-latest
+    services:
+      petstore_server:
+        image: swaggerapi/petstore
+        ports:
+          - "8080:8080"
+        env:
+          SWAGGER_HOST: "http://localhost:8080"
+          SWAGGER_BASE_PATH: "/v2"
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'zulu'
+          java-version: '21'
+          cache: 'gradle'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Fetch Petstore JSON
+        run: curl -s https://petstore.swagger.io/v2/swagger.json > petstore.json
+
+      - name: Build and Run Kotlin Generator
+        run: |
+          ./gradlew run --args="from_openapi -i petstore.json --clientName MyGeneratedClient --output kotlin-client --dateType string"
+
+      - name: Copy Kotlin Integration Tests
+        run: |
+          mkdir -p kotlin-client/composeApp/src/commonTest/kotlin/com/example/auto
+          cp tests/integration/kotlin-integration.kt kotlin-client/composeApp/src/commonTest/kotlin/com/example/auto/IntegrationTest.kt
+
+      - name: Test Kotlin Client
+        working-directory: kotlin-client
+        run: ./gradlew test
