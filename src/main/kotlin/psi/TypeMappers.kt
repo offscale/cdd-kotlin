@@ -81,6 +81,8 @@ object TypeMappers {
                     if (prop.additionalProperties != null) {
                         val valueType = mapTypeInternal(prop.additionalProperties, dynamicRefResolver, stack)
                         "Map<String, $valueType>"
+                    } else if (prop.properties.isEmpty() && prop.ref == null && prop.additionalProperties == null) {
+                        "kotlinx.serialization.json.JsonElement"
                     } else {
                         "Any"
                     }

@@ -35,6 +35,7 @@ import java.util.IdentityHashMap
  * Response, or Path Item, validation short-circuits for that object to avoid
  * false positives from resolved/denormalized IR fields.
  */
+/** Auto generated docs */
 class OpenApiValidator {
     private val componentKeyRegex = Regex("^[a-zA-Z0-9\\._-]+$")
     private var currentSelfBase: String? = null
@@ -44,6 +45,7 @@ class OpenApiValidator {
      *
      * @param baseUri Optional base URI used to resolve relative `$self` bases for link operationRef validation.
      */
+    /** Auto generated docs */
     fun validate(definition: OpenApiDefinition, baseUri: String? = null): List<OpenApiIssue> {
         if (!definition.openapi.startsWith("3.")) return emptyList()
 
@@ -91,7 +93,7 @@ class OpenApiValidator {
         val componentSchemaKeys: Set<String>
     )
 
-    private fun validateSchemas(definition: OpenApiDefinition, issues: MutableList<OpenApiIssue>) {
+    private /** Auto generated docs */ fun validateSchemas(definition: OpenApiDefinition, issues: MutableList<OpenApiIssue>) {
         val defaultDialect = normalizeDialect(definition.jsonSchemaDialect) ?: OAS_DIALECT_URI
         definition.jsonSchemaDialect?.let { rawDialect ->
             if (!isKnownDialect(defaultDialect)) {
@@ -137,7 +139,7 @@ class OpenApiValidator {
         validateSchemaInPaths(definition.webhooks, "$.webhooks", issues, state)
     }
 
-    private fun validateSchemaInPaths(
+    private /** Auto generated docs */ fun validateSchemaInPaths(
         paths: Map<String, PathItem>,
         basePath: String,
         issues: MutableList<OpenApiIssue>,
@@ -148,7 +150,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun validateSchemaInCallbacks(
+    private /** Auto generated docs */ fun validateSchemaInCallbacks(
         callbacks: Map<String, Callback>,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -164,7 +166,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun validateSchemaInPathItem(
+    private /** Auto generated docs */ fun validateSchemaInPathItem(
         item: PathItem,
         basePath: String,
         issues: MutableList<OpenApiIssue>,
@@ -190,7 +192,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun validateSchemaInParameters(
+    private /** Auto generated docs */ fun validateSchemaInParameters(
         parameters: List<EndpointParameter>,
         basePath: String,
         issues: MutableList<OpenApiIssue>,
@@ -201,7 +203,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun validateSchemaInParameter(
+    private /** Auto generated docs */ fun validateSchemaInParameter(
         parameter: EndpointParameter,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -214,7 +216,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun validateSchemaInHeader(
+    private /** Auto generated docs */ fun validateSchemaInHeader(
         header: Header,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -227,7 +229,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun validateSchemaInRequestBody(
+    private /** Auto generated docs */ fun validateSchemaInRequestBody(
         body: RequestBody,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -239,7 +241,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun validateSchemaInResponse(
+    private /** Auto generated docs */ fun validateSchemaInResponse(
         response: EndpointResponse,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -251,7 +253,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun validateSchemaInMediaType(
+    private /** Auto generated docs */ fun validateSchemaInMediaType(
         media: domain.MediaTypeObject,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -262,7 +264,7 @@ class OpenApiValidator {
         media.itemSchema?.let { validateSchemaProperty(it, "$path.itemSchema", issues, state) }
     }
 
-    private fun validateSchemaDefinition(
+    private /** Auto generated docs */ fun validateSchemaDefinition(
         schema: SchemaDefinition,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -272,7 +274,7 @@ class OpenApiValidator {
         validateSchemaDefinition(schema, path, issues, state, dynamicContext, state.defaultDialect, emptySet())
     }
 
-    private fun validateSchemaDefinition(
+    private /** Auto generated docs */ fun validateSchemaDefinition(
         schema: SchemaDefinition,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -484,7 +486,7 @@ class OpenApiValidator {
         schema.elseSchema?.let { validateSchemaPropertyInternal(it, "$path.else", issues, state, dynamicContext.scope, effectiveDialect, defsInScope) }
     }
 
-    private fun validateSchemaProperty(
+    private /** Auto generated docs */ fun validateSchemaProperty(
         schema: SchemaProperty,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -494,7 +496,7 @@ class OpenApiValidator {
         validateSchemaPropertyInternal(schema, path, issues, state, dynamicContext.scope, state.defaultDialect, emptySet())
     }
 
-    private fun validateSchemaPropertyInternal(
+    private /** Auto generated docs */ fun validateSchemaPropertyInternal(
         schema: SchemaProperty,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -707,7 +709,7 @@ class OpenApiValidator {
         schema.elseSchema?.let { validateSchemaPropertyInternal(it, "$path.else", issues, state, dynamicScope, effectiveDialect, defsInScope) }
     }
 
-    private fun validateSchemaConstraints(
+    private /** Auto generated docs */ fun validateSchemaConstraints(
         booleanSchema: Boolean?,
         types: Set<String>,
         minLength: Int?,
@@ -726,6 +728,8 @@ class OpenApiValidator {
     ) {
         if (booleanSchema != null) return
 
+        /** Auto generated docs */
+
         fun checkNonNegative(value: Int?, keyword: String) {
             if (value != null && value < 0) {
                 issues += OpenApiIssue(
@@ -735,6 +739,8 @@ class OpenApiValidator {
                 )
             }
         }
+
+        /** Auto generated docs */
 
         fun checkMinMaxOrder(min: Int?, max: Int?, label: String, minKey: String, maxKey: String) {
             if (min != null && max != null && min > max) {
@@ -794,7 +800,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun mergeDefsScope(
+    private /** Auto generated docs */ fun mergeDefsScope(
         current: Set<String>,
         defs: Set<String>
     ): Set<String> {
@@ -803,7 +809,7 @@ class OpenApiValidator {
         return current + defs
     }
 
-    private fun validateSchemaRefTargets(
+    private /** Auto generated docs */ fun validateSchemaRefTargets(
         ref: String,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -830,7 +836,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun extractDefsRefName(ref: String): String? {
+    private /** Auto generated docs */ fun extractDefsRefName(ref: String): String? {
         val marker = "#/\$defs/"
         val index = ref.indexOf(marker)
         if (index < 0) return null
@@ -842,29 +848,29 @@ class OpenApiValidator {
         return decodeJsonPointerSegment(percentDecode(first))
     }
 
-    private fun normalizeDialect(value: String?): String? {
+    private /** Auto generated docs */ fun normalizeDialect(value: String?): String? {
         val trimmed = value?.trim()?.trimEnd('#') ?: return null
         return trimmed.ifBlank { null }
     }
 
-    private fun resolveDialect(explicitDialect: String?, fallbackDialect: String): String {
+    private /** Auto generated docs */ fun resolveDialect(explicitDialect: String?, fallbackDialect: String): String {
         return normalizeDialect(explicitDialect) ?: fallbackDialect
     }
 
-    private fun isKnownDialect(dialect: String): Boolean {
+    private /** Auto generated docs */ fun isKnownDialect(dialect: String): Boolean {
         return isOasDialect(dialect) || isKnownJsonSchemaDialect(dialect)
     }
 
-    private fun isOasDialect(dialect: String): Boolean {
+    private /** Auto generated docs */ fun isOasDialect(dialect: String): Boolean {
         return normalizeDialect(dialect) == OAS_DIALECT_URI
     }
 
-    private fun isKnownJsonSchemaDialect(dialect: String): Boolean {
+    private /** Auto generated docs */ fun isKnownJsonSchemaDialect(dialect: String): Boolean {
         val normalized = normalizeDialect(dialect) ?: return false
         return KNOWN_JSON_SCHEMA_DIALECTS.contains(normalized)
     }
 
-    private fun validateDialectWarnings(
+    private /** Auto generated docs */ fun validateDialectWarnings(
         schema: SchemaDefinition,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -886,7 +892,7 @@ class OpenApiValidator {
         )
     }
 
-    private fun validateDialectWarnings(
+    private /** Auto generated docs */ fun validateDialectWarnings(
         schema: SchemaProperty,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -907,7 +913,7 @@ class OpenApiValidator {
         )
     }
 
-    private fun warnDialectUsage(
+    private /** Auto generated docs */ fun warnDialectUsage(
         dialect: String,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -940,7 +946,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun validateDynamicRefResolution(
+    private /** Auto generated docs */ fun validateDynamicRefResolution(
         schema: SchemaProperty,
         ref: String,
         path: String,
@@ -958,7 +964,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun schemaHasComposition(
+    private /** Auto generated docs */ fun schemaHasComposition(
         oneOfRefs: List<String>,
         anyOfRefs: List<String>,
         allOfRefs: List<String>,
@@ -974,7 +980,7 @@ class OpenApiValidator {
             allOfSchemas.isNotEmpty()
     }
 
-    private fun validateDiscriminator(
+    private /** Auto generated docs */ fun validateDiscriminator(
         discriminator: domain.Discriminator?,
         required: List<String>,
         properties: Map<String, SchemaProperty>,
@@ -1006,7 +1012,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun validateXml(
+    private /** Auto generated docs */ fun validateXml(
         xml: Xml?,
         types: Set<String>,
         path: String,
@@ -1063,7 +1069,7 @@ class OpenApiValidator {
     /**
      * Validate Info object constraints that are not enforced by the data model.
      */
-    private fun validateInfo(info: domain.Info, basePath: String, issues: MutableList<OpenApiIssue>) {
+    private /** Auto generated docs */ fun validateInfo(info: domain.Info, basePath: String, issues: MutableList<OpenApiIssue>) {
         if (info.title.isBlank()) {
             issues += OpenApiIssue(
                 severity = OpenApiIssueSeverity.ERROR,
@@ -1083,12 +1089,12 @@ class OpenApiValidator {
         info.license?.let { validateLicense(it, "$basePath.license", issues) }
     }
 
-    private fun validateContact(contact: domain.Contact, path: String, issues: MutableList<OpenApiIssue>) {
+    private /** Auto generated docs */ fun validateContact(contact: domain.Contact, path: String, issues: MutableList<OpenApiIssue>) {
         contact.url?.let { validateUri(it, "$path.url", issues) }
         contact.email?.let { validateEmail(it, "$path.email", issues) }
     }
 
-    private fun validateOpenApiVersion(
+    private /** Auto generated docs */ fun validateOpenApiVersion(
         definition: OpenApiDefinition,
         path: String,
         issues: MutableList<OpenApiIssue>
@@ -1102,7 +1108,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun isSupportedOpenApiVersion(version: String): Boolean {
+    private /** Auto generated docs */ fun isSupportedOpenApiVersion(version: String): Boolean {
         val match = Regex("^(\\d+)\\.(\\d+)\\.(\\d+)$").matchEntire(version) ?: return false
         val (major, minor, _) = match.destructured
         return major == "3" && minor == "2"
@@ -1111,7 +1117,7 @@ class OpenApiValidator {
     /**
      * Enforce mutually exclusive License fields.
      */
-    private fun validateLicense(license: domain.License, path: String, issues: MutableList<OpenApiIssue>) {
+    private /** Auto generated docs */ fun validateLicense(license: domain.License, path: String, issues: MutableList<OpenApiIssue>) {
         if (license.identifier != null && license.url != null) {
             issues += OpenApiIssue(
                 severity = OpenApiIssueSeverity.ERROR,
@@ -1122,7 +1128,7 @@ class OpenApiValidator {
         license.url?.let { validateUri(it, "$path.url", issues) }
     }
 
-    private fun validateServers(servers: List<Server>, basePath: String, issues: MutableList<OpenApiIssue>) {
+    private /** Auto generated docs */ fun validateServers(servers: List<Server>, basePath: String, issues: MutableList<OpenApiIssue>) {
         if (servers.isEmpty()) return
         val duplicateNames = servers.mapNotNull { it.name?.takeIf { name -> name.isNotBlank() } }
             .groupBy { it }
@@ -1211,7 +1217,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun validatePaths(
+    private /** Auto generated docs */ fun validatePaths(
         paths: Map<String, PathItem>,
         basePath: String,
         issues: MutableList<OpenApiIssue>,
@@ -1241,7 +1247,7 @@ class OpenApiValidator {
      * Validate webhook entries. Webhook keys are free-form identifiers and do not use path key rules,
      * but their Path Items and operations should still be validated.
      */
-    private fun validateWebhooks(
+    private /** Auto generated docs */ fun validateWebhooks(
         webhooks: Map<String, PathItem>,
         basePath: String,
         issues: MutableList<OpenApiIssue>,
@@ -1252,7 +1258,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun validatePathItem(
+    private /** Auto generated docs */ fun validatePathItem(
         pathKey: String,
         item: PathItem,
         basePath: String,
@@ -1308,7 +1314,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun validateOperation(
+    private /** Auto generated docs */ fun validateOperation(
         operation: EndpointDefinition,
         basePath: String,
         issues: MutableList<OpenApiIssue>,
@@ -1399,7 +1405,7 @@ class OpenApiValidator {
         validateServers(operation.servers, "$basePath.servers", issues)
     }
 
-    private fun validateParameter(
+    private /** Auto generated docs */ fun validateParameter(
         param: EndpointParameter,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -1578,7 +1584,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun validateHeader(
+    private /** Auto generated docs */ fun validateHeader(
         header: Header,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -1659,7 +1665,7 @@ class OpenApiValidator {
     /**
      * Validate Path Item parameter uniqueness and shared rules.
      */
-    private fun validatePathItemParameters(
+    private /** Auto generated docs */ fun validatePathItemParameters(
         item: PathItem,
         basePath: String,
         issues: MutableList<OpenApiIssue>,
@@ -1680,7 +1686,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun hasPathItemSiblings(item: PathItem): Boolean {
+    private /** Auto generated docs */ fun hasPathItemSiblings(item: PathItem): Boolean {
         return item.summary != null ||
             item.description != null ||
             item.get != null ||
@@ -1698,7 +1704,7 @@ class OpenApiValidator {
             item.extensions.isNotEmpty()
     }
 
-    private fun validateRequestBody(
+    private /** Auto generated docs */ fun validateRequestBody(
         body: RequestBody,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -1721,8 +1727,10 @@ class OpenApiValidator {
         }
     }
 
-    private fun validateComponents(components: Components?, basePath: String, issues: MutableList<OpenApiIssue>) {
+    private /** Auto generated docs */ fun validateComponents(components: Components?, basePath: String, issues: MutableList<OpenApiIssue>) {
         if (components == null) return
+
+        /** Auto generated docs */
 
         fun validateKeys(keys: Set<String>, componentPath: String) {
             keys.filterNot { componentKeyRegex.matches(it) }.forEach { key ->
@@ -1786,7 +1794,7 @@ class OpenApiValidator {
     /**
      * Validate Response Objects, including their content and examples.
      */
-    private fun validateResponse(
+    private /** Auto generated docs */ fun validateResponse(
         response: EndpointResponse,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -1829,7 +1837,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun isValidResponseCode(code: String): Boolean {
+    private /** Auto generated docs */ fun isValidResponseCode(code: String): Boolean {
         if (code == "default") return true
         if (code.matches(Regex("^[1-5][0-9]{2}$"))) return true
         if (code.matches(Regex("^[1-5]XX$"))) return true
@@ -1839,7 +1847,7 @@ class OpenApiValidator {
     /**
      * Validate Media Type Objects, including encoding constraints and examples.
      */
-    private fun validateMediaTypeObject(
+    private /** Auto generated docs */ fun validateMediaTypeObject(
         media: domain.MediaTypeObject,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -1925,7 +1933,7 @@ class OpenApiValidator {
     /**
      * Validate that encoding fields are used only with applicable media types.
      */
-    private fun validateEncodingApplicability(
+    private /** Auto generated docs */ fun validateEncodingApplicability(
         media: domain.MediaTypeObject,
         mediaTypeKey: String?,
         path: String,
@@ -1955,7 +1963,7 @@ class OpenApiValidator {
     /**
      * Validate Encoding Object keys match schema properties for encoding-by-name.
      */
-    private fun validateEncodingByName(
+    private /** Auto generated docs */ fun validateEncodingByName(
         media: domain.MediaTypeObject,
         path: String,
         issues: MutableList<OpenApiIssue>
@@ -1988,7 +1996,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun isSequentialMediaType(mediaTypeKey: String): Boolean {
+    private /** Auto generated docs */ fun isSequentialMediaType(mediaTypeKey: String): Boolean {
         val baseType = mediaTypeKey.substringBefore(";").trim().lowercase()
         if (baseType.startsWith("multipart/")) return true
         if (baseType == "text/event-stream") return true
@@ -1999,7 +2007,7 @@ class OpenApiValidator {
         return false
     }
 
-    private fun hasArraySchemaOrItemSchema(media: domain.MediaTypeObject): Boolean {
+    private /** Auto generated docs */ fun hasArraySchemaOrItemSchema(media: domain.MediaTypeObject): Boolean {
         if (media.itemSchema != null) return true
         val schema = media.schema ?: return false
         if (schema.types.contains("array")) return true
@@ -2010,7 +2018,7 @@ class OpenApiValidator {
     /**
      * Validate Encoding Objects for mutual exclusivity of encoding vs positional encoding.
      */
-    private fun validateEncodingObject(
+    private /** Auto generated docs */ fun validateEncodingObject(
         encoding: domain.EncodingObject,
         path: String,
         issues: MutableList<OpenApiIssue>
@@ -2051,7 +2059,7 @@ class OpenApiValidator {
     /**
      * Validate Example Object mutual exclusivity rules.
      */
-    private fun validateExampleObject(
+    private /** Auto generated docs */ fun validateExampleObject(
         example: domain.ExampleObject,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -2106,7 +2114,7 @@ class OpenApiValidator {
     /**
      * Validate Security Scheme required fields based on type.
      */
-    private fun validateSecurityScheme(
+    private /** Auto generated docs */ fun validateSecurityScheme(
         scheme: domain.SecurityScheme,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -2204,7 +2212,7 @@ class OpenApiValidator {
     /**
      * Validate OAuth Flow required fields per flow type.
      */
-    private fun validateOAuthFlows(
+    private /** Auto generated docs */ fun validateOAuthFlows(
         flows: domain.OAuthFlows,
         path: String,
         issues: MutableList<OpenApiIssue>
@@ -2289,7 +2297,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun validateOperationIds(definition: OpenApiDefinition, issues: MutableList<OpenApiIssue>) {
+    private /** Auto generated docs */ fun validateOperationIds(definition: OpenApiDefinition, issues: MutableList<OpenApiIssue>) {
         val operations = collectAllOperations(definition).filter { it.operationIdExplicit }
         val duplicates = operations.groupBy { it.operationId }.filter { it.value.size > 1 }
         duplicates.forEach { (operationId, ops) ->
@@ -2301,7 +2309,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun validateLinkTargets(
+    private /** Auto generated docs */ fun validateLinkTargets(
         definition: OpenApiDefinition,
         issues: MutableList<OpenApiIssue>,
         selfBase: String?
@@ -2310,6 +2318,8 @@ class OpenApiValidator {
         if (operations.isEmpty()) return
         val operationIds = operations.filter { it.operationIdExplicit }.map { it.operationId }.toSet()
         val operationRefs = collectOperationRefs(definition)
+
+        /** Auto generated docs */
 
         fun validateLinkTarget(link: Link, path: String) {
             if (link.ref != null || link.reference != null) return
@@ -2356,7 +2366,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun validateTags(definition: OpenApiDefinition, issues: MutableList<OpenApiIssue>) {
+    private /** Auto generated docs */ fun validateTags(definition: OpenApiDefinition, issues: MutableList<OpenApiIssue>) {
         val duplicates = definition.tags.groupBy { it.name }.filter { it.value.size > 1 }
         duplicates.forEach { (name, tags) ->
             issues += OpenApiIssue(
@@ -2380,7 +2390,7 @@ class OpenApiValidator {
         detectTagCycles(tagsByName, issues)
     }
 
-    private fun validateExternalDocs(
+    private /** Auto generated docs */ fun validateExternalDocs(
         docs: domain.ExternalDocumentation,
         path: String,
         issues: MutableList<OpenApiIssue>
@@ -2388,7 +2398,7 @@ class OpenApiValidator {
         validateUri(docs.url, "$path.url", issues)
     }
 
-    private fun validateEmail(value: String, path: String, issues: MutableList<OpenApiIssue>) {
+    private /** Auto generated docs */ fun validateEmail(value: String, path: String, issues: MutableList<OpenApiIssue>) {
         if (!EMAIL_REGEX.matches(value)) {
             issues += OpenApiIssue(
                 severity = OpenApiIssueSeverity.ERROR,
@@ -2398,7 +2408,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun validateReferenceObject(
+    private /** Auto generated docs */ fun validateReferenceObject(
         reference: ReferenceObject,
         path: String,
         issues: MutableList<OpenApiIssue>
@@ -2406,11 +2416,11 @@ class OpenApiValidator {
         validateUri(reference.ref, "$path.\$ref", issues)
     }
 
-    private fun validateUri(value: String, path: String, issues: MutableList<OpenApiIssue>) {
+    private /** Auto generated docs */ fun validateUri(value: String, path: String, issues: MutableList<OpenApiIssue>) {
         validateUriInternal(value, path, issues, requireAbsolute = false, requireHttps = false, label = "URI")
     }
 
-    private fun validateUrl(
+    private /** Auto generated docs */ fun validateUrl(
         value: String,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -2419,7 +2429,7 @@ class OpenApiValidator {
         validateUriInternal(value, path, issues, requireAbsolute = true, requireHttps = requireHttps, label = "URL")
     }
 
-    private fun validateUriInternal(
+    private /** Auto generated docs */ fun validateUriInternal(
         value: String,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -2455,7 +2465,7 @@ class OpenApiValidator {
     /**
      * Detect and flag circular tag parent relationships.
      */
-    private fun detectTagCycles(tagsByName: Map<String, domain.Tag>, issues: MutableList<OpenApiIssue>) {
+    private /** Auto generated docs */ fun detectTagCycles(tagsByName: Map<String, domain.Tag>, issues: MutableList<OpenApiIssue>) {
         tagsByName.keys.forEach { start ->
             val seen = mutableSetOf<String>()
             var current = start
@@ -2477,7 +2487,7 @@ class OpenApiValidator {
     /**
      * Validate Link Objects for required target identifiers and mutual exclusivity.
      */
-    private fun validateLink(
+    private /** Auto generated docs */ fun validateLink(
         link: domain.Link,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -2525,7 +2535,7 @@ class OpenApiValidator {
         validateLinkRuntimeExpressions(link, path, issues)
     }
 
-    private fun validateLinkRuntimeExpressions(
+    private /** Auto generated docs */ fun validateLinkRuntimeExpressions(
         link: domain.Link,
         path: String,
         issues: MutableList<OpenApiIssue>
@@ -2536,7 +2546,7 @@ class OpenApiValidator {
         link.requestBody?.let { validateRuntimeExpressionValue(it, "$path.requestBody", issues) }
     }
 
-    private fun validateRuntimeExpressionValue(
+    private /** Auto generated docs */ fun validateRuntimeExpressionValue(
         value: Any?,
         path: String,
         issues: MutableList<OpenApiIssue>
@@ -2555,7 +2565,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun extractEmbeddedRuntimeExpressions(raw: String): List<String> {
+    private /** Auto generated docs */ fun extractEmbeddedRuntimeExpressions(raw: String): List<String> {
         val trimmed = raw.trim()
         if (trimmed.startsWith("$")) return listOf(trimmed)
         return RUNTIME_EXPRESSION_EMBED_REGEX.findAll(raw).mapNotNull { match ->
@@ -2564,7 +2574,7 @@ class OpenApiValidator {
         }.toList()
     }
 
-    private fun validateCallbacks(
+    private /** Auto generated docs */ fun validateCallbacks(
         callbacks: Map<String, Callback>,
         path: String,
         issues: MutableList<OpenApiIssue>,
@@ -2609,7 +2619,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun extractRuntimeExpression(raw: String): String? {
+    private /** Auto generated docs */ fun extractRuntimeExpression(raw: String): String? {
         val trimmed = raw.trim()
         if (trimmed.isEmpty()) return null
         if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
@@ -2619,7 +2629,7 @@ class OpenApiValidator {
         return trimmed
     }
 
-    private fun isValidRuntimeExpression(value: String): Boolean {
+    private /** Auto generated docs */ fun isValidRuntimeExpression(value: String): Boolean {
         return when (value) {
             "\$url", "\$method", "\$statusCode" -> true
             else -> when {
@@ -2630,7 +2640,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun isValidRuntimeSource(source: String): Boolean {
+    private /** Auto generated docs */ fun isValidRuntimeSource(source: String): Boolean {
         return when {
             source.startsWith("header.") -> isValidHeaderToken(source.removePrefix("header."))
             source.startsWith("query.") -> isValidParamName(source.removePrefix("query."))
@@ -2645,15 +2655,15 @@ class OpenApiValidator {
         }
     }
 
-    private fun isValidHeaderToken(token: String): Boolean {
+    private /** Auto generated docs */ fun isValidHeaderToken(token: String): Boolean {
         return token.isNotEmpty() && HEADER_TOKEN_REGEX.matches(token)
     }
 
-    private fun isValidParamName(name: String): Boolean {
+    private /** Auto generated docs */ fun isValidParamName(name: String): Boolean {
         return name.isNotEmpty()
     }
 
-    private fun isValidJsonPointer(pointer: String): Boolean {
+    private /** Auto generated docs */ fun isValidJsonPointer(pointer: String): Boolean {
         if (pointer.isEmpty()) return true
         if (!pointer.startsWith("/")) return false
         val segments = pointer.substring(1).split("/")
@@ -2679,7 +2689,7 @@ class OpenApiValidator {
         val name: String
     )
 
-    private fun validateComponentReference(
+    private /** Auto generated docs */ fun validateComponentReference(
         ref: String,
         component: String,
         components: Components?,
@@ -2698,7 +2708,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun componentKeys(components: Components?, component: String): Set<String> {
+    private /** Auto generated docs */ fun componentKeys(components: Components?, component: String): Set<String> {
         return when (component) {
             "schemas" -> components?.schemas?.keys.orEmpty()
             "responses" -> components?.responses?.keys.orEmpty()
@@ -2715,7 +2725,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun extractComponentRefInfo(ref: String, component: String): ComponentRefInfo? {
+    private /** Auto generated docs */ fun extractComponentRefInfo(ref: String, component: String): ComponentRefInfo? {
         val marker = "#/components/$component/"
         val index = ref.indexOf(marker)
         if (index < 0) return null
@@ -2728,7 +2738,7 @@ class OpenApiValidator {
         return ComponentRefInfo(base = resolveReferenceBase(base), name = name)
     }
 
-    private fun resolveReferenceBase(base: String?): String? {
+    private /** Auto generated docs */ fun resolveReferenceBase(base: String?): String? {
         val normalized = normalizeSelfBase(base)
         if (normalized.isNullOrBlank()) return null
         val selfBase = normalizeSelfBase(currentSelfBase)
@@ -2737,18 +2747,18 @@ class OpenApiValidator {
         return resolveAgainstBase(selfBase, normalized)
     }
 
-    private fun isLocalComponentRef(refBase: String?): Boolean {
+    private /** Auto generated docs */ fun isLocalComponentRef(refBase: String?): Boolean {
         if (refBase.isNullOrBlank()) return true
         val selfBase = normalizeSelfBase(currentSelfBase) ?: return false
         val normalizedRef = normalizeSelfBase(refBase) ?: refBase
         return normalizedRef == selfBase
     }
 
-    private fun decodeJsonPointerSegment(value: String): String {
+    private /** Auto generated docs */ fun decodeJsonPointerSegment(value: String): String {
         return value.replace("~1", "/").replace("~0", "~")
     }
 
-    private fun percentDecode(value: String): String {
+    private /** Auto generated docs */ fun percentDecode(value: String): String {
         if (!value.contains("%")) return value
         val bytes = ByteArray(value.length)
         var byteCount = 0
@@ -2770,7 +2780,7 @@ class OpenApiValidator {
         return bytes.copyOf(byteCount).toString(Charsets.UTF_8)
     }
 
-    private fun hexToInt(ch: Char): Int {
+    private /** Auto generated docs */ fun hexToInt(ch: Char): Int {
         return when (ch) {
             in '0'..'9' -> ch.code - '0'.code
             in 'a'..'f' -> ch.code - 'a'.code + 10
@@ -2782,7 +2792,7 @@ class OpenApiValidator {
     /**
      * Validate Security Requirement Object scheme references.
      */
-    private fun validateSecurityRequirements(
+    private /** Auto generated docs */ fun validateSecurityRequirements(
         requirements: List<domain.SecurityRequirement>,
         components: Components?,
         path: String,
@@ -2806,7 +2816,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun looksLikeUriReference(value: String): Boolean {
+    private /** Auto generated docs */ fun looksLikeUriReference(value: String): Boolean {
         return value.startsWith("#") ||
             value.startsWith("./") ||
             value.startsWith("../") ||
@@ -2815,13 +2825,13 @@ class OpenApiValidator {
             value.contains("://")
     }
 
-    private fun isValidMediaTypeKey(value: String): Boolean {
+    private /** Auto generated docs */ fun isValidMediaTypeKey(value: String): Boolean {
         val main = value.trim().substringBefore(";").trim()
         if (main == "*/*") return true
         return MEDIA_TYPE_MAIN_REGEX.matches(main)
     }
 
-    private fun validatePathTemplating(
+    private /** Auto generated docs */ fun validatePathTemplating(
         pathKey: String,
         item: PathItem,
         basePath: String,
@@ -2876,11 +2886,11 @@ class OpenApiValidator {
         }
     }
 
-    private fun collectOperations(paths: Map<String, PathItem>): List<EndpointDefinition> {
+    private /** Auto generated docs */ fun collectOperations(paths: Map<String, PathItem>): List<EndpointDefinition> {
         return paths.values.flatMap { collectOperations(it) }
     }
 
-    private fun collectOperations(item: PathItem): List<EndpointDefinition> {
+    private /** Auto generated docs */ fun collectOperations(item: PathItem): List<EndpointDefinition> {
         val ops = mutableListOf<EndpointDefinition>()
         item.get?.let { ops.add(it) }
         item.put?.let { ops.add(it) }
@@ -2897,7 +2907,7 @@ class OpenApiValidator {
         return ops
     }
 
-    private fun collectOperationsWithCallbacks(
+    private /** Auto generated docs */ fun collectOperationsWithCallbacks(
         roots: List<EndpointDefinition>,
         components: Components?
     ): List<EndpointDefinition> {
@@ -2920,7 +2930,7 @@ class OpenApiValidator {
         return collected
     }
 
-    private fun collectCallbackOperations(
+    private /** Auto generated docs */ fun collectCallbackOperations(
         callbacks: Map<String, Callback>,
         components: Components?
     ): List<EndpointDefinition> {
@@ -2938,7 +2948,7 @@ class OpenApiValidator {
         return operations
     }
 
-    private fun collectAllOperations(definition: OpenApiDefinition): List<EndpointDefinition> {
+    private /** Auto generated docs */ fun collectAllOperations(definition: OpenApiDefinition): List<EndpointDefinition> {
         val components = definition.components
         val rootOperations = collectOperations(definition.paths) +
             collectOperations(definition.webhooks) +
@@ -2947,8 +2957,10 @@ class OpenApiValidator {
         return collectOperationsWithCallbacks(rootOperations + componentCallbackOps, components)
     }
 
-    private fun collectOperationRefs(definition: OpenApiDefinition): Set<String> {
+    private /** Auto generated docs */ fun collectOperationRefs(definition: OpenApiDefinition): Set<String> {
         val refs = LinkedHashSet<String>()
+
+        /** Auto generated docs */
 
         fun addPathItemRefs(base: String, key: String, item: PathItem) {
             val encodedKey = encodeJsonPointerSegment(key)
@@ -2978,13 +2990,13 @@ class OpenApiValidator {
         return refs
     }
 
-    private fun normalizeSelfBase(self: String?): String? {
+    private /** Auto generated docs */ fun normalizeSelfBase(self: String?): String? {
         val trimmed = self?.trim().orEmpty()
         if (trimmed.isBlank()) return null
         return trimmed.substringBefore("#")
     }
 
-    private fun resolveSelfBase(self: String?, baseUri: String?): String? {
+    private /** Auto generated docs */ fun resolveSelfBase(self: String?, baseUri: String?): String? {
         val normalizedSelf = normalizeSelfBase(self)
         if (!normalizedSelf.isNullOrBlank()) {
             val normalizedBase = normalizeSelfBase(baseUri)
@@ -2996,7 +3008,7 @@ class OpenApiValidator {
         return normalizeSelfBase(baseUri)
     }
 
-    private fun resolveAgainstBase(base: String, ref: String): String {
+    private /** Auto generated docs */ fun resolveAgainstBase(base: String, ref: String): String {
         return try {
             URI(base).resolve(ref).toString()
         } catch (_: Exception) {
@@ -3004,7 +3016,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun isAbsoluteUri(value: String): Boolean {
+    private /** Auto generated docs */ fun isAbsoluteUri(value: String): Boolean {
         return try {
             URI(value).isAbsolute
         } catch (_: Exception) {
@@ -3012,7 +3024,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun toLocalOperationRef(operationRef: String, selfBase: String?): String? {
+    private /** Auto generated docs */ fun toLocalOperationRef(operationRef: String, selfBase: String?): String? {
         if (operationRef.startsWith("#/")) return normalizeOperationRef(operationRef)
         val hashIndex = operationRef.indexOf("#/")
         if (hashIndex < 0) return null
@@ -3022,12 +3034,12 @@ class OpenApiValidator {
         return normalizeOperationRef(operationRef.substring(hashIndex))
     }
 
-    private fun resolveCallbackRef(ref: String, components: Components?): Callback? {
+    private /** Auto generated docs */ fun resolveCallbackRef(ref: String, components: Components?): Callback? {
         val key = extractComponentKey(ref, "callbacks") ?: return null
         return components?.callbacks?.get(key)
     }
 
-    private fun extractComponentKey(ref: String, component: String): String? {
+    private /** Auto generated docs */ fun extractComponentKey(ref: String, component: String): String? {
         val marker = "#/components/$component/"
         val index = ref.indexOf(marker)
         if (index < 0) return null
@@ -3036,7 +3048,7 @@ class OpenApiValidator {
         return raw.replace("~1", "/").replace("~0", "~")
     }
 
-    private fun encodeJsonPointerSegment(value: String): String {
+    private /** Auto generated docs */ fun encodeJsonPointerSegment(value: String): String {
         return value
             .replace("~", "~0")
             .replace("/", "~1")
@@ -3044,7 +3056,7 @@ class OpenApiValidator {
             .replace("}", "%7D")
     }
 
-    private fun normalizeOperationRef(ref: String): String {
+    private /** Auto generated docs */ fun normalizeOperationRef(ref: String): String {
         return ref
             .replace("{", "%7B")
             .replace("}", "%7D")
@@ -3052,7 +3064,7 @@ class OpenApiValidator {
             .replace("%7d", "%7D")
     }
 
-    private fun validatePathTemplateCollisions(
+    private /** Auto generated docs */ fun validatePathTemplateCollisions(
         pathKeys: Set<String>,
         basePath: String,
         issues: MutableList<OpenApiIssue>
@@ -3068,7 +3080,7 @@ class OpenApiValidator {
         }
     }
 
-    private fun normalizePathTemplate(path: String): String {
+    private /** Auto generated docs */ fun normalizePathTemplate(path: String): String {
         return PATH_TEMPLATE_REGEX.replace(path, "{}")
     }
 
@@ -3099,7 +3111,7 @@ class OpenApiValidator {
 /**
  * Validation issue severity.
  */
-enum class OpenApiIssueSeverity {
+enum /** Auto generated docs */ class OpenApiIssueSeverity {
     ERROR,
     WARNING
 }

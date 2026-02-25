@@ -328,7 +328,7 @@ class OpenApiParser(
     ): OpenApiDefinition {
         val self = root.text("\$self")
         return withSelfBase(self, baseUri, registry) {
-            val components = parseComponents(root.get("components"))
+            val components = parseComponents(root.get("components") ?: root)
             val pathsResult = parsePaths(root.get("paths"), components)
             val webhooksResult = parsePaths(root.get("webhooks"), components)
             val securityResult = parseSecurityRequirements(root.get("security"))
@@ -914,7 +914,7 @@ class OpenApiParser(
         val headers = parseComponentHeaders(obj.get("headers"))
         val partialComponents = Components(headers = headers)
         val components = Components(
-            schemas = parseSchemas(obj.get("schemas")),
+            schemas = parseSchemas(obj.get("schemas") ?: obj.get("definitions")),
             responses = parseComponentResponses(obj.get("responses")),
             parameters = parseComponentParameters(obj.get("parameters")),
             requestBodies = parseComponentRequestBodies(obj.get("requestBodies")),

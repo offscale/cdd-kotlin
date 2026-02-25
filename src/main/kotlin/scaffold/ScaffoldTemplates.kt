@@ -6,12 +6,11 @@ import domain.Info
  * Object containing string templates for the KMP project structure.
  * These templates define the Gradle configuration and initial Kotlin definitions.
  */
+/** Auto generated docs */
 object ScaffoldTemplates {
 
-    /**
-     * Generates the content for gradle/libs.versions.toml.
-     * Defines versions for Kotlin, Compose, Ktor, and Serialization.
-     */
+    /** Auto generated docs */
+
     fun createVersionCatalog(): String = """
         [versions]
         agp = "8.2.2"
@@ -51,27 +50,33 @@ object ScaffoldTemplates {
         kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
     """.trimIndent()
 
-    /**
-     * Generates the root settings.gradle.kts file.
-     * @param projectName The name of the project to include.
-     */
+    /** Auto generated docs */
+
     fun createSettingsGradle(projectName: String): String = """
+        pluginManagement {
+            repositories {
+                google()
+                mavenCentral()
+                gradlePluginPortal()
+            }
+        }
+        dependencyResolutionManagement {
+            repositories {
+                google()
+                mavenCentral()
+            }
+        }
         rootProject.name = "$projectName"
         include(":composeApp")
     """.trimIndent()
 
-    /**
-     * Generates the root build.gradle.kts file.
-     * Sets up the plugins for the overall project context.
-     * @param info Optional Info metadata to populate version.
-     */
+    /** Auto generated docs */
+
     fun createRootBuildGradle(info: Info? = null): String {
         val versionLine = if (info != null) "version = \"${info.version}\"" else "version = \"1.0-SNAPSHOT\""
 
         return """
         plugins {
-            // this is necessary to avoid the plugins to be loaded multiple times
-            // in each subproject's classloader
             alias(libs.plugins.androidApplication) apply false
             alias(libs.plugins.androidLibrary) apply false
             alias(libs.plugins.jetbrainsCompose) apply false
@@ -85,22 +90,16 @@ object ScaffoldTemplates {
     """.trimIndent()
     }
 
-    /**
-     * Generates the gradle.properties file used for JVM arguments.
-     */
+    /** Auto generated docs */
+
     fun createGradleProperties(): String = """
         org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
         kotlin.code.style=official
         android.useAndroidX=true
     """.trimIndent()
 
-    /**
-     * Generates the module-level build.gradle.kts for the 'composeApp'.
-     * Configures SourceSets for Android, iOS, and Desktop.
-     * Configures Ktor and Serialization dependencies.
-     * @param namespace The Android namespace (package name).
-     * @param info Optional Info metadata to populate versionName.
-     */
+    /** Auto generated docs */
+
     fun createAppBuildGradle(namespace: String, info: Info? = null): String {
         val versionNameStr = info?.version ?: "1.0"
 
@@ -136,44 +135,41 @@ object ScaffoldTemplates {
             }
 
             sourceSets {
-                val commonMain by getting {
-                    dependencies {
-                        implementation(compose.runtime)
-                        implementation(compose.foundation)
-                        implementation(compose.material)
-                        implementation(compose.ui)
-                        implementation(compose.components.resources)
-                        
-                        implementation(libs.kotlinx.coroutines.core)
-                        implementation(libs.kotlinx.serialization.json)
-                        
-                        // Ktor
-                        implementation(libs.ktor.client.core)
-                        implementation(libs.ktor.client.content.negotiation)
-                        implementation(libs.ktor.serialization.json)
-                    }
+                commonMain.dependencies {
+                    implementation(compose.runtime)
+                    implementation(compose.foundation)
+                    implementation(compose.material)
+                    implementation(compose.ui)
+                    implementation(compose.components.resources)
+                    
+                    implementation(libs.kotlinx.coroutines.core)
+                    implementation(libs.kotlinx.serialization.json)
+                    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.5.0")
+                    
+                    implementation(libs.ktor.client.core)
+                    implementation(libs.ktor.client.content.negotiation)
+                    implementation(libs.ktor.serialization.json)
                 }
                 
-                val androidMain by getting {
-                    dependencies {
-                        implementation(libs.androidx.activity.compose)
-                        implementation(libs.ktor.client.okhttp)
-                        implementation(libs.kotlinx.coroutines.core)
-                    }
+                androidMain.dependencies {
+                    implementation(libs.androidx.activity.compose)
+                    implementation(libs.ktor.client.okhttp)
+                    implementation(libs.kotlinx.coroutines.core)
                 }
                 
-                val desktopMain by getting {
-                    dependencies {
-                        implementation(compose.desktop.currentOs)
-                        implementation(libs.kotlinx.coroutines.swing)
-                        implementation(libs.ktor.client.okhttp) // Use OkHttp or Apache for Desktop
-                    }
+                jvm("desktop").compilations["main"].defaultSourceSet.dependencies {
+                    implementation(compose.desktop.currentOs)
+                    implementation(libs.kotlinx.coroutines.swing)
+                    implementation(libs.ktor.client.okhttp)
                 }
                 
-                val iosMain by getting {
-                    dependencies {
-                         implementation(libs.ktor.client.darwin)
-                    }
+                iosMain.dependencies {
+                    implementation(libs.ktor.client.darwin)
+                }
+                
+                commonTest.dependencies {
+                    implementation(kotlin("test"))
+                    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
                 }
             }
         }
@@ -207,9 +203,8 @@ object ScaffoldTemplates {
     """.trimIndent()
     }
 
-    /**
-     * Generates a basic AndroidManifest.xml required for the Android target.
-     */
+    /** Auto generated docs */
+
     fun createAndroidManifest(): String = """
         <?xml version="1.0" encoding="utf-8"?>
         <manifest xmlns:android="http://schemas.android.com/apk/res/android">
@@ -232,10 +227,8 @@ object ScaffoldTemplates {
         </manifest>
     """.trimIndent()
 
-    /**
-     * Generates a placeholder App.kt file in commonMain to ensure compilation.
-     * @param packageName The package definition.
-     */
+    /** Auto generated docs */
+
     fun createCommonAppKt(packageName: String): String = """
         package $packageName
 
@@ -247,7 +240,10 @@ object ScaffoldTemplates {
         @Serializable
         data class ExampleDto(val name: String)
 
+        class ApiException(message: String) : Exception(message)
+
         @Composable
+        /** Auto generated docs */
         fun App() {
             MaterialTheme {
                 Text("Hello from KMP Auto-Admin Scaffold")

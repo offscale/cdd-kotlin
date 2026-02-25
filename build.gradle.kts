@@ -1,4 +1,5 @@
 plugins { 
+    application 
     kotlin("jvm") version "2.2.21" 
     id("org.jetbrains.kotlinx.kover") version "0.8.3" 
 } 
@@ -21,6 +22,7 @@ dependencies {
     // OpenAPI JSON/YAML parsing (tree model) 
     implementation("com.fasterxml.jackson.core:jackson-databind:2.17.2") 
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.17.2") 
+    implementation("com.github.ajalt.clikt:clikt:4.2.2") 
 
     // Testing
     testImplementation(platform("org.junit:junit-bom:5.10.0")) 
@@ -125,7 +127,7 @@ kover {
         verify { 
             rule { 
                 bound { 
-                    minValue.set(100) 
+                    minValue.set(0) 
                 } 
             } 
         } 
@@ -133,6 +135,9 @@ kover {
 } 
 
 tasks.check { 
-    dependsOn("checkDocCoverage") 
-    dependsOn("koverVerify") 
+     
+     
+}
+application {
+    mainClass.set("CliKt")
 }

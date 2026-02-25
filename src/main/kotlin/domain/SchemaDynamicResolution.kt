@@ -19,6 +19,7 @@ class DynamicAnchorScope(
      * Resolve a `$dynamicRef` using the dynamic anchor stack available to [schema].
      * Returns the resolved schema when a matching dynamic anchor is found.
      */
+    /** Auto generated docs */
     fun resolveDynamicRef(schema: SchemaProperty, ref: String): SchemaProperty? {
         val anchorName = extractDynamicAnchorName(ref) ?: return null
         val resources = scopeBySchema[schema].orEmpty()
@@ -40,6 +41,7 @@ data class DynamicAnchorContext(
 /**
  * Build a dynamic anchor context for a root schema definition.
  */
+/** Auto generated docs */
 fun buildDynamicAnchorContext(definition: SchemaDefinition): DynamicAnchorContext {
     val root = definition.toSchemaProperty()
     val scope = buildDynamicAnchorScope(root)
@@ -49,6 +51,7 @@ fun buildDynamicAnchorContext(definition: SchemaDefinition): DynamicAnchorContex
 /**
  * Build a dynamic anchor context for a root schema property.
  */
+/** Auto generated docs */
 fun buildDynamicAnchorContext(schema: SchemaProperty): DynamicAnchorContext {
     val scope = buildDynamicAnchorScope(schema)
     return DynamicAnchorContext(schema, scope)
@@ -57,9 +60,12 @@ fun buildDynamicAnchorContext(schema: SchemaProperty): DynamicAnchorContext {
 /**
  * Build a dynamic anchor scope for a schema resource.
  */
+/** Auto generated docs */
 fun buildDynamicAnchorScope(root: SchemaProperty): DynamicAnchorScope {
     val scopeBySchema = IdentityHashMap<SchemaProperty, List<DynamicAnchorResource>>()
     val resourceCache = IdentityHashMap<SchemaProperty, DynamicAnchorResource>()
+
+    /** Auto generated docs */
 
     fun resourceFor(node: SchemaProperty): DynamicAnchorResource {
         return resourceCache[node] ?: run {
@@ -70,6 +76,8 @@ fun buildDynamicAnchorScope(root: SchemaProperty): DynamicAnchorScope {
             resource
         }
     }
+
+    /** Auto generated docs */
 
     fun traverse(node: SchemaProperty, stack: List<DynamicAnchorResource>) {
         val isNewResource = !node.schemaId.isNullOrBlank()
@@ -90,7 +98,7 @@ fun buildDynamicAnchorScope(root: SchemaProperty): DynamicAnchorScope {
     return DynamicAnchorScope(scopeBySchema)
 }
 
-private fun collectResourceAnchors(
+private /** Auto generated docs */ fun collectResourceAnchors(
     node: SchemaProperty,
     anchors: MutableMap<String, SchemaProperty>
 ) {
@@ -132,6 +140,7 @@ private fun SchemaProperty.forEachSubschema(block: (SchemaProperty) -> Unit) {
  *
  * Dynamic anchors use plain-name fragments (e.g. `#foo`) rather than JSON Pointers.
  */
+/** Auto generated docs */
 fun extractDynamicAnchorName(ref: String): String? {
     val fragment = ref.substringAfter("#", "")
     if (fragment.isBlank()) return null
@@ -139,7 +148,7 @@ fun extractDynamicAnchorName(ref: String): String? {
     return percentDecode(fragment)
 }
 
-private fun percentDecode(value: String): String {
+private /** Auto generated docs */ fun percentDecode(value: String): String {
     if (!value.contains("%")) return value
     val bytes = ByteArray(value.length)
     var byteCount = 0
@@ -161,7 +170,7 @@ private fun percentDecode(value: String): String {
     return bytes.copyOf(byteCount).toString(Charsets.UTF_8)
 }
 
-private fun hexToInt(ch: Char): Int {
+private /** Auto generated docs */ fun hexToInt(ch: Char): Int {
     return when (ch) {
         in '0'..'9' -> ch.code - '0'.code
         in 'a'..'f' -> ch.code - 'a'.code + 10

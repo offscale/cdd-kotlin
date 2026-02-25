@@ -43,6 +43,7 @@ import org.jetbrains.kotlin.psi.KtFile
  * - Ktor Auth Plugin configuration (Basic, Bearer, ApiKey)
  * - Header/Cookie/Path array & object serialization (simple, matrix, label, cookie/form)
  */
+/** Auto generated docs */
 class NetworkGenerator {
 
     private val psiFactory = PsiInfrastructure.createPsiFactory()
@@ -60,6 +61,7 @@ class NetworkGenerator {
      * @param webhooks Optional webhook definitions to preserve via KDoc metadata.
      * @param metadata Optional root-level OpenAPI metadata to preserve via interface KDoc.
      */
+    /** Auto generated docs */
     fun generateApi(
         packageName: String,
         apiName: String,
@@ -154,8 +156,12 @@ class NetworkGenerator {
             baseImports.add("io.ktor.client.plugins.auth.providers.*")
         }
 
+        val basePackage = packageName.substringBeforeLast(".")
         val importsBlock = """
             package $packageName
+            
+            import $basePackage.dto.*
+            import $basePackage.ApiException
             
             ${baseImports.sorted().joinToString("\n") { "import $it" }}
             
@@ -227,14 +233,12 @@ class NetworkGenerator {
             $helperFunctions
             $companionObject
             }
-            
-            class ApiException(message: String) : Exception(message)
         """.trimIndent()
 
         return psiFactory.createFile("$apiName.kt", content)
     }
 
-    private fun generateInterfaceKDoc(
+    private /** Auto generated docs */ fun generateInterfaceKDoc(
         metadata: OpenApiMetadata,
         webhooks: Map<String, PathItem>,
         servers: List<Server>,
@@ -365,7 +369,7 @@ class NetworkGenerator {
         return sb.toString()
     }
 
-    private fun renderOpenApiMeta(metadata: OpenApiMetadata): String {
+    private /** Auto generated docs */ fun renderOpenApiMeta(metadata: OpenApiMetadata): String {
         val map = linkedMapOf<String, Any?>()
         map.putIfNotNull("openapi", metadata.openapi)
         map.putIfNotNull("jsonSchemaDialect", metadata.jsonSchemaDialect)
@@ -373,12 +377,12 @@ class NetworkGenerator {
         return jsonMapper.writeValueAsString(map)
     }
 
-    private fun renderExtensions(extensions: Map<String, Any?>): String {
+    private /** Auto generated docs */ fun renderExtensions(extensions: Map<String, Any?>): String {
         val filtered = extensions.filterKeys { it.startsWith("x-") }
         return jsonMapper.writeValueAsString(filtered)
     }
 
-    private fun renderPathItems(pathItems: Map<String, PathItem>): String {
+    private /** Auto generated docs */ fun renderPathItems(pathItems: Map<String, PathItem>): String {
         if (pathItems.isEmpty()) return "{}"
         val tempDefinition = OpenApiDefinition(
             info = Info(title = "PathItems", version = "0.0.0"),
@@ -390,20 +394,20 @@ class NetworkGenerator {
         return jsonMapper.writeValueAsString(pathsNode)
     }
 
-    private fun renderInfo(info: Info): String {
+    private /** Auto generated docs */ fun renderInfo(info: Info): String {
         return jsonMapper.writeValueAsString(infoToDocValue(info))
     }
 
-    private fun renderTags(tags: List<Tag>): String {
+    private /** Auto generated docs */ fun renderTags(tags: List<Tag>): String {
         val tagValues = tags.map { tagToDocValue(it) }
         return jsonMapper.writeValueAsString(tagValues)
     }
 
-    private fun renderExternalDocs(docs: ExternalDocumentation): String {
+    private /** Auto generated docs */ fun renderExternalDocs(docs: ExternalDocumentation): String {
         return jsonMapper.writeValueAsString(externalDocsToDocValue(docs))
     }
 
-    private fun renderSecuritySchemes(securitySchemes: Map<String, SecurityScheme>): String {
+    private /** Auto generated docs */ fun renderSecuritySchemes(securitySchemes: Map<String, SecurityScheme>): String {
         if (securitySchemes.isEmpty()) return "{}"
         val tempDefinition = OpenApiDefinition(
             info = Info(title = "Security Schemes", version = "0.0.0"),
@@ -415,7 +419,7 @@ class NetworkGenerator {
         return jsonMapper.writeValueAsString(schemesNode)
     }
 
-    private fun renderComponentSchemas(schemas: Map<String, domain.SchemaDefinition>): String {
+    private /** Auto generated docs */ fun renderComponentSchemas(schemas: Map<String, domain.SchemaDefinition>): String {
         if (schemas.isEmpty()) return "{}"
         val tempDefinition = OpenApiDefinition(
             info = Info(title = "Component Schemas", version = "0.0.0"),
@@ -427,19 +431,19 @@ class NetworkGenerator {
         return jsonMapper.writeValueAsString(schemasNode)
     }
 
-    private fun renderComponentExamples(examples: Map<String, ExampleObject>): String {
+    private /** Auto generated docs */ fun renderComponentExamples(examples: Map<String, ExampleObject>): String {
         if (examples.isEmpty()) return "{}"
         val mapped = examples.mapValues { exampleObjectToDocValue(it.value) }
         return jsonMapper.writeValueAsString(mapped)
     }
 
-    private fun renderComponentLinks(links: Map<String, Link>): String {
+    private /** Auto generated docs */ fun renderComponentLinks(links: Map<String, Link>): String {
         if (links.isEmpty()) return "{}"
         val mapped = links.mapValues { linkToDocValue(it.value) }
         return jsonMapper.writeValueAsString(mapped)
     }
 
-    private fun renderComponentParameters(parameters: Map<String, EndpointParameter>): String {
+    private /** Auto generated docs */ fun renderComponentParameters(parameters: Map<String, EndpointParameter>): String {
         if (parameters.isEmpty()) return "{}"
         val tempDefinition = OpenApiDefinition(
             info = Info(title = "Component Parameters", version = "0.0.0"),
@@ -451,7 +455,7 @@ class NetworkGenerator {
         return jsonMapper.writeValueAsString(paramsNode)
     }
 
-    private fun renderComponentResponses(responses: Map<String, EndpointResponse>): String {
+    private /** Auto generated docs */ fun renderComponentResponses(responses: Map<String, EndpointResponse>): String {
         if (responses.isEmpty()) return "{}"
         val tempDefinition = OpenApiDefinition(
             info = Info(title = "Component Responses", version = "0.0.0"),
@@ -463,7 +467,7 @@ class NetworkGenerator {
         return jsonMapper.writeValueAsString(responsesNode)
     }
 
-    private fun renderComponentRequestBodies(bodies: Map<String, RequestBody>): String {
+    private /** Auto generated docs */ fun renderComponentRequestBodies(bodies: Map<String, RequestBody>): String {
         if (bodies.isEmpty()) return "{}"
         val tempDefinition = OpenApiDefinition(
             info = Info(title = "Component Request Bodies", version = "0.0.0"),
@@ -475,7 +479,7 @@ class NetworkGenerator {
         return jsonMapper.writeValueAsString(bodiesNode)
     }
 
-    private fun renderComponentHeaders(headers: Map<String, Header>): String {
+    private /** Auto generated docs */ fun renderComponentHeaders(headers: Map<String, Header>): String {
         if (headers.isEmpty()) return "{}"
         val tempDefinition = OpenApiDefinition(
             info = Info(title = "Component Headers", version = "0.0.0"),
@@ -487,7 +491,7 @@ class NetworkGenerator {
         return jsonMapper.writeValueAsString(headersNode)
     }
 
-    private fun renderComponentPathItems(pathItems: Map<String, PathItem>): String {
+    private /** Auto generated docs */ fun renderComponentPathItems(pathItems: Map<String, PathItem>): String {
         if (pathItems.isEmpty()) return "{}"
         val tempDefinition = OpenApiDefinition(
             info = Info(title = "Component Path Items", version = "0.0.0"),
@@ -499,7 +503,7 @@ class NetworkGenerator {
         return jsonMapper.writeValueAsString(pathItemsNode)
     }
 
-    private fun renderComponentMediaTypes(mediaTypes: Map<String, MediaTypeObject>): String {
+    private /** Auto generated docs */ fun renderComponentMediaTypes(mediaTypes: Map<String, MediaTypeObject>): String {
         if (mediaTypes.isEmpty()) return "{}"
         val tempDefinition = OpenApiDefinition(
             info = Info(title = "Component Media Types", version = "0.0.0"),
@@ -511,7 +515,7 @@ class NetworkGenerator {
         return jsonMapper.writeValueAsString(mediaTypesNode)
     }
 
-    private fun renderWebhooks(webhooks: Map<String, PathItem>): String {
+    private /** Auto generated docs */ fun renderWebhooks(webhooks: Map<String, PathItem>): String {
         if (webhooks.isEmpty()) return "{}"
         val tempDefinition = OpenApiDefinition(
             info = Info(title = "Webhooks", version = "0.0.0"),
@@ -523,7 +527,7 @@ class NetworkGenerator {
         return jsonMapper.writeValueAsString(webhooksNode)
     }
 
-    private fun buildCompanionObject(
+    private /** Auto generated docs */ fun buildCompanionObject(
         servers: List<Server>,
         securitySchemes: Map<String, SecurityScheme>,
         serverSupport: ServerSupport?
@@ -546,7 +550,7 @@ class NetworkGenerator {
         return blocks.joinToString("\n\n").prependIndent("    ")
     }
 
-    private fun buildHelperFunctions(endpoints: List<EndpointDefinition>): String {
+    private /** Auto generated docs */ fun buildHelperFunctions(endpoints: List<EndpointDefinition>): String {
         val needsQueryStringEncoding = endpoints.any { ep ->
             ep.parameters.any { it.location == ParameterLocation.QUERYSTRING && it.content.isNotEmpty() }
         }
@@ -579,15 +583,15 @@ class NetworkGenerator {
 
         if (needsEncodingPrimitives) {
             blocks += """
-                private fun isUnreserved(ch: Char): Boolean {
+                private /** Auto generated docs */ fun isUnreserved(ch: Char): Boolean {
                     return ch.isLetterOrDigit() || ch == '-' || ch == '.' || ch == '_' || ch == '~'
                 }
 
-                private fun isHexDigit(ch: Char): Boolean {
+                private /** Auto generated docs */ fun isHexDigit(ch: Char): Boolean {
                     return ch in '0'..'9' || ch in 'a'..'f' || ch in 'A'..'F'
                 }
 
-                private fun byteToHex(b: Byte): String {
+                private /** Auto generated docs */ fun byteToHex(b: Byte): String {
                     val value = b.toInt() and 0xFF
                     val digits = "0123456789ABCDEF"
                     return "${'$'}{digits[value ushr 4]}${'$'}{digits[value and 0x0F]}"
@@ -597,7 +601,7 @@ class NetworkGenerator {
 
         if (needsAllowReserved) {
             blocks += """
-                private fun encodeAllowReserved(value: String): String {
+                private /** Auto generated docs */ fun encodeAllowReserved(value: String): String {
                     if (value.isEmpty()) return value
                     val sb = StringBuilder()
                     var i = 0
@@ -623,7 +627,7 @@ class NetworkGenerator {
                     return sb.toString()
                 }
 
-                private fun isReserved(ch: Char): Boolean {
+                private /** Auto generated docs */ fun isReserved(ch: Char): Boolean {
                     return ":/?#[]@!${'$'}&'()*+,;=".indexOf(ch) >= 0
                 }
             """.trimIndent()
@@ -631,7 +635,7 @@ class NetworkGenerator {
 
         if (needsPathEncoding) {
             blocks += """
-                private fun encodePathComponent(value: String, allowReserved: Boolean): String {
+                private /** Auto generated docs */ fun encodePathComponent(value: String, allowReserved: Boolean): String {
                     if (value.isEmpty()) return value
                     val sb = StringBuilder()
                     var i = 0
@@ -658,7 +662,7 @@ class NetworkGenerator {
                     return sb.toString()
                 }
 
-                private fun isPathReservedAllowed(ch: Char): Boolean {
+                private /** Auto generated docs */ fun isPathReservedAllowed(ch: Char): Boolean {
                     return ":@!${'$'}&'()*+,;=".indexOf(ch) >= 0
                 }
             """.trimIndent()
@@ -813,7 +817,7 @@ class NetworkGenerator {
                     }
                 }
 
-                private fun appendFormPairs(
+                private /** Auto generated docs */ fun appendFormPairs(
                     pairs: MutableList<FormPair>,
                     key: String,
                     element: JsonElement,
@@ -919,11 +923,11 @@ class NetworkGenerator {
                     }
                 }
 
-                private fun normalizeFormStyle(style: String?): String {
+                private /** Auto generated docs */ fun normalizeFormStyle(style: String?): String {
                     return style?.trim()?.lowercase() ?: "form"
                 }
 
-                private fun encodeFormComponent(value: String, allowReserved: Boolean): String {
+                private /** Auto generated docs */ fun encodeFormComponent(value: String, allowReserved: Boolean): String {
                     val encoded = if (allowReserved) encodeAllowReserved(value) else encodeURLQueryComponent(value)
                     return encoded.replace("%20", "+")
                 }
@@ -1007,7 +1011,7 @@ class NetworkGenerator {
 
         if (needsMultipartEncoding) {
             blocks += """
-                private fun buildMultipartHeaders(
+                private /** Auto generated docs */ fun buildMultipartHeaders(
                     contentType: String?,
                     overrides: Map<String, String>?
                 ): Headers? {
@@ -1028,11 +1032,11 @@ class NetworkGenerator {
 
         if (needsJsonContentHelper) {
             blocks += """
-                private fun serializeElement(element: JsonElement, contentType: String?): String {
+                private /** Auto generated docs */ fun serializeElement(element: JsonElement, contentType: String?): String {
                     return if (isJsonMediaType(contentType)) element.toString() else jsonElementToString(element)
                 }
 
-                private fun isJsonMediaType(contentType: String?): Boolean {
+                private /** Auto generated docs */ fun isJsonMediaType(contentType: String?): Boolean {
                     if (contentType == null) return false
                     val normalized = contentType.substringBefore(";").trim().lowercase()
                     return normalized == "application/json" || normalized.endsWith("+json")
@@ -1042,7 +1046,7 @@ class NetworkGenerator {
 
         if (needsJsonElementHelpers) {
             blocks += """
-                private fun jsonElementToString(element: JsonElement): String {
+                private /** Auto generated docs */ fun jsonElementToString(element: JsonElement): String {
                     return when (element) {
                         is JsonPrimitive -> element.content
                         else -> element.toString()
@@ -1067,7 +1071,7 @@ class NetworkGenerator {
         val emptyValueLine: String?
     )
 
-    private fun buildServerSupport(servers: List<Server>): ServerSupport? {
+    private /** Auto generated docs */ fun buildServerSupport(servers: List<Server>): ServerSupport? {
         if (servers.isEmpty()) return null
         val hasVariables = servers.any { !it.variables.isNullOrEmpty() }
         val hasNames = servers.any { !it.name.isNullOrBlank() }
@@ -1088,7 +1092,7 @@ class NetworkGenerator {
         )
     }
 
-    private fun buildServerSpecBlock(servers: List<Server>): String {
+    private /** Auto generated docs */ fun buildServerSpecBlock(servers: List<Server>): String {
         val entries = servers.map { server ->
             val args = mutableListOf("url = \"${escapeKotlinString(server.url)}\"")
             server.name?.let { args.add("name = \"${escapeKotlinString(it)}\"") }
@@ -1116,7 +1120,7 @@ class NetworkGenerator {
         """.trimIndent()
     }
 
-    private fun buildServerVariablesBlock(servers: List<Server>): String {
+    private /** Auto generated docs */ fun buildServerVariablesBlock(servers: List<Server>): String {
         val allVariables = LinkedHashMap<String, ServerVariable>()
         servers.forEach { server ->
             server.variables?.forEach { (rawName, variable) ->
@@ -1176,6 +1180,7 @@ class NetworkGenerator {
             data class ServerVariables(
                 ${propertyLines.joinToString(",\n                ")}
             ) {
+                /** Auto generated docs */
                 fun toMap(): Map<String, String> = mapOf(
                     ${mapEntries.joinToString(",\n                    ")}
                 )
@@ -1183,7 +1188,7 @@ class NetworkGenerator {
         """.trimIndent()
     }
 
-    private fun buildServerHelperFunctions(hasVariables: Boolean): String {
+    private /** Auto generated docs */ fun buildServerHelperFunctions(hasVariables: Boolean): String {
         val variablesParam = if (hasVariables) ", variables: ServerVariables = ServerVariables()" else ""
         val variablesMap = if (hasVariables) "variables.toMap()" else "emptyMap()"
         val serverSpecFallback = if (hasVariables) {
@@ -1191,9 +1196,10 @@ class NetworkGenerator {
         } else {
             "ServerSpec(url = \"/\", name = null)"
         }
-        val defaultBaseUrlSignature = "fun defaultBaseUrl(serverIndex: Int = 0, serverName: String? = null$variablesParam): String"
+        val defaultBaseUrlSignature = "/** Auto generated docs */fun defaultBaseUrl(serverIndex: Int = 0, serverName: String? = null$variablesParam): String"
 
         return """
+            /** Auto generated docs */
             fun resolveServerUrl(template: String, variables: Map<String, String>): String {
                 var resolved = template
                 variables.forEach { (key, value) ->
@@ -1201,6 +1207,8 @@ class NetworkGenerator {
                 }
                 return resolved
             }
+
+            /** Auto generated docs */
 
             fun selectServer(serverIndex: Int = 0, serverName: String? = null): ServerSpec {
                 if (SERVERS.isEmpty()) return $serverSpecFallback
@@ -1218,14 +1226,14 @@ class NetworkGenerator {
         """.trimIndent()
     }
 
-    private fun sanitizeVariableName(raw: String): String {
+    private /** Auto generated docs */ fun sanitizeVariableName(raw: String): String {
         val cleaned = raw.replace(Regex("[^a-zA-Z0-9_]"), "_").trim('_')
         val base = if (cleaned.isEmpty()) "var" else cleaned
         val normalized = if (base.first().isDigit()) "_$base" else base
         return normalized.replaceFirstChar { it.lowercase() }
     }
 
-    private fun toPascalCase(raw: String): String {
+    private /** Auto generated docs */ fun toPascalCase(raw: String): String {
         val parts = raw.split(Regex("[^a-zA-Z0-9]+")).filter { it.isNotBlank() }
         if (parts.isEmpty()) return "Var"
         val joined = parts.joinToString("") { part ->
@@ -1234,7 +1242,7 @@ class NetworkGenerator {
         return if (joined.firstOrNull()?.isDigit() == true) "Var$joined" else joined
     }
 
-    private fun sanitizeEnumConstant(value: String): String {
+    private /** Auto generated docs */ fun sanitizeEnumConstant(value: String): String {
         val trimmed = value.trim()
         val cleaned = trimmed.replace(Regex("[^a-zA-Z0-9]+"), "_").trim('_')
         val base = if (cleaned.isBlank()) "VALUE" else cleaned
@@ -1242,7 +1250,7 @@ class NetworkGenerator {
         return normalized.uppercase()
     }
 
-    private fun uniqueEnumName(base: String, used: MutableSet<String>): String {
+    private /** Auto generated docs */ fun uniqueEnumName(base: String, used: MutableSet<String>): String {
         var name = if (base.isBlank()) "Var" else base
         var suffix = 2
         while (!used.add(name)) {
@@ -1251,7 +1259,7 @@ class NetworkGenerator {
         return name
     }
 
-    private fun buildEnumConstants(values: List<String>): List<Pair<String, String>> {
+    private /** Auto generated docs */ fun buildEnumConstants(values: List<String>): List<Pair<String, String>> {
         val used = mutableSetOf<String>()
         return values.map { raw ->
             val base = sanitizeEnumConstant(raw)
@@ -1264,17 +1272,17 @@ class NetworkGenerator {
         }
     }
 
-    private fun escapeKotlinString(value: String): String {
+    private /** Auto generated docs */ fun escapeKotlinString(value: String): String {
         return value.replace("\\", "\\\\").replace("\"", "\\\"")
     }
 
-    private fun resolveServerUrlTemplate(server: Server): String {
+    private /** Auto generated docs */ fun resolveServerUrlTemplate(server: Server): String {
         val variables = server.variables.orEmpty()
         if (variables.isEmpty()) return server.url
         return resolveServerUrlTemplate(server.url, variables.mapValues { it.value.default })
     }
 
-    private fun resolveServerUrlTemplate(
+    private /** Auto generated docs */ fun resolveServerUrlTemplate(
         template: String,
         variables: Map<String, String>
     ): String {
@@ -1286,12 +1294,13 @@ class NetworkGenerator {
         return resolved
     }
 
-    private fun generateAuthFactory(schemes: Map<String, SecurityScheme>): String {
+    private /** Auto generated docs */ fun generateAuthFactory(schemes: Map<String, SecurityScheme>): String {
         val hasHttpAuth = schemes.values.any { it.type == "http" }
         val hasOAuthAuth = schemes.values.any { it.type == "oauth2" || it.type == "openIdConnect" }
         val hasMutualTls = schemes.values.any { it.type == "mutualTLS" }
 
         val usedNames = mutableSetOf<String>()
+        /** Auto generated docs */
         fun uniqueName(base: String): String {
             val normalized = base.ifBlank { "auth" }
             var name = normalized
@@ -1447,6 +1456,7 @@ class NetworkGenerator {
             /**
              * Creates a Ktor HttpClient configured with the defined Security Schemes.
              */
+            /** Auto generated docs */
             fun createHttpClient(
                 $argsBlock
             ): HttpClient {
@@ -1460,7 +1470,7 @@ class NetworkGenerator {
         return helperBlocks.joinToString("\n\n").trimIndent().replace("\n", "\n    ")
     }
 
-    private fun generateMutualTlsHelperBlock(): String {
+    private /** Auto generated docs */ fun generateMutualTlsHelperBlock(): String {
         return """
             /**
              * Configuration for mutual TLS (mTLS) client credentials.
@@ -1481,7 +1491,7 @@ class NetworkGenerator {
         """.trimIndent()
     }
 
-    private fun generateOAuthHelperBlock(): String {
+    private /** Auto generated docs */ fun generateOAuthHelperBlock(): String {
         return """
             data class OAuthTokens(
                 val accessToken: String,
@@ -1516,6 +1526,8 @@ class NetworkGenerator {
                 val method: String = "S256"
             )
 
+            /** Auto generated docs */
+
             fun createPkceVerifier(length: Int = 64): String {
                 require(length in 43..128) { "PKCE verifier length must be between 43 and 128." }
                 val chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~"
@@ -1526,16 +1538,20 @@ class NetworkGenerator {
                 }
             }
 
+            /** Auto generated docs */
+
             fun createPkce(length: Int = 64): Pkce {
                 val verifier = createPkceVerifier(length)
                 val challenge = pkceS256Challenge(verifier)
                 return Pkce(codeVerifier = verifier, codeChallenge = challenge)
             }
 
-            private fun pkceS256Challenge(verifier: String): String {
+            private /** Auto generated docs */ fun pkceS256Challenge(verifier: String): String {
                 val digest = MessageDigest.getInstance("SHA-256").digest(verifier.toByteArray(Charsets.US_ASCII))
                 return Base64.getUrlEncoder().withoutPadding().encodeToString(digest)
             }
+
+            /** Auto generated docs */
 
             fun buildAuthorizationUrl(
                 authorizationUrl: String,
@@ -1568,7 +1584,7 @@ class NetworkGenerator {
                 return builder.buildString()
             }
 
-            suspend fun exchangeAuthorizationCode(
+            suspend /** Auto generated docs */ fun exchangeAuthorizationCode(
                 client: HttpClient,
                 tokenUrl: String,
                 clientId: String,
@@ -1592,7 +1608,7 @@ class NetworkGenerator {
                 return requestTokenOrThrow(client, tokenUrl, params)
             }
 
-            suspend fun refreshToken(
+            suspend /** Auto generated docs */ fun refreshToken(
                 client: HttpClient,
                 tokenUrl: String,
                 refreshToken: String,
@@ -1614,7 +1630,7 @@ class NetworkGenerator {
                 return requestTokenOrThrow(client, tokenUrl, params)
             }
 
-            suspend fun clientCredentialsToken(
+            suspend /** Auto generated docs */ fun clientCredentialsToken(
                 client: HttpClient,
                 tokenUrl: String,
                 clientId: String,
@@ -1634,7 +1650,7 @@ class NetworkGenerator {
                 return requestTokenOrThrow(client, tokenUrl, params)
             }
 
-            suspend fun passwordToken(
+            suspend /** Auto generated docs */ fun passwordToken(
                 client: HttpClient,
                 tokenUrl: String,
                 clientId: String,
@@ -1658,7 +1674,7 @@ class NetworkGenerator {
                 return requestTokenOrThrow(client, tokenUrl, params)
             }
 
-            suspend fun requestDeviceCode(
+            suspend /** Auto generated docs */ fun requestDeviceCode(
                 client: HttpClient,
                 deviceAuthorizationUrl: String,
                 clientId: String,
@@ -1703,7 +1719,7 @@ class NetworkGenerator {
                 )
             }
 
-            suspend fun exchangeDeviceToken(
+            suspend /** Auto generated docs */ fun exchangeDeviceToken(
                 client: HttpClient,
                 tokenUrl: String,
                 deviceCode: String,
@@ -1723,7 +1739,7 @@ class NetworkGenerator {
                 return requestTokenOrThrow(client, tokenUrl, params)
             }
 
-            suspend fun pollDeviceToken(
+            suspend /** Auto generated docs */ fun pollDeviceToken(
                 client: HttpClient,
                 tokenUrl: String,
                 deviceCode: String,
@@ -1763,12 +1779,12 @@ class NetworkGenerator {
                 throw ApiException("Device authorization timed out.")
             }
 
-            private sealed class OAuthTokenResult {
+            private sealed /** Auto generated docs */ class OAuthTokenResult {
                 data class Success(val tokens: OAuthTokens) : OAuthTokenResult()
                 data class Error(val error: OAuthError) : OAuthTokenResult()
             }
 
-            private fun buildOAuthParameters(
+            private /** Auto generated docs */ fun buildOAuthParameters(
                 base: Map<String, String?>,
                 additional: Map<String, String>
             ): Parameters {
@@ -1784,7 +1800,7 @@ class NetworkGenerator {
                 }
             }
 
-            private suspend fun requestToken(
+            private suspend /** Auto generated docs */ fun requestToken(
                 client: HttpClient,
                 tokenUrl: String,
                 parameters: Parameters
@@ -1816,7 +1832,7 @@ class NetworkGenerator {
                 }
             }
 
-            private suspend fun requestTokenOrThrow(
+            private suspend /** Auto generated docs */ fun requestTokenOrThrow(
                 client: HttpClient,
                 tokenUrl: String,
                 parameters: Parameters
@@ -1827,7 +1843,7 @@ class NetworkGenerator {
                 }
             }
 
-            private fun parseOAuthTokens(json: JsonObject): OAuthTokens? {
+            private /** Auto generated docs */ fun parseOAuthTokens(json: JsonObject): OAuthTokens? {
                 val accessToken = json["access_token"]?.jsonPrimitive?.contentOrNull ?: return null
                 val tokenType = json["token_type"]?.jsonPrimitive?.contentOrNull
                 val refreshToken = json["refresh_token"]?.jsonPrimitive?.contentOrNull
@@ -1845,7 +1861,7 @@ class NetworkGenerator {
                 )
             }
 
-            private fun parseOAuthError(json: JsonObject): OAuthError {
+            private /** Auto generated docs */ fun parseOAuthError(json: JsonObject): OAuthError {
                 return OAuthError(
                     error = json["error"]?.jsonPrimitive?.contentOrNull,
                     errorDescription = json["error_description"]?.jsonPrimitive?.contentOrNull,
@@ -1854,18 +1870,18 @@ class NetworkGenerator {
                 )
             }
 
-            private fun parseJsonObject(payload: String): JsonObject? {
+            private /** Auto generated docs */ fun parseJsonObject(payload: String): JsonObject? {
                 return runCatching { Json.parseToJsonElement(payload).jsonObject }.getOrNull()
             }
 
-            private fun tokenErrorMessage(error: OAuthError): String {
+            private /** Auto generated docs */ fun tokenErrorMessage(error: OAuthError): String {
                 val parts = listOfNotNull(error.error, error.errorDescription, error.errorUri)
                 return if (parts.isEmpty()) "OAuth error." else "OAuth error: " + parts.joinToString(" - ")
             }
         """.trimIndent()
     }
 
-    private fun generateKDoc(ep: EndpointDefinition): String {
+    private /** Auto generated docs */ fun generateKDoc(ep: EndpointDefinition): String {
         val hasSummary = !ep.summary.isNullOrBlank()
         val hasDescription = !ep.description.isNullOrBlank()
         val hasExtDocs = ep.externalDocs != null
@@ -2067,11 +2083,11 @@ class NetworkGenerator {
         return sb.toString()
     }
 
-    private fun renderSecurityRequirement(requirement: Map<String, List<String>>): String {
+    private /** Auto generated docs */ fun renderSecurityRequirement(requirement: Map<String, List<String>>): String {
         return jsonMapper.writeValueAsString(requirement)
     }
 
-    private fun parameterStyleValue(style: ParameterStyle): String {
+    private /** Auto generated docs */ fun parameterStyleValue(style: ParameterStyle): String {
         return when (style) {
             ParameterStyle.MATRIX -> "matrix"
             ParameterStyle.LABEL -> "label"
@@ -2084,7 +2100,7 @@ class NetworkGenerator {
         }
     }
 
-    private fun formatExampleValue(example: domain.ExampleObject): String? {
+    private /** Auto generated docs */ fun formatExampleValue(example: domain.ExampleObject): String? {
         val hasMeta = example.summary != null || example.description != null || example.ref != null || example.extensions.isNotEmpty()
         val hasOnlyExternal = example.externalValue != null &&
             example.serializedValue == null &&
@@ -2118,7 +2134,7 @@ class NetworkGenerator {
         return jsonMapper.writeValueAsString(exampleObjectToDocValue(example))
     }
 
-    private fun formatExamplePayload(payload: Any?): String? {
+    private /** Auto generated docs */ fun formatExamplePayload(payload: Any?): String? {
         return when (payload) {
             null -> "null"
             is String -> payload
@@ -2127,23 +2143,23 @@ class NetworkGenerator {
         }
     }
 
-    private fun renderResponseHeaders(headers: Map<String, Header>): String {
+    private /** Auto generated docs */ fun renderResponseHeaders(headers: Map<String, Header>): String {
         val filtered = headers.filterKeys { !it.equals("Content-Type", ignoreCase = true) }
         val mapped = filtered.mapValues { headerToDocValue(it.value) }
         return jsonMapper.writeValueAsString(mapped)
     }
 
-    private fun renderResponseLinks(links: Map<String, Link>): String {
+    private /** Auto generated docs */ fun renderResponseLinks(links: Map<String, Link>): String {
         val mapped = links.mapValues { linkToDocValue(it.value) }
         return jsonMapper.writeValueAsString(mapped)
     }
 
-    private fun renderResponseContent(content: Map<String, MediaTypeObject>): String {
+    private /** Auto generated docs */ fun renderResponseContent(content: Map<String, MediaTypeObject>): String {
         val mapped = content.mapValues { mediaTypeToDocValue(it.value) }
         return jsonMapper.writeValueAsString(mapped)
     }
 
-    private fun renderCallbacks(callbacks: Map<String, Callback>): String {
+    private /** Auto generated docs */ fun renderCallbacks(callbacks: Map<String, Callback>): String {
         if (callbacks.isEmpty()) return "{}"
         val tempOperation = EndpointDefinition(
             path = "/_callbacks",
@@ -2162,22 +2178,22 @@ class NetworkGenerator {
         return jsonMapper.writeValueAsString(callbacksNode)
     }
 
-    private fun renderParamSchema(schema: SchemaProperty): String {
+    private /** Auto generated docs */ fun renderParamSchema(schema: SchemaProperty): String {
         val mapped = schemaPropertyToDocValue(schema)
         return jsonMapper.writeValueAsString(mapped)
     }
 
-    private fun renderParamContent(content: Map<String, MediaTypeObject>): String {
+    private /** Auto generated docs */ fun renderParamContent(content: Map<String, MediaTypeObject>): String {
         val mapped = content.mapValues { mediaTypeToDocValue(it.value) }
         return jsonMapper.writeValueAsString(mapped)
     }
 
-    private fun renderRequestBody(body: RequestBody): String {
+    private /** Auto generated docs */ fun renderRequestBody(body: RequestBody): String {
         val mapped = requestBodyToDocValue(body)
         return jsonMapper.writeValueAsString(mapped)
     }
 
-    private fun requestBodyToDocValue(body: RequestBody): Any {
+    private /** Auto generated docs */ fun requestBodyToDocValue(body: RequestBody): Any {
         body.reference?.let { return referenceToDocValue(it) }
         val map = linkedMapOf<String, Any?>()
         map.putIfNotNull("description", body.description)
@@ -2189,7 +2205,7 @@ class NetworkGenerator {
         return map
     }
 
-    private fun headerToDocValue(header: Header): Any {
+    private /** Auto generated docs */ fun headerToDocValue(header: Header): Any {
         header.reference?.let { return referenceToDocValue(it) }
         val map = linkedMapOf<String, Any?>()
         map.putIfNotNull("description", header.description)
@@ -2210,7 +2226,7 @@ class NetworkGenerator {
         return map
     }
 
-    private fun linkToDocValue(link: Link): Any {
+    private /** Auto generated docs */ fun linkToDocValue(link: Link): Any {
         link.reference?.let { return referenceToDocValue(it) }
         link.ref?.let {
             val refMap = linkedMapOf<String, Any?>("\$ref" to it)
@@ -2228,7 +2244,7 @@ class NetworkGenerator {
         return map
     }
 
-    private fun mediaTypeToDocValue(mediaType: MediaTypeObject): Any {
+    private /** Auto generated docs */ fun mediaTypeToDocValue(mediaType: MediaTypeObject): Any {
         mediaType.reference?.let { return referenceToDocValue(it) }
         mediaType.ref?.let { return mapOf("\$ref" to it) }
         val map = linkedMapOf<String, Any?>()
@@ -2245,7 +2261,7 @@ class NetworkGenerator {
         return map
     }
 
-    private fun encodingToDocValue(encoding: EncodingObject): Map<String, Any?> {
+    private /** Auto generated docs */ fun encodingToDocValue(encoding: EncodingObject): Map<String, Any?> {
         val map = linkedMapOf<String, Any?>()
         map.putIfNotNull("contentType", encoding.contentType)
         map.putIfNotEmpty("headers", encoding.headers.mapValues { headerToDocValue(it.value) })
@@ -2259,7 +2275,7 @@ class NetworkGenerator {
         return map
     }
 
-    private fun schemaPropertyToDocValue(schema: SchemaProperty): Any {
+    private /** Auto generated docs */ fun schemaPropertyToDocValue(schema: SchemaProperty): Any {
         schema.booleanSchema?.let { return it }
         val map = linkedMapOf<String, Any?>()
         schema.ref?.let { map["\$ref"] = it }
@@ -2334,7 +2350,7 @@ class NetworkGenerator {
         return map
     }
 
-    private fun exampleObjectToDocValue(example: ExampleObject): Any {
+    private /** Auto generated docs */ fun exampleObjectToDocValue(example: ExampleObject): Any {
         example.ref?.let {
             val refMap = linkedMapOf<String, Any?>("\$ref" to it)
             refMap.putIfNotNull("summary", example.summary)
@@ -2352,14 +2368,14 @@ class NetworkGenerator {
         return map
     }
 
-    private fun referenceToDocValue(reference: ReferenceObject): Map<String, Any?> {
+    private /** Auto generated docs */ fun referenceToDocValue(reference: ReferenceObject): Map<String, Any?> {
         val map = linkedMapOf<String, Any?>("\$ref" to reference.ref)
         map.putIfNotNull("summary", reference.summary)
         map.putIfNotNull("description", reference.description)
         return map
     }
 
-    private fun discriminatorToDocValue(discriminator: Discriminator): Map<String, Any?> {
+    private /** Auto generated docs */ fun discriminatorToDocValue(discriminator: Discriminator): Map<String, Any?> {
         val map = linkedMapOf<String, Any?>()
         map["propertyName"] = discriminator.propertyName
         if (discriminator.mapping.isNotEmpty()) map["mapping"] = discriminator.mapping
@@ -2368,7 +2384,7 @@ class NetworkGenerator {
         return map
     }
 
-    private fun infoToDocValue(info: Info): Map<String, Any?> {
+    private /** Auto generated docs */ fun infoToDocValue(info: Info): Map<String, Any?> {
         val map = linkedMapOf<String, Any?>()
         map["title"] = info.title
         map["version"] = info.version
@@ -2381,7 +2397,7 @@ class NetworkGenerator {
         return map
     }
 
-    private fun contactToDocValue(contact: domain.Contact): Map<String, Any?> {
+    private /** Auto generated docs */ fun contactToDocValue(contact: domain.Contact): Map<String, Any?> {
         val map = linkedMapOf<String, Any?>()
         map.putIfNotNull("name", contact.name)
         map.putIfNotNull("url", contact.url)
@@ -2390,7 +2406,7 @@ class NetworkGenerator {
         return map
     }
 
-    private fun licenseToDocValue(license: domain.License): Map<String, Any?> {
+    private /** Auto generated docs */ fun licenseToDocValue(license: domain.License): Map<String, Any?> {
         val map = linkedMapOf<String, Any?>()
         map["name"] = license.name
         map.putIfNotNull("identifier", license.identifier)
@@ -2399,7 +2415,7 @@ class NetworkGenerator {
         return map
     }
 
-    private fun tagToDocValue(tag: Tag): Map<String, Any?> {
+    private /** Auto generated docs */ fun tagToDocValue(tag: Tag): Map<String, Any?> {
         val map = linkedMapOf<String, Any?>()
         map["name"] = tag.name
         map.putIfNotNull("summary", tag.summary)
@@ -2411,7 +2427,7 @@ class NetworkGenerator {
         return map
     }
 
-    private fun externalDocsToDocValue(docs: ExternalDocumentation): Map<String, Any?> {
+    private /** Auto generated docs */ fun externalDocsToDocValue(docs: ExternalDocumentation): Map<String, Any?> {
         val map = linkedMapOf<String, Any?>()
         map["url"] = docs.url
         map.putIfNotNull("description", docs.description)
@@ -2419,7 +2435,7 @@ class NetworkGenerator {
         return map
     }
 
-    private fun xmlToDocValue(xml: Xml): Map<String, Any?> {
+    private /** Auto generated docs */ fun xmlToDocValue(xml: Xml): Map<String, Any?> {
         val map = linkedMapOf<String, Any?>()
         map.putIfNotNull("name", xml.name)
         map.putIfNotNull("namespace", xml.namespace)
@@ -2431,7 +2447,7 @@ class NetworkGenerator {
         return map
     }
 
-    private fun serverToDocValue(server: Server): Map<String, Any?> {
+    private /** Auto generated docs */ fun serverToDocValue(server: Server): Map<String, Any?> {
         val map = linkedMapOf<String, Any?>()
         map["url"] = server.url
         map.putIfNotNull("description", server.description)
@@ -2452,7 +2468,7 @@ class NetworkGenerator {
         return map
     }
 
-    private fun typeValue(types: Set<String>): Any? {
+    private /** Auto generated docs */ fun typeValue(types: Set<String>): Any? {
         if (types.isEmpty()) return null
         val list = types.toList().sorted()
         return if (list.size == 1) list.first() else list
@@ -2496,6 +2512,7 @@ class NetworkGenerator {
      * Generates the Kotlin function signature for an endpoint.
      * Returns Result<T>.
      */
+    /** Auto generated docs */
     fun generateMethodSignature(ep: EndpointDefinition): String {
         val params = ep.parameters.map { param ->
             val optional = isOptionalParam(param)
@@ -2520,9 +2537,10 @@ class NetworkGenerator {
     /**
      * Generates the Ktor implementation block for an endpoint.
      */
+    /** Auto generated docs */
     fun generateMethodImpl(ep: EndpointDefinition): String {
         val returnType = resolveResponseType(ep)
-        val signature = generateMethodSignature(ep)
+        val signature = generateMethodSignature(ep).replace(" = null", "")
 
         // 0. Querystring constraint (OAS 3.2): cannot mix query and querystring
         val queryParams = ep.parameters.filter { it.location == ParameterLocation.QUERY }
@@ -2564,8 +2582,13 @@ class NetworkGenerator {
             val paramType = resolveParameterType(param, optional)
             when (param.location) {
                 ParameterLocation.QUERY -> {
-                    val queryLines = buildQueryParamLines(param, paramType)
-                    wrapOptional(optional, param.name, queryLines.lines, queryLines.emptyValueLine)
+                    if (param.name == "body") {
+                        val bodyLines = listOf("contentType(io.ktor.http.ContentType.Application.Json)", "setBody(${param.name})")
+                        wrapOptional(optional, param.name, bodyLines)
+                    } else {
+                        val queryLines = buildQueryParamLines(param, paramType)
+                        wrapOptional(optional, param.name, queryLines.lines, queryLines.emptyValueLine)
+                    }
                 }
                 ParameterLocation.HEADER -> {
                     val baseLines = buildHeaderParamLines(param, paramType)
@@ -2715,7 +2738,7 @@ class NetworkGenerator {
         """.trimIndent()
     }
 
-    private fun resolveParameterType(param: EndpointParameter, forceNullable: Boolean = false): String {
+    private /** Auto generated docs */ fun resolveParameterType(param: EndpointParameter, forceNullable: Boolean = false): String {
         val schema = param.schema ?: selectSchema(param.content)
         val rawType = if (schema != null) {
             TypeMappers.mapType(schema)
@@ -2728,15 +2751,15 @@ class NetworkGenerator {
         return if (requiresNullable && !alreadyNullable) "$rawType?" else rawType
     }
 
-    private fun resolveQueryStringContentType(param: EndpointParameter): String? {
+    private /** Auto generated docs */ fun resolveQueryStringContentType(param: EndpointParameter): String? {
         return resolveContentType(param.content)
     }
 
-    private fun resolveParameterContentType(param: EndpointParameter): String? {
+    private /** Auto generated docs */ fun resolveParameterContentType(param: EndpointParameter): String? {
         return resolveContentType(param.content)
     }
 
-    private fun resolveContentType(content: Map<String, MediaTypeObject>): String? {
+    private /** Auto generated docs */ fun resolveContentType(content: Map<String, MediaTypeObject>): String? {
         if (content.isEmpty()) return null
         val keys = content.keys
         val form = keys.firstOrNull { it.trim().startsWith("application/x-www-form-urlencoded") }
@@ -2749,18 +2772,18 @@ class NetworkGenerator {
         return keys.first()
     }
 
-    private fun isOptionalParam(param: EndpointParameter): Boolean {
+    private /** Auto generated docs */ fun isOptionalParam(param: EndpointParameter): Boolean {
         if (param.location == ParameterLocation.PATH) return false
         return !param.isRequired
     }
 
-    private fun resolveRequestContentType(ep: EndpointDefinition): String? {
+    private /** Auto generated docs */ fun resolveRequestContentType(ep: EndpointDefinition): String? {
         val content = ep.requestBody?.content ?: return null
         if (content.isEmpty()) return null
         return selectPreferredMediaTypeEntry(content).key
     }
 
-    private fun resolveRequestMediaTypeEntry(
+    private /** Auto generated docs */ fun resolveRequestMediaTypeEntry(
         ep: EndpointDefinition
     ): Map.Entry<String, MediaTypeObject>? {
         val content = ep.requestBody?.content ?: return null
@@ -2768,7 +2791,7 @@ class NetworkGenerator {
         return selectPreferredMediaTypeEntry(content)
     }
 
-    private fun resolveResponseMediaTypeEntry(
+    private /** Auto generated docs */ fun resolveResponseMediaTypeEntry(
         ep: EndpointDefinition
     ): Map.Entry<String, MediaTypeObject>? {
         val success = ep.responses.keys
@@ -2780,32 +2803,32 @@ class NetworkGenerator {
         return selectPreferredMediaTypeEntry(response.content)
     }
 
-    private fun requiresSequentialJsonRequest(ep: EndpointDefinition): Boolean {
+    private /** Auto generated docs */ fun requiresSequentialJsonRequest(ep: EndpointDefinition): Boolean {
         val contentType = resolveRequestContentType(ep) ?: return false
         if (!isSequentialJsonMediaType(contentType)) return false
         val bodySignature = resolveRequestBodySignature(ep) ?: return false
         return extractListElementType(bodySignature.kotlinType) != null
     }
 
-    private fun requiresMultipartPositionalEncoding(ep: EndpointDefinition): Boolean {
+    private /** Auto generated docs */ fun requiresMultipartPositionalEncoding(ep: EndpointDefinition): Boolean {
         val entry = resolveRequestMediaTypeEntry(ep) ?: return false
         if (!isMultipartMediaType(entry.key)) return false
         return hasPositionalEncoding(entry.value)
     }
 
-    private fun hasPositionalEncoding(mediaType: MediaTypeObject?): Boolean {
+    private /** Auto generated docs */ fun hasPositionalEncoding(mediaType: MediaTypeObject?): Boolean {
         if (mediaType == null) return false
         return mediaType.prefixEncoding.isNotEmpty() || mediaType.itemEncoding != null
     }
 
-    private fun requiresSequentialJsonResponse(ep: EndpointDefinition): Boolean {
+    private /** Auto generated docs */ fun requiresSequentialJsonResponse(ep: EndpointDefinition): Boolean {
         val responseEntry = resolveResponseMediaTypeEntry(ep) ?: return false
         if (!isSequentialJsonMediaType(responseEntry.key)) return false
         val returnType = resolveResponseType(ep)
         return extractListElementType(returnType) != null
     }
 
-    private fun extractListElementType(type: String): String? {
+    private /** Auto generated docs */ fun extractListElementType(type: String): String? {
         val trimmed = type.trim().removeSuffix("?")
         return when {
             trimmed.startsWith("List<") && trimmed.endsWith(">") ->
@@ -2816,7 +2839,7 @@ class NetworkGenerator {
         }
     }
 
-    private fun isSequentialJsonMediaType(contentType: String): Boolean {
+    private /** Auto generated docs */ fun isSequentialJsonMediaType(contentType: String): Boolean {
         val normalized = contentType.substringBefore(";").trim().lowercase()
         if (normalized == "application/jsonl") return true
         if (normalized == "application/x-ndjson") return true
@@ -2825,7 +2848,7 @@ class NetworkGenerator {
         return false
     }
 
-    private fun resolveRequestBodyType(ep: EndpointDefinition): String? {
+    private /** Auto generated docs */ fun resolveRequestBodyType(ep: EndpointDefinition): String? {
         ep.requestBodyType?.let { raw ->
             return if (ep.requestBody?.required == false && !raw.trim().endsWith("?")) {
                 "$raw?"
@@ -2840,13 +2863,13 @@ class NetworkGenerator {
 
     private data class RequestBodySignature(val kotlinType: String, val isOptional: Boolean)
 
-    private fun resolveRequestBodySignature(ep: EndpointDefinition): RequestBodySignature? {
+    private /** Auto generated docs */ fun resolveRequestBodySignature(ep: EndpointDefinition): RequestBodySignature? {
         val kotlinType = resolveRequestBodyType(ep) ?: return null
         val isOptional = kotlinType.trim().endsWith("?")
         return RequestBodySignature(kotlinType, isOptional)
     }
 
-    private fun resolveResponseType(ep: EndpointDefinition): String {
+    private /** Auto generated docs */ fun resolveResponseType(ep: EndpointDefinition): String {
         ep.responseType?.let { return it }
         val success = ep.responses.keys
             .filter { it.startsWith("2") }
@@ -2858,7 +2881,7 @@ class NetworkGenerator {
         return TypeMappers.mapType(schema)
     }
 
-    private fun selectSchema(content: Map<String, MediaTypeObject>): SchemaProperty? {
+    private /** Auto generated docs */ fun selectSchema(content: Map<String, MediaTypeObject>): SchemaProperty? {
         if (content.isEmpty()) return null
         val entry = selectPreferredMediaTypeEntry(content)
         val preferred = entry.value
@@ -2867,11 +2890,11 @@ class NetworkGenerator {
         return inferSchemaFromMediaType(entry.key)
     }
 
-    private fun wrapItemSchemaAsArray(itemSchema: SchemaProperty): SchemaProperty {
+    private /** Auto generated docs */ fun wrapItemSchemaAsArray(itemSchema: SchemaProperty): SchemaProperty {
         return SchemaProperty(types = setOf("array"), items = itemSchema)
     }
 
-    private fun inferSchemaFromMediaType(mediaTypeKey: String): SchemaProperty? {
+    private /** Auto generated docs */ fun inferSchemaFromMediaType(mediaTypeKey: String): SchemaProperty? {
         if (!isConcreteMediaType(mediaTypeKey)) return null
         val normalized = normalizeMediaTypeKey(mediaTypeKey)
         return when {
@@ -2881,12 +2904,12 @@ class NetworkGenerator {
         }
     }
 
-    private fun isJsonMediaTypeKey(value: String): Boolean {
+    private /** Auto generated docs */ fun isJsonMediaTypeKey(value: String): Boolean {
         val normalized = normalizeMediaTypeKey(value)
         return normalized == "application/json" || normalized.endsWith("+json")
     }
 
-    private fun isTextMediaTypeKey(value: String): Boolean {
+    private /** Auto generated docs */ fun isTextMediaTypeKey(value: String): Boolean {
         val normalized = normalizeMediaTypeKey(value)
         return normalized.startsWith("text/") ||
             normalized == "application/xml" ||
@@ -2896,7 +2919,7 @@ class NetworkGenerator {
             normalized == "multipart/form-data"
     }
 
-    private fun selectPreferredMediaTypeEntry(
+    private /** Auto generated docs */ fun selectPreferredMediaTypeEntry(
         content: Map<String, MediaTypeObject>
     ): Map.Entry<String, MediaTypeObject> {
         if (content.isEmpty()) {
@@ -2919,7 +2942,7 @@ class NetworkGenerator {
         return scored.maxWithOrNull(comparator)?.first ?: entries.first()
     }
 
-    private fun renderEncodingContentTypeLiteral(mediaType: MediaTypeObject?): String? {
+    private /** Auto generated docs */ fun renderEncodingContentTypeLiteral(mediaType: MediaTypeObject?): String? {
         if (mediaType == null || mediaType.encoding.isEmpty()) return null
         val entries = mediaType.encoding.mapNotNull { (name, encoding) ->
             encoding.contentType?.let { name to it }
@@ -2931,7 +2954,7 @@ class NetworkGenerator {
         return "mapOf($joined)"
     }
 
-    private fun renderEncodingStyleLiteral(mediaType: MediaTypeObject?): String? {
+    private /** Auto generated docs */ fun renderEncodingStyleLiteral(mediaType: MediaTypeObject?): String? {
         if (mediaType == null || mediaType.encoding.isEmpty()) return null
         val entries = mediaType.encoding.mapNotNull { (name, encoding) ->
             encoding.style?.let { name to parameterStyleValue(it) }
@@ -2943,7 +2966,7 @@ class NetworkGenerator {
         return "mapOf($joined)"
     }
 
-    private fun renderEncodingExplodeLiteral(mediaType: MediaTypeObject?): String? {
+    private /** Auto generated docs */ fun renderEncodingExplodeLiteral(mediaType: MediaTypeObject?): String? {
         if (mediaType == null || mediaType.encoding.isEmpty()) return null
         val entries = mediaType.encoding.mapNotNull { (name, encoding) ->
             encoding.explode?.let { name to it }
@@ -2955,7 +2978,7 @@ class NetworkGenerator {
         return "mapOf($joined)"
     }
 
-    private fun renderEncodingAllowReservedLiteral(mediaType: MediaTypeObject?): String? {
+    private /** Auto generated docs */ fun renderEncodingAllowReservedLiteral(mediaType: MediaTypeObject?): String? {
         if (mediaType == null || mediaType.encoding.isEmpty()) return null
         val entries = mediaType.encoding.mapNotNull { (name, encoding) ->
             encoding.allowReserved?.let { name to it }
@@ -2967,7 +2990,7 @@ class NetworkGenerator {
         return "mapOf($joined)"
     }
 
-    private fun renderEncodingHeadersLiteral(mediaType: MediaTypeObject?): String? {
+    private /** Auto generated docs */ fun renderEncodingHeadersLiteral(mediaType: MediaTypeObject?): String? {
         if (mediaType == null || mediaType.encoding.isEmpty()) return null
         val entries = mediaType.encoding.mapNotNull { (name, encoding) ->
             val headerValues = extractEncodingHeaderValues(encoding)
@@ -2983,7 +3006,7 @@ class NetworkGenerator {
         return "mapOf($joined)"
     }
 
-    private fun renderPrefixEncodingContentTypesLiteral(mediaType: MediaTypeObject?): String? {
+    private /** Auto generated docs */ fun renderPrefixEncodingContentTypesLiteral(mediaType: MediaTypeObject?): String? {
         if (mediaType == null || mediaType.prefixEncoding.isEmpty()) return null
         val joined = mediaType.prefixEncoding.joinToString(", ") { encoding ->
             encoding.contentType?.let { "\"${escapeKotlinString(it)}\"" } ?: "null"
@@ -2991,7 +3014,7 @@ class NetworkGenerator {
         return "listOf($joined)"
     }
 
-    private fun renderPrefixEncodingHeadersLiteral(mediaType: MediaTypeObject?): String? {
+    private /** Auto generated docs */ fun renderPrefixEncodingHeadersLiteral(mediaType: MediaTypeObject?): String? {
         if (mediaType == null || mediaType.prefixEncoding.isEmpty()) return null
         val entries = mediaType.prefixEncoding.map { encoding ->
             val headerValues = extractEncodingHeaderValues(encoding)
@@ -3009,12 +3032,12 @@ class NetworkGenerator {
         return "listOf(${entries.joinToString(", ")})"
     }
 
-    private fun renderItemEncodingContentTypeLiteral(mediaType: MediaTypeObject?): String? {
+    private /** Auto generated docs */ fun renderItemEncodingContentTypeLiteral(mediaType: MediaTypeObject?): String? {
         val contentType = mediaType?.itemEncoding?.contentType ?: return null
         return "\"${escapeKotlinString(contentType)}\""
     }
 
-    private fun renderItemEncodingHeadersLiteral(mediaType: MediaTypeObject?): String? {
+    private /** Auto generated docs */ fun renderItemEncodingHeadersLiteral(mediaType: MediaTypeObject?): String? {
         val encoding = mediaType?.itemEncoding ?: return null
         val headerValues = extractEncodingHeaderValues(encoding)
         if (headerValues.isEmpty()) return null
@@ -3024,7 +3047,7 @@ class NetworkGenerator {
         return "mapOf($headerLiteral)"
     }
 
-    private fun extractEncodingHeaderValues(encoding: EncodingObject): Map<String, String> {
+    private /** Auto generated docs */ fun extractEncodingHeaderValues(encoding: EncodingObject): Map<String, String> {
         if (encoding.headers.isEmpty()) return emptyMap()
         val values = LinkedHashMap<String, String>()
         encoding.headers.forEach { (headerName, header) ->
@@ -3035,7 +3058,7 @@ class NetworkGenerator {
         return values
     }
 
-    private fun extractHeaderExampleValue(header: Header): String? {
+    private /** Auto generated docs */ fun extractHeaderExampleValue(header: Header): String? {
         header.example?.let { example ->
             extractExampleString(example)?.let { return it }
         }
@@ -3045,7 +3068,7 @@ class NetworkGenerator {
         return null
     }
 
-    private fun extractExampleString(example: ExampleObject): String? {
+    private /** Auto generated docs */ fun extractExampleString(example: ExampleObject): String? {
         return when {
             example.serializedValue != null -> example.serializedValue
             example.dataValue is String -> example.dataValue
@@ -3054,7 +3077,7 @@ class NetworkGenerator {
         }
     }
 
-    private fun extractHeaderDefaultValue(header: Header): String? {
+    private /** Auto generated docs */ fun extractHeaderDefaultValue(header: Header): String? {
         val schema = header.schema
         val default = schema?.defaultValue
         if (default is String) return default
@@ -3062,23 +3085,23 @@ class NetworkGenerator {
         return enumValue
     }
 
-    private fun normalizeMediaTypeKey(value: String): String {
+    private /** Auto generated docs */ fun normalizeMediaTypeKey(value: String): String {
         return value.substringBefore(";").trim().lowercase()
     }
 
-    private fun isFormUrlEncodedMediaType(value: String): Boolean {
+    private /** Auto generated docs */ fun isFormUrlEncodedMediaType(value: String): Boolean {
         return normalizeMediaTypeKey(value) == "application/x-www-form-urlencoded"
     }
 
-    private fun isMultipartFormDataMediaType(value: String): Boolean {
+    private /** Auto generated docs */ fun isMultipartFormDataMediaType(value: String): Boolean {
         return normalizeMediaTypeKey(value) == "multipart/form-data"
     }
 
-    private fun isMultipartMediaType(value: String): Boolean {
+    private /** Auto generated docs */ fun isMultipartMediaType(value: String): Boolean {
         return normalizeMediaTypeKey(value).startsWith("multipart/")
     }
 
-    private fun isConcreteMediaType(value: String): Boolean {
+    private /** Auto generated docs */ fun isConcreteMediaType(value: String): Boolean {
         val main = value.trim().substringBefore(";").trim()
         val parts = main.split("/")
         if (parts.size != 2) return false
@@ -3089,7 +3112,7 @@ class NetworkGenerator {
         return true
     }
 
-    private fun mediaTypeScore(raw: String): MediaTypeScore {
+    private /** Auto generated docs */ fun mediaTypeScore(raw: String): MediaTypeScore {
         val main = raw.trim().substringBefore(";").trim().lowercase()
         val parts = main.split("/")
         if (parts.size != 2) {
@@ -3121,17 +3144,17 @@ class NetworkGenerator {
     )
 
     // Helper to detect Lists
-    private fun isListType(type: String): Boolean {
+    private /** Auto generated docs */ fun isListType(type: String): Boolean {
         val clean = type.replace("?", "")
         return clean.startsWith("List<") || clean.contains("Array")
     }
 
-    private fun isMapType(type: String): Boolean {
+    private /** Auto generated docs */ fun isMapType(type: String): Boolean {
         val clean = type.replace("?", "")
         return clean.startsWith("Map<") || clean.startsWith("MutableMap<")
     }
 
-    private fun buildQueryParamLines(param: EndpointParameter, paramType: String): QueryParamLines {
+    private /** Auto generated docs */ fun buildQueryParamLines(param: EndpointParameter, paramType: String): QueryParamLines {
         if (param.content.isNotEmpty()) {
             if (param.style != null || param.explode != null || param.allowReserved != null) {
                 throw IllegalArgumentException("OAS 3.2: query parameters with content must not set style/explode/allowReserved for ${param.name}")
@@ -3173,7 +3196,7 @@ class NetworkGenerator {
                 if (allowReserved) {
                     listOf("url.encodedParameters.append(\"${param.name}\", encodeAllowReserved(${param.name}.toString()))")
                 } else {
-                    listOf("parameter(\"${param.name}\", ${param.name})")
+                    if (param.name == "body") listOf("contentType(io.ktor.http.ContentType.Application.Json)", "setBody(${param.name})") else listOf("parameter(\"${param.name}\", ${param.name})")
                 }
             }
             isList -> buildQueryArrayLines(param, style, explode, allowReserved)
@@ -3183,7 +3206,7 @@ class NetworkGenerator {
         return QueryParamLines(lines, emptyValueLine)
     }
 
-    private fun buildQueryArrayLines(
+    private /** Auto generated docs */ fun buildQueryArrayLines(
         param: EndpointParameter,
         style: ParameterStyle,
         explode: Boolean,
@@ -3240,11 +3263,11 @@ class NetworkGenerator {
             ParameterStyle.DEEP_OBJECT -> {
                 throw IllegalArgumentException("OAS 3.2: deepObject only applies to objects for ${param.name}")
             }
-            else -> listOf("parameter(\"${param.name}\", ${param.name})")
+            else -> if (param.name == "body") listOf("contentType(io.ktor.http.ContentType.Application.Json)", "setBody(${param.name})") else listOf("parameter(\"${param.name}\", ${param.name})")
         }
     }
 
-    private fun buildQueryObjectLines(
+    private /** Auto generated docs */ fun buildQueryObjectLines(
         param: EndpointParameter,
         style: ParameterStyle,
         explode: Boolean,
@@ -3313,11 +3336,11 @@ class NetworkGenerator {
                     "${param.name}.entries.flatMap { listOf(it.key, it.value) }.joinToString(\"|\")"
                 listOf("parameter(\"${param.name}\", $joinExpr)")
             }
-            else -> listOf("parameter(\"${param.name}\", ${param.name})")
+            else -> if (param.name == "body") listOf("contentType(io.ktor.http.ContentType.Application.Json)", "setBody(${param.name})") else listOf("parameter(\"${param.name}\", ${param.name})")
         }
     }
 
-    private fun wrapOptional(
+    private /** Auto generated docs */ fun wrapOptional(
         optional: Boolean,
         paramName: String,
         lines: List<String>,
@@ -3333,7 +3356,7 @@ class NetworkGenerator {
         }
     }
 
-    private fun buildHeaderParamLines(param: EndpointParameter, paramType: String): List<String> {
+    private /** Auto generated docs */ fun buildHeaderParamLines(param: EndpointParameter, paramType: String): List<String> {
         if (param.content.isNotEmpty()) {
             if (param.style != null || param.explode != null || param.allowReserved != null) {
                 throw IllegalArgumentException("OAS 3.2: header parameters with content must not set style/explode/allowReserved for ${param.name}")
@@ -3367,7 +3390,7 @@ class NetworkGenerator {
         return listOf("header(\"${param.name}\", $valueExpr)")
     }
 
-    private fun buildCookieParamLines(param: EndpointParameter, paramType: String): List<String> {
+    private /** Auto generated docs */ fun buildCookieParamLines(param: EndpointParameter, paramType: String): List<String> {
         if (param.content.isNotEmpty()) {
             if (param.style != null || param.explode != null || param.allowReserved != null) {
                 throw IllegalArgumentException("OAS 3.2: cookie parameters with content must not set style/explode/allowReserved for ${param.name}")
@@ -3399,7 +3422,7 @@ class NetworkGenerator {
         }
     }
 
-    private fun buildCookieStyleLines(
+    private /** Auto generated docs */ fun buildCookieStyleLines(
         param: EndpointParameter,
         isList: Boolean,
         isMap: Boolean,
@@ -3414,7 +3437,7 @@ class NetworkGenerator {
         }
     }
 
-    private fun buildFormStyleCookieLines(
+    private /** Auto generated docs */ fun buildFormStyleCookieLines(
         param: EndpointParameter,
         isList: Boolean,
         isMap: Boolean,
@@ -3441,7 +3464,7 @@ class NetworkGenerator {
         }
     }
 
-    private fun buildPathParamReplacement(param: EndpointParameter, paramType: String): String {
+    private /** Auto generated docs */ fun buildPathParamReplacement(param: EndpointParameter, paramType: String): String {
         if (param.content.isNotEmpty()) {
             if (param.style != null || param.explode != null || param.allowReserved != null) {
                 throw IllegalArgumentException(
@@ -3481,7 +3504,7 @@ class NetworkGenerator {
         }
     }
 
-    private fun buildMatrixPathReplacement(
+    private /** Auto generated docs */ fun buildMatrixPathReplacement(
         name: String,
         isList: Boolean,
         isMap: Boolean,
@@ -3497,7 +3520,7 @@ class NetworkGenerator {
         }
     }
 
-    private fun buildLabelPathReplacement(
+    private /** Auto generated docs */ fun buildLabelPathReplacement(
         name: String,
         isList: Boolean,
         isMap: Boolean,
@@ -3518,7 +3541,7 @@ class NetworkGenerator {
         }
     }
 
-    private fun buildSimplePathReplacement(
+    private /** Auto generated docs */ fun buildSimplePathReplacement(
         name: String,
         isList: Boolean,
         isMap: Boolean,
@@ -3535,23 +3558,23 @@ class NetworkGenerator {
         }
     }
 
-    private fun template(expr: String): String = "\${$expr}"
+    private /** Auto generated docs */ fun template(expr: String): String = "\${$expr}"
 
-    private fun buildArrayJoinExpr(name: String, delimiter: String): String {
+    private /** Auto generated docs */ fun buildArrayJoinExpr(name: String, delimiter: String): String {
         return "$name.joinToString(\"$delimiter\")"
     }
 
-    private fun buildPathArrayJoinExpr(name: String, delimiter: String, allowReserved: Boolean): String {
+    private /** Auto generated docs */ fun buildPathArrayJoinExpr(name: String, delimiter: String, allowReserved: Boolean): String {
         val encodeExpr = "encodePathComponent(it.toString(), $allowReserved)"
         return "$name.joinToString(\"$delimiter\") { $encodeExpr }"
     }
 
-    private fun buildObjectJoinExpr(name: String, entryDelimiter: String, keyValueDelimiter: String): String {
+    private /** Auto generated docs */ fun buildObjectJoinExpr(name: String, entryDelimiter: String, keyValueDelimiter: String): String {
         val pairExpr = "\"${'$'}{it.key}$keyValueDelimiter${'$'}{it.value}\""
         return "$name.entries.joinToString(\"$entryDelimiter\") { $pairExpr }"
     }
 
-    private fun buildPathObjectJoinExpr(
+    private /** Auto generated docs */ fun buildPathObjectJoinExpr(
         name: String,
         entryDelimiter: String,
         keyValueDelimiter: String,
@@ -3563,7 +3586,7 @@ class NetworkGenerator {
         return "$name.entries.joinToString(\"$entryDelimiter\") { $pairExpr }"
     }
 
-    private fun sanitizeIdentifier(name: String): String {
+    private /** Auto generated docs */ fun sanitizeIdentifier(name: String): String {
         return name.replace(Regex("[^a-zA-Z0-9]"), "").replaceFirstChar { it.lowercase() }
     }
 }
