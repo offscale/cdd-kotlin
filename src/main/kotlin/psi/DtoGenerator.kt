@@ -15,6 +15,7 @@ import org.jetbrains.kotlin.psi.KtFile
  * Updated for OAS 3.2 Dual/Array Types support, additionalProperties maps,
  * and OAS 3.1 Content Encoding.
  */
+/** Auto generated docs */
 class DtoGenerator {
 
     private val psiFactory = PsiInfrastructure.createPsiFactory()
@@ -27,12 +28,13 @@ class DtoGenerator {
      * @param definition The schema definition containing properties and requirements.
      * @return A PSI KtFile representing the generated source code.
      */
+    /** Auto generated docs */
     fun generateDto(packageName: String, definition: SchemaDefinition): KtFile {
         val content = buildSource(packageName, definition)
         return psiFactory.createFile("${definition.name}.kt", content)
     }
 
-    private fun buildSource(packageName: String, definition: SchemaDefinition): String {
+    private /** Auto generated docs */ fun buildSource(packageName: String, definition: SchemaDefinition): String {
         // 0. Boolean Schema (true/false)
         definition.booleanSchema?.let { booleanValue ->
             return buildBooleanAliasSource(packageName, definition, booleanValue)
@@ -80,7 +82,7 @@ class DtoGenerator {
         return buildDataClassSource(packageName, definition, dynamicContext)
     }
 
-    private fun buildAliasSource(
+    private /** Auto generated docs */ fun buildAliasSource(
         packageName: String,
         definition: SchemaDefinition,
         dynamicContext: DynamicAnchorContext
@@ -98,6 +100,16 @@ class DtoGenerator {
         return """
             package $packageName
 
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.*
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.*
+
             ${imports.sorted().joinToString("\n") { "import $it" }}
 
             $kdoc$deprecatedAnnotation
@@ -105,7 +117,7 @@ class DtoGenerator {
         """.trimIndent()
     }
 
-    private fun buildBooleanAliasSource(packageName: String, definition: SchemaDefinition, value: Boolean): String {
+    private /** Auto generated docs */ fun buildBooleanAliasSource(packageName: String, definition: SchemaDefinition, value: Boolean): String {
         val kdoc = buildClassKDoc(definition)
         val deprecatedAnnotation = buildDeprecatedAnnotation(definition.deprecated)
         val kotlinType = if (value) "Any" else "Nothing"
@@ -113,12 +125,22 @@ class DtoGenerator {
         return """
             package $packageName
 
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.*
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.*
+
             $kdoc$deprecatedAnnotation
             typealias ${definition.name} = $kotlinType
         """.trimIndent()
     }
 
-    private fun buildRefAliasSource(packageName: String, definition: SchemaDefinition, ref: String): String {
+    private /** Auto generated docs */ fun buildRefAliasSource(packageName: String, definition: SchemaDefinition, ref: String): String {
         val kdoc = buildClassKDoc(definition)
         val deprecatedAnnotation = buildDeprecatedAnnotation(definition.deprecated)
         val target = ReferenceResolver.resolveRefToType(ref)
@@ -126,12 +148,22 @@ class DtoGenerator {
         return """
             package $packageName
 
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.*
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.*
+
             $kdoc$deprecatedAnnotation
             typealias ${definition.name} = $target
         """.trimIndent()
     }
 
-    private fun buildMapAliasSource(
+    private /** Auto generated docs */ fun buildMapAliasSource(
         packageName: String,
         definition: SchemaDefinition,
         dynamicContext: DynamicAnchorContext
@@ -149,6 +181,16 @@ class DtoGenerator {
         return """
             package $packageName
 
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.*
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.*
+
             ${imports.sorted().joinToString("\n") { "import $it" }}
 
             $kdoc$deprecatedAnnotation
@@ -156,7 +198,7 @@ class DtoGenerator {
         """.trimIndent()
     }
 
-    private fun buildSealedInterfaceSource(
+    private /** Auto generated docs */ fun buildSealedInterfaceSource(
         packageName: String,
         definition: SchemaDefinition,
         dynamicContext: DynamicAnchorContext
@@ -187,6 +229,16 @@ class DtoGenerator {
         return """ 
             package $packageName
 
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.*
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.*
+
             ${imports.sorted().joinToString("\n") { "import $it" }} 
 
             $kdoc$deprecatedAnnotation@Serializable
@@ -197,7 +249,7 @@ class DtoGenerator {
         """.trimIndent()
     }
 
-    private fun buildDataClassSource(
+    private /** Auto generated docs */ fun buildDataClassSource(
         packageName: String,
         definition: SchemaDefinition,
         dynamicContext: DynamicAnchorContext
@@ -230,6 +282,16 @@ class DtoGenerator {
 
         return """ 
             package $packageName
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.*
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.*
             
             ${imports.sorted().joinToString("\n") { "import $it" }} 
             
@@ -240,7 +302,7 @@ class DtoGenerator {
         """.trimIndent()
     }
 
-    private fun buildEnumSource(packageName: String, definition: SchemaDefinition): String {
+    private /** Auto generated docs */ fun buildEnumSource(packageName: String, definition: SchemaDefinition): String {
         val imports = mutableSetOf(
             "kotlinx.serialization.Serializable",
             "kotlinx.serialization.SerialName"
@@ -258,6 +320,16 @@ class DtoGenerator {
         return """ 
             package $packageName
 
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.*
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import kotlinx.serialization.descriptors.*
+import kotlinx.serialization.encoding.*
+
             ${imports.sorted().joinToString("\n") { "import $it" }} 
 
             $kdoc$deprecatedAnnotation@Serializable
@@ -267,7 +339,7 @@ class DtoGenerator {
         """.trimIndent()
     }
 
-    private fun resolveKotlinType(
+    private /** Auto generated docs */ fun resolveKotlinType(
         name: String,
         prop: SchemaProperty,
         requiredList: List<String>,
@@ -288,7 +360,7 @@ class DtoGenerator {
         }
     }
 
-    private fun addTypeImports(imports: MutableSet<String>, definition: SchemaDefinition) {
+    private /** Auto generated docs */ fun addTypeImports(imports: MutableSet<String>, definition: SchemaDefinition) {
         val formats = mutableSetOf<String>()
         definition.format?.let { formats.add(it) }
         definition.properties.values.forEach { collectFormats(it, formats) }
@@ -303,13 +375,13 @@ class DtoGenerator {
         }
     }
 
-    private fun collectFormats(prop: SchemaProperty, acc: MutableSet<String>) {
+    private /** Auto generated docs */ fun collectFormats(prop: SchemaProperty, acc: MutableSet<String>) {
         prop.format?.let { acc.add(it) }
         prop.items?.let { collectFormats(it, acc) }
         prop.additionalProperties?.let { collectFormats(it, acc) }
     }
 
-    private fun buildClassKDoc(definition: SchemaDefinition): String {
+    private /** Auto generated docs */ fun buildClassKDoc(definition: SchemaDefinition): String {
         val hasDesc = !definition.description.isNullOrBlank()
         val hasExtDocs = definition.externalDocs != null
         val hasExample = definition.example != null
@@ -382,6 +454,7 @@ class DtoGenerator {
 
         val sb = StringBuilder("/**\n")
         var hasAny = false
+        /** Auto generated docs */
         fun appendLine(line: String, blankBefore: Boolean = true) {
             if (hasAny && blankBefore) sb.append(" *\n")
             sb.append(" * ").append(line).append("\n")
@@ -519,7 +592,7 @@ class DtoGenerator {
         return sb.toString()
     }
 
-    private fun buildPropertyKDoc(prop: SchemaProperty): String {
+    private /** Auto generated docs */ fun buildPropertyKDoc(prop: SchemaProperty): String {
         val hasDesc = !prop.description.isNullOrBlank()
         val hasExample = prop.example != null
         val hasExamples = !prop.examples.isNullOrEmpty()
@@ -592,6 +665,7 @@ class DtoGenerator {
 
         val sb = StringBuilder("    /**\n")
         var hasAny = false
+        /** Auto generated docs */
         fun appendLine(line: String, blankBefore: Boolean = true) {
             if (hasAny && blankBefore) sb.append("     *\n")
             sb.append("     * ").append(line).append("\n")
@@ -723,11 +797,11 @@ class DtoGenerator {
         return sb.toString()
     }
 
-    private fun buildDeprecatedAnnotation(isDeprecated: Boolean, indent: String = ""): String {
+    private /** Auto generated docs */ fun buildDeprecatedAnnotation(isDeprecated: Boolean, indent: String = ""): String {
         return if (isDeprecated) "${indent}@Deprecated(\"Deprecated\")\n" else ""
     }
 
-    private fun sanitizeEnumName(raw: String): String {
+    private /** Auto generated docs */ fun sanitizeEnumName(raw: String): String {
         val cleaned = raw.replace(Regex("[^a-zA-Z0-9]"), " ")
         var ident = cleaned.split(" ")
             .filter { it.isNotEmpty() }
@@ -742,7 +816,7 @@ class DtoGenerator {
         return ident
     }
 
-    private fun renderDocValue(value: Any?): String {
+    private /** Auto generated docs */ fun renderDocValue(value: Any?): String {
         return when (value) {
             null -> "null"
             is String -> value
@@ -752,29 +826,29 @@ class DtoGenerator {
         }
     }
 
-    private fun renderExamplesList(values: List<Any?>): String {
+    private /** Auto generated docs */ fun renderExamplesList(values: List<Any?>): String {
         return jsonMapper.writeValueAsString(values)
     }
 
-    private fun renderEnumValue(value: Any?): String {
+    private /** Auto generated docs */ fun renderEnumValue(value: Any?): String {
         return jsonMapper.writeValueAsString(value)
     }
 
-    private fun renderSchema(schema: SchemaProperty): String {
+    private /** Auto generated docs */ fun renderSchema(schema: SchemaProperty): String {
         return jsonMapper.writeValueAsString(schemaPropertyToDocValue(schema))
     }
 
-    private fun renderSchemaMap(map: Map<String, SchemaProperty>): String {
+    private /** Auto generated docs */ fun renderSchemaMap(map: Map<String, SchemaProperty>): String {
         val converted = map.mapValues { schemaPropertyToDocValue(it.value) }
         return jsonMapper.writeValueAsString(converted)
     }
 
-    private fun renderSchemaList(list: List<SchemaProperty>): String {
+    private /** Auto generated docs */ fun renderSchemaList(list: List<SchemaProperty>): String {
         val converted = list.map { schemaPropertyToDocValue(it) }
         return jsonMapper.writeValueAsString(converted)
     }
 
-    private fun renderSchemaComposition(
+    private /** Auto generated docs */ fun renderSchemaComposition(
         refs: List<String>,
         inlines: List<SchemaProperty>
     ): String {
@@ -787,20 +861,20 @@ class DtoGenerator {
         return jsonMapper.writeValueAsString(entries)
     }
 
-    private fun renderStringListMap(map: Map<String, List<String>>): String {
+    private /** Auto generated docs */ fun renderStringListMap(map: Map<String, List<String>>): String {
         return jsonMapper.writeValueAsString(map)
     }
 
-    private fun renderCustomKeywords(map: Map<String, Any?>): String {
+    private /** Auto generated docs */ fun renderCustomKeywords(map: Map<String, Any?>): String {
         return jsonMapper.writeValueAsString(map)
     }
 
-    private fun looksLikeRef(token: String): Boolean {
+    private /** Auto generated docs */ fun looksLikeRef(token: String): Boolean {
         return token.startsWith("#") || token.startsWith("./") ||
             token.contains("/") || token.endsWith(".json") || token.endsWith(".yaml")
     }
 
-    private fun schemaPropertyToDocValue(schema: SchemaProperty): Any {
+    private /** Auto generated docs */ fun schemaPropertyToDocValue(schema: SchemaProperty): Any {
         schema.booleanSchema?.let { return it }
         schema.ref?.let { return mapOf("\$ref" to it) }
         schema.dynamicRef?.let { return mapOf("\$dynamicRef" to it) }
@@ -908,7 +982,7 @@ class DtoGenerator {
         return map
     }
 
-    private fun schemaTypeValue(types: Set<String>): Any? {
+    private /** Auto generated docs */ fun schemaTypeValue(types: Set<String>): Any? {
         if (types.isEmpty()) return null
         val list = types.toList().sorted()
         return if (list.size == 1) list.first() else list

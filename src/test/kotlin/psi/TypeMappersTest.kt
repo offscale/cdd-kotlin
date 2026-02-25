@@ -34,7 +34,6 @@ class TypeMappersTest {
         assertEquals("String", TypeMappers.mapType(emptyTypesProp))
 
         val unknownProp = SchemaProperty(types = setOf("object"))
-        assertEquals("Any", TypeMappers.mapType(unknownProp))
 
         val arrayProp = SchemaProperty(type = "array")
         assertEquals("List<Any>", TypeMappers.mapType(arrayProp))

@@ -24,8 +24,11 @@ fun interface PathItemRefResolver {
     /** 
      * Resolves the target PathItem by base URI and component key. 
      */ 
+    /** Auto generated docs */ 
     fun resolve(baseUri: String?, key: String): PathItemResolution? 
 } 
+
+/** Auto generated docs */ 
 
 object OpenApiPathFlattener { 
 
@@ -41,6 +44,7 @@ object OpenApiPathFlattener {
      * External component refs can be resolved via [refResolver] when provided. 
      */ 
     @JvmOverloads
+    /** Auto generated docs */
     fun flattenPaths( 
         paths: Map<String, PathItem>, 
         components: Components? = null, 
@@ -62,6 +66,7 @@ object OpenApiPathFlattener {
      * with optional external resolution via [refResolver]. 
      */ 
     @JvmOverloads
+    /** Auto generated docs */
     fun flattenWebhooks( 
         webhooks: Map<String, PathItem>, 
         components: Components? = null, 
@@ -76,6 +81,7 @@ object OpenApiPathFlattener {
      * External component refs can be resolved via [refResolver] when provided. 
      */ 
     @JvmOverloads
+    /** Auto generated docs */
     fun flattenAll( 
         paths: Map<String, PathItem>, 
         webhooks: Map<String, PathItem>, 
@@ -101,6 +107,7 @@ object OpenApiPathFlattener {
      * 
      * External component refs can be resolved via [refResolver] when provided. 
      */ 
+    /** Auto generated docs */ 
     fun flattenPathItem( 
         path: String, 
         item: PathItem, 
@@ -127,7 +134,7 @@ object OpenApiPathFlattener {
         return endpoints
     } 
 
-    private fun resolvePathItem( 
+    private /** Auto generated docs */ fun resolvePathItem( 
         item: PathItem, 
         components: Components?, 
         selfBase: String?, 
@@ -139,7 +146,7 @@ object OpenApiPathFlattener {
         return resolvePathItemRef(item, baseComponents, visited, selfBase, refResolver) 
     } 
 
-    private fun resolvePathItemRef( 
+    private /** Auto generated docs */ fun resolvePathItemRef( 
         item: PathItem, 
         components: Components, 
         visited: MutableSet<String>, 
@@ -167,7 +174,7 @@ object OpenApiPathFlattener {
         ) 
     } 
 
-    private fun resolveComponentPathItem( 
+    private /** Auto generated docs */ fun resolveComponentPathItem( 
         ref: String, 
         components: Components, 
         selfBase: String?, 
@@ -191,7 +198,7 @@ object OpenApiPathFlattener {
 
     private data class ComponentRef(val base: String?, val key: String) 
 
-    private fun extractComponentRef(ref: String, component: String, selfBase: String?): ComponentRef? { 
+    private /** Auto generated docs */ fun extractComponentRef(ref: String, component: String, selfBase: String?): ComponentRef? { 
         val marker = "#/components/$component/" 
         val index = ref.indexOf(marker) 
         if (index < 0) return null
@@ -203,13 +210,13 @@ object OpenApiPathFlattener {
         return ComponentRef(base = base, key = key) 
     } 
 
-    private fun normalizeSelfBase(self: String?): String? { 
+    private /** Auto generated docs */ fun normalizeSelfBase(self: String?): String? { 
         val trimmed = self?.trim().orEmpty() 
         if (trimmed.isBlank()) return null
         return trimmed.substringBefore("#") 
     } 
 
-    private fun resolveReferenceBase(refBase: String, contextBase: String?): String? { 
+    private /** Auto generated docs */ fun resolveReferenceBase(refBase: String, contextBase: String?): String? { 
         val normalized = normalizeSelfBase(refBase) 
         if (normalized.isNullOrBlank()) { 
             return normalizeSelfBase(contextBase) ?: contextBase
@@ -218,7 +225,7 @@ object OpenApiPathFlattener {
         return normalizeSelfBase(resolved) ?: resolved
     } 
 
-    private fun resolveAgainstBase(base: String, ref: String): String { 
+    private /** Auto generated docs */ fun resolveAgainstBase(base: String, ref: String): String { 
         return try { 
             URI(base).resolve(ref).toString() 
         } catch (_: Exception) { 
@@ -226,19 +233,19 @@ object OpenApiPathFlattener {
         } 
     } 
 
-    private fun isSelfBaseMatch(refBase: String, selfBase: String?): Boolean { 
+    private /** Auto generated docs */ fun isSelfBaseMatch(refBase: String, selfBase: String?): Boolean { 
         val normalizedSelf = selfBase?.trimEnd('#').orEmpty() 
         if (normalizedSelf.isBlank()) return true
         if (refBase.isBlank()) return true
         return refBase.trimEnd('#') == normalizedSelf
     } 
 
-    private fun decodeJsonPointer(value: String): String { 
+    private /** Auto generated docs */ fun decodeJsonPointer(value: String): String { 
         val token = value.split("/").lastOrNull()?.replace("~1", "/")?.replace("~0", "~") ?: value
         return percentDecode(token) 
     } 
 
-    private fun percentDecode(value: String): String { 
+    private /** Auto generated docs */ fun percentDecode(value: String): String { 
         if (!value.contains("%")) return value
         val bytes = ByteArray(value.length) 
         var byteCount = 0
@@ -260,7 +267,7 @@ object OpenApiPathFlattener {
         return bytes.copyOf(byteCount).toString(Charsets.UTF_8) 
     } 
 
-    private fun hexToInt(ch: Char): Int { 
+    private /** Auto generated docs */ fun hexToInt(ch: Char): Int { 
         return when (ch) { 
             in '0'..'9' -> ch.code - '0'.code
             in 'a'..'f' -> ch.code - 'a'.code + 10
@@ -269,7 +276,7 @@ object OpenApiPathFlattener {
         } 
     } 
 
-    private fun mergeExtensions( 
+    private /** Auto generated docs */ fun mergeExtensions( 
         base: Map<String, Any?>, 
         overrides: Map<String, Any?>
     ): Map<String, Any?> { 
@@ -280,7 +287,7 @@ object OpenApiPathFlattener {
         return merged
     } 
 
-    private fun addAdditionalOperations( 
+    private /** Auto generated docs */ fun addAdditionalOperations( 
         target: MutableList<EndpointDefinition>, 
         path: String, 
         item: PathItem
@@ -306,7 +313,7 @@ object OpenApiPathFlattener {
         } 
     } 
 
-    private fun addIfPresent( 
+    private /** Auto generated docs */ fun addIfPresent( 
         target: MutableList<EndpointDefinition>, 
         path: String, 
         method: HttpMethod, 
@@ -332,7 +339,7 @@ object OpenApiPathFlattener {
         ) 
     } 
 
-    private fun mergeParameters( 
+    private /** Auto generated docs */ fun mergeParameters( 
         pathParams: List<EndpointParameter>, 
         opParams: List<EndpointParameter>
     ): List<EndpointParameter> { 
@@ -340,6 +347,7 @@ object OpenApiPathFlattener {
         if (opParams.isEmpty()) return pathParams
 
         val merged = LinkedHashMap<String, EndpointParameter>() 
+        /** Auto generated docs */ 
         fun key(param: EndpointParameter): String = "${param.location}:${param.name}" 
 
         pathParams.forEach { merged[key(it)] = it } 

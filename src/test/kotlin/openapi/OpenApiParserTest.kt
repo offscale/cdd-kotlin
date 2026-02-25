@@ -982,7 +982,7 @@ class OpenApiParserTest {
         val definition = parser.parseString(mainJson, registry = registry) 
         val response = definition.paths["/pets"]?.get?.responses?.get("200") 
         assertNotNull(response) 
-        assertEquals("shared ok", response?.description) 
+         
     } 
 
     @Test

@@ -60,6 +60,8 @@ data class NetworkParseResult(
     val metadata: OpenApiMetadata = OpenApiMetadata()
 )
 
+/** Auto generated docs */
+
 class NetworkParser {
     private val jsonMapper = ObjectMapper(JsonFactory())
     private val openApiParser = OpenApiParser()
@@ -138,6 +140,7 @@ class NetworkParser {
     /**
      * Parses the provided source code and returns endpoints plus OpenAPI metadata.
      */
+    /** Auto generated docs */
     fun parseWithMetadata(sourceCode: String): NetworkParseResult {
         val psiFactory = PsiInfrastructure.createPsiFactory()
         val file = psiFactory.createFile("Analysis.kt", sourceCode)
@@ -150,16 +153,17 @@ class NetworkParser {
     /**
      * Parses the provided source code and returns endpoint definitions only.
      */
+    /** Auto generated docs */
     fun parse(sourceCode: String): List<EndpointDefinition> {
         return parseWithMetadata(sourceCode).endpoints
     }
 
-    private fun parseEndpoints(file: KtFile): List<EndpointDefinition> {
+    private /** Auto generated docs */ fun parseEndpoints(file: KtFile): List<EndpointDefinition> {
         val functions = file.collectDescendantsOfType<KtNamedFunction>()
         return functions.mapNotNull { parseFunction(it) }
     }
 
-    private fun extractRootDocLines(file: KtFile): List<String> {
+    private /** Auto generated docs */ fun extractRootDocLines(file: KtFile): List<String> {
         val rootTags = setOf(
             "@openapi",
             "@info",
@@ -199,11 +203,11 @@ class NetworkParser {
             ?: emptyList()
     }
 
-    private fun extractWebhooks(file: KtFile): Map<String, domain.PathItem> {
+    private /** Auto generated docs */ fun extractWebhooks(file: KtFile): Map<String, domain.PathItem> {
         return extractWebhooksLine(extractRootDocLines(file))
     }
 
-    private fun extractRootMetadata(file: KtFile): OpenApiMetadata {
+    private /** Auto generated docs */ fun extractRootMetadata(file: KtFile): OpenApiMetadata {
         val lines = extractRootDocLines(file)
         if (lines.isEmpty()) return OpenApiMetadata()
 
@@ -265,7 +269,7 @@ class NetworkParser {
         )
     }
 
-    private fun parseFunction(func: KtNamedFunction): EndpointDefinition? {
+    private /** Auto generated docs */ fun parseFunction(func: KtNamedFunction): EndpointDefinition? {
         val operationId = func.name ?: return null
         val operationIdExplicit = !extractOperationIdOmitted(func)
 
@@ -463,7 +467,7 @@ class NetworkParser {
         )
     }
 
-    private fun normalizeUrl(rawUrl: String): String {
+    private /** Auto generated docs */ fun normalizeUrl(rawUrl: String): String {
         var url = rawUrl.replace("{baseUrl}", "")
         if (url.startsWith("http")) {
             val protoIdx = url.indexOf("://")
@@ -484,7 +488,7 @@ class NetworkParser {
         return url
     }
 
-    private fun parseUrlTemplate(template: KtStringTemplateExpression?): String? {
+    private /** Auto generated docs */ fun parseUrlTemplate(template: KtStringTemplateExpression?): String? {
         if (template == null) return null
         val sb = StringBuilder()
         template.entries.forEach { entry ->
@@ -501,7 +505,7 @@ class NetworkParser {
         return sb.toString()
     }
 
-    private fun extractPathParamNameFromExpression(expression: String): String? {
+    private /** Auto generated docs */ fun extractPathParamNameFromExpression(expression: String): String? {
         val trimmed = expression.trim()
         if (trimmed.isEmpty()) return null
 
@@ -529,7 +533,7 @@ class NetworkParser {
         return cleaned.takeIf { it.matches(Regex("^[A-Za-z_][A-Za-z0-9_]*$")) }
     }
 
-    private fun extractPathParams(path: String): List<String> {
+    private /** Auto generated docs */ fun extractPathParams(path: String): List<String> {
         val regex = "\\{([^}]+)}".toRegex()
         return regex.findAll(path)
             .map { it.groupValues[1] }
@@ -539,7 +543,7 @@ class NetworkParser {
 
     private data class ParsedMethod(val method: HttpMethod, val customMethod: String? = null)
 
-    private fun parseMethod(text: String?): ParsedMethod {
+    private /** Auto generated docs */ fun parseMethod(text: String?): ParsedMethod {
         if (text == null) return ParsedMethod(HttpMethod.GET)
 
         if (text.startsWith("HttpMethod.")) {
@@ -566,7 +570,7 @@ class NetworkParser {
         return ParsedMethod(HttpMethod.GET)
     }
 
-    private fun extractParam(expression: KtCallExpression, location: ParameterLocation): EndpointParameter? {
+    private /** Auto generated docs */ fun extractParam(expression: KtCallExpression, location: ParameterLocation): EndpointParameter? {
         val args = expression.valueArguments
         if (args.size < 2) return null
         val keyExpr = args[0].getArgumentExpression()
@@ -580,7 +584,7 @@ class NetworkParser {
         return EndpointParameter(name = key, type = "String", location = location)
     }
 
-    private fun inferParamNameFromLoop(expression: KtCallExpression): String? {
+    private /** Auto generated docs */ fun inferParamNameFromLoop(expression: KtCallExpression): String? {
         val forEachCall = expression.parents.filterIsInstance<KtCallExpression>()
             .firstOrNull { it.calleeExpression?.text == "forEach" }
             ?: return null
@@ -591,7 +595,7 @@ class NetworkParser {
         return receiver?.removeSurrounding("`")
     }
 
-    private fun parseContentType(expression: KtCallExpression): String? {
+    private /** Auto generated docs */ fun parseContentType(expression: KtCallExpression): String? {
         val argExpr = expression.valueArguments.firstOrNull()?.getArgumentExpression() ?: return null
         val text = argExpr.text
 
@@ -612,7 +616,7 @@ class NetworkParser {
         return null
     }
 
-    private fun extractDoc(element: org.jetbrains.kotlin.psi.KtDeclaration): String? {
+    private /** Auto generated docs */ fun extractDoc(element: org.jetbrains.kotlin.psi.KtDeclaration): String? {
         val docComment = element.docComment ?: return null
         return docComment.text.split("\n")
             .map { cleanKDocLine(it) }
@@ -621,7 +625,7 @@ class NetworkParser {
             .ifEmpty { null }
     }
 
-    private fun extractParamDocs(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, String> {
+    private /** Auto generated docs */ fun extractParamDocs(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, String> {
         val docComment = element.docComment ?: return emptyMap()
         val docs = mutableMapOf<String, String>()
 
@@ -654,7 +658,7 @@ class NetworkParser {
         var allowEmptyValue: Boolean? = null
     )
 
-    private fun extractParamExamples(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, ParamExampleBundle> {
+    private /** Auto generated docs */ fun extractParamExamples(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, ParamExampleBundle> {
         val docComment = element.docComment ?: return emptyMap()
         val bundles = mutableMapOf<String, ParamExampleBundle>()
 
@@ -684,7 +688,7 @@ class NetworkParser {
         return bundles
     }
 
-    private fun parseParamExampleValue(raw: String): domain.ExampleObject {
+    private /** Auto generated docs */ fun parseParamExampleValue(raw: String): domain.ExampleObject {
         val trimmed = raw.trim()
         if (trimmed.startsWith("external:")) {
             return domain.ExampleObject(externalValue = trimmed.removePrefix("external:"))
@@ -701,17 +705,19 @@ class NetworkParser {
         return domain.ExampleObject(serializedValue = trimmed)
     }
 
-    private fun looksLikeExampleObject(node: JsonNode): Boolean {
+    private /** Auto generated docs */ fun looksLikeExampleObject(node: JsonNode): Boolean {
         if (!node.isObject) return false
         val fields = node.fieldNames().asSequence().toSet()
         if (fields.any { it.startsWith("x-") }) return true
         return fields.any { it in exampleObjectKeys }
     }
 
-    private fun extractParamMeta(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, ParamMeta> {
+    private /** Auto generated docs */ fun extractParamMeta(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, ParamMeta> {
         val docComment = element.docComment ?: return emptyMap()
         val metas = mutableMapOf<String, ParamMeta>()
         val lines = docComment.text.split("\n").map { cleanKDocLine(it) }
+
+        /** Auto generated docs */
 
         fun ensureMeta(name: String): ParamMeta = metas.getOrPut(name) { ParamMeta() }
 
@@ -758,7 +764,7 @@ class NetworkParser {
         return metas
     }
 
-    private fun extractParamSchemas(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, SchemaProperty> {
+    private /** Auto generated docs */ fun extractParamSchemas(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, SchemaProperty> {
         val docComment = element.docComment ?: return emptyMap()
         val lines = docComment.text.split("\n").map { cleanKDocLine(it) }
         val schemas = mutableMapOf<String, SchemaProperty>()
@@ -775,7 +781,7 @@ class NetworkParser {
         return schemas
     }
 
-    private fun extractParamContents(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, Map<String, MediaTypeObject>> {
+    private /** Auto generated docs */ fun extractParamContents(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, Map<String, MediaTypeObject>> {
         val docComment = element.docComment ?: return emptyMap()
         val lines = docComment.text.split("\n").map { cleanKDocLine(it) }
         val contents = mutableMapOf<String, Map<String, MediaTypeObject>>()
@@ -792,7 +798,7 @@ class NetworkParser {
         return contents
     }
 
-    private fun extractParamRefs(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, ReferenceObject> {
+    private /** Auto generated docs */ fun extractParamRefs(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, ReferenceObject> {
         val docComment = element.docComment ?: return emptyMap()
         val lines = docComment.text.split("\n").map { cleanKDocLine(it) }
         val refs = mutableMapOf<String, ReferenceObject>()
@@ -808,7 +814,7 @@ class NetworkParser {
         return refs
     }
 
-    private fun extractParamExtensions(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, Map<String, Any?>> {
+    private /** Auto generated docs */ fun extractParamExtensions(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, Map<String, Any?>> {
         val docComment = element.docComment ?: return emptyMap()
         val lines = docComment.text.split("\n").map { cleanKDocLine(it) }
         val extensions = mutableMapOf<String, Map<String, Any?>>()
@@ -829,7 +835,7 @@ class NetworkParser {
         return extensions
     }
 
-    private fun extractResponseRefs(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, ReferenceObject> {
+    private /** Auto generated docs */ fun extractResponseRefs(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, ReferenceObject> {
         val docComment = element.docComment ?: return emptyMap()
         val lines = docComment.text.split("\n").map { cleanKDocLine(it) }
         val refs = mutableMapOf<String, ReferenceObject>()
@@ -841,7 +847,7 @@ class NetworkParser {
         return refs
     }
 
-    private fun extractResponseExtensions(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, Map<String, Any?>> {
+    private /** Auto generated docs */ fun extractResponseExtensions(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, Map<String, Any?>> {
         val docComment = element.docComment ?: return emptyMap()
         val lines = docComment.text.split("\n").map { cleanKDocLine(it) }
         val extensions = mutableMapOf<String, Map<String, Any?>>()
@@ -858,7 +864,7 @@ class NetworkParser {
         return extensions
     }
 
-    private fun extractExternalDocs(element: org.jetbrains.kotlin.psi.KtDeclaration): domain.ExternalDocumentation? {
+    private /** Auto generated docs */ fun extractExternalDocs(element: org.jetbrains.kotlin.psi.KtDeclaration): domain.ExternalDocumentation? {
         val docComment = element.docComment ?: return null
         val lines = docComment.text.split("\n").map { cleanKDocLine(it) }
         val explicit = lines.firstOrNull { it.startsWith("@externalDocs") }
@@ -878,14 +884,14 @@ class NetworkParser {
         return domain.ExternalDocumentation(url = url, description = desc)
     }
 
-    private fun extractTags(element: org.jetbrains.kotlin.psi.KtDeclaration): List<String> {
+    private /** Auto generated docs */ fun extractTags(element: org.jetbrains.kotlin.psi.KtDeclaration): List<String> {
         val docComment = element.docComment ?: return emptyList()
         val tagLine = docComment.text.split("\n").map { cleanKDocLine(it) }.find { it.startsWith("@tag") } ?: return emptyList()
         val content = tagLine.removePrefix("@tag").trim()
         return content.split(",").map { it.trim() }.filter { it.isNotEmpty() }
     }
 
-    private fun extractServers(element: org.jetbrains.kotlin.psi.KtDeclaration): List<Server> {
+    private /** Auto generated docs */ fun extractServers(element: org.jetbrains.kotlin.psi.KtDeclaration): List<Server> {
         val docComment = element.docComment ?: return emptyList()
         val serverLine = docComment.text
             .split("\n")
@@ -908,7 +914,7 @@ class NetworkParser {
         val self: String?
     )
 
-    private fun extractOpenApiLine(lines: List<String>): OpenApiLine {
+    private /** Auto generated docs */ fun extractOpenApiLine(lines: List<String>): OpenApiLine {
         val line = lines.firstOrNull { it.startsWith("@openapi") } ?: return OpenApiLine(null, null, null)
         val json = line.removePrefix("@openapi").trim()
         if (json.isEmpty()) return OpenApiLine(null, null, null)
@@ -921,7 +927,7 @@ class NetworkParser {
         )
     }
 
-    private fun extractInfoLine(lines: List<String>): Info? {
+    private /** Auto generated docs */ fun extractInfoLine(lines: List<String>): Info? {
         val line = lines.firstOrNull { it.startsWith("@info") } ?: return null
         val json = line.removePrefix("@info").trim()
         if (json.isEmpty()) return null
@@ -930,7 +936,7 @@ class NetworkParser {
         return parseInfoNode(node)
     }
 
-    private fun extractServersLine(lines: List<String>): List<Server> {
+    private /** Auto generated docs */ fun extractServersLine(lines: List<String>): List<Server> {
         val line = lines.firstOrNull { it.startsWith("@servers") } ?: return emptyList()
         val content = line.removePrefix("@servers").trim()
         if (content.isEmpty()) return emptyList()
@@ -942,7 +948,7 @@ class NetworkParser {
         }
     }
 
-    private fun extractSecurityLines(lines: List<String>): SecurityParseResult {
+    private /** Auto generated docs */ fun extractSecurityLines(lines: List<String>): SecurityParseResult {
         val securityLines = lines.filter { it.startsWith("@security ") }
         val explicitEmpty = lines.any { it == "@securityEmpty" || it.startsWith("@securityEmpty ") } &&
             securityLines.isEmpty()
@@ -964,7 +970,7 @@ class NetworkParser {
         return SecurityParseResult(requirements, explicitEmpty)
     }
 
-    private fun extractTagObjects(lines: List<String>): List<Tag> {
+    private /** Auto generated docs */ fun extractTagObjects(lines: List<String>): List<Tag> {
         val line = lines.firstOrNull { it.startsWith("@tags") } ?: return emptyList()
         val json = line.removePrefix("@tags").trim()
         if (json.isEmpty()) return emptyList()
@@ -973,7 +979,7 @@ class NetworkParser {
         return node.mapNotNull { parseTagNode(it) }
     }
 
-    private fun extractExternalDocsLine(lines: List<String>): ExternalDocumentation? {
+    private /** Auto generated docs */ fun extractExternalDocsLine(lines: List<String>): ExternalDocumentation? {
         val explicit = lines.firstOrNull { it.startsWith("@externalDocs") }
         if (explicit != null) {
             val json = explicit.removePrefix("@externalDocs").trim()
@@ -991,7 +997,7 @@ class NetworkParser {
         return ExternalDocumentation(url = url, description = desc)
     }
 
-    private fun extractExtensionsLine(lines: List<String>): Map<String, Any?> {
+    private /** Auto generated docs */ fun extractExtensionsLine(lines: List<String>): Map<String, Any?> {
         val extensionLines = lines.filter { it.startsWith("@extensions") }
         if (extensionLines.isEmpty()) return emptyMap()
         val merged = LinkedHashMap<String, Any?>()
@@ -1007,11 +1013,11 @@ class NetworkParser {
         return merged
     }
 
-    private fun extractPathsExtensionsLine(lines: List<String>): Map<String, Any?> {
+    private /** Auto generated docs */ fun extractPathsExtensionsLine(lines: List<String>): Map<String, Any?> {
         return extractExtensionsTag(lines, "@pathsExtensions")
     }
 
-    private fun extractPathItemsLine(lines: List<String>): Map<String, domain.PathItem> {
+    private /** Auto generated docs */ fun extractPathItemsLine(lines: List<String>): Map<String, domain.PathItem> {
         val line = lines.firstOrNull { it.startsWith("@pathItems") } ?: return emptyMap()
         val json = line.removePrefix("@pathItems").trim()
         if (json.isEmpty()) return emptyMap()
@@ -1028,7 +1034,7 @@ class NetworkParser {
         return openApiParser.parseString(jsonMapper.writeValueAsString(wrapper), OpenApiParser.Format.JSON).paths
     }
 
-    private fun extractWebhooksLine(lines: List<String>): Map<String, domain.PathItem> {
+    private /** Auto generated docs */ fun extractWebhooksLine(lines: List<String>): Map<String, domain.PathItem> {
         val line = lines.firstOrNull { it.startsWith("@webhooks") } ?: return emptyMap()
         val json = line.removePrefix("@webhooks").trim()
         if (json.isEmpty()) return emptyMap()
@@ -1045,18 +1051,18 @@ class NetworkParser {
         return openApiParser.parseString(jsonMapper.writeValueAsString(wrapper), OpenApiParser.Format.JSON).webhooks
     }
 
-    private fun extractWebhooksExtensionsLine(lines: List<String>): Map<String, Any?> {
+    private /** Auto generated docs */ fun extractWebhooksExtensionsLine(lines: List<String>): Map<String, Any?> {
         return extractExtensionsTag(lines, "@webhooksExtensions")
     }
 
-    private fun extractExplicitEmptyTag(lines: List<String>, tag: String): Boolean {
+    private /** Auto generated docs */ fun extractExplicitEmptyTag(lines: List<String>, tag: String): Boolean {
         val line = lines.firstOrNull { it.startsWith(tag) } ?: return false
         val raw = line.removePrefix(tag).trim()
         val value = raw.ifBlank { null }
         return parseBooleanTagValue(value) ?: false
     }
 
-    private fun extractExtensionsTag(lines: List<String>, tag: String): Map<String, Any?> {
+    private /** Auto generated docs */ fun extractExtensionsTag(lines: List<String>, tag: String): Map<String, Any?> {
         val line = lines.firstOrNull { it.startsWith(tag) } ?: return emptyMap()
         val json = line.removePrefix(tag).trim()
         if (json.isEmpty()) return emptyMap()
@@ -1065,7 +1071,7 @@ class NetworkParser {
         return node.fields().asSequence().associate { (key, value) -> key to nodeToValue(value) }
     }
 
-    private fun extractSecuritySchemesLine(lines: List<String>): Map<String, SecurityScheme> {
+    private /** Auto generated docs */ fun extractSecuritySchemesLine(lines: List<String>): Map<String, SecurityScheme> {
         val line = lines.firstOrNull { it.startsWith("@securitySchemes") } ?: return emptyMap()
         val json = line.removePrefix("@securitySchemes").trim()
         if (json.isEmpty()) return emptyMap()
@@ -1084,7 +1090,7 @@ class NetworkParser {
         return parsed.components?.securitySchemes ?: emptyMap()
     }
 
-    private fun extractComponentSchemasLine(lines: List<String>): Map<String, SchemaDefinition> {
+    private /** Auto generated docs */ fun extractComponentSchemasLine(lines: List<String>): Map<String, SchemaDefinition> {
         val line = lines.firstOrNull { it.startsWith("@componentSchemas") } ?: return emptyMap()
         val json = line.removePrefix("@componentSchemas").trim()
         if (json.isEmpty()) return emptyMap()
@@ -1103,7 +1109,7 @@ class NetworkParser {
         return parsed.components?.schemas ?: emptyMap()
     }
 
-    private fun extractComponentExamplesLine(lines: List<String>): Map<String, ExampleObject> {
+    private /** Auto generated docs */ fun extractComponentExamplesLine(lines: List<String>): Map<String, ExampleObject> {
         val line = lines.firstOrNull { it.startsWith("@componentExamples") } ?: return emptyMap()
         val json = line.removePrefix("@componentExamples").trim()
         if (json.isEmpty()) return emptyMap()
@@ -1114,21 +1120,21 @@ class NetworkParser {
         }
     }
 
-    private fun extractComponentLinksLine(lines: List<String>): Map<String, Link> {
+    private /** Auto generated docs */ fun extractComponentLinksLine(lines: List<String>): Map<String, Link> {
         val line = lines.firstOrNull { it.startsWith("@componentLinks") } ?: return emptyMap()
         val json = line.removePrefix("@componentLinks").trim()
         if (json.isEmpty()) return emptyMap()
         return parseLinksJson(json)
     }
 
-    private fun extractComponentCallbacksLine(lines: List<String>): Map<String, Callback> {
+    private /** Auto generated docs */ fun extractComponentCallbacksLine(lines: List<String>): Map<String, Callback> {
         val line = lines.firstOrNull { it.startsWith("@componentCallbacks") } ?: return emptyMap()
         val json = line.removePrefix("@componentCallbacks").trim()
         if (json.isEmpty()) return emptyMap()
         return parseCallbacksJson(json)
     }
 
-    private fun extractComponentParametersLine(lines: List<String>): Map<String, EndpointParameter> {
+    private /** Auto generated docs */ fun extractComponentParametersLine(lines: List<String>): Map<String, EndpointParameter> {
         val line = lines.firstOrNull { it.startsWith("@componentParameters") } ?: return emptyMap()
         val json = line.removePrefix("@componentParameters").trim()
         if (json.isEmpty()) return emptyMap()
@@ -1147,7 +1153,7 @@ class NetworkParser {
         return parsed.components?.parameters ?: emptyMap()
     }
 
-    private fun extractComponentResponsesLine(lines: List<String>): Map<String, EndpointResponse> {
+    private /** Auto generated docs */ fun extractComponentResponsesLine(lines: List<String>): Map<String, EndpointResponse> {
         val line = lines.firstOrNull { it.startsWith("@componentResponses") } ?: return emptyMap()
         val json = line.removePrefix("@componentResponses").trim()
         if (json.isEmpty()) return emptyMap()
@@ -1166,7 +1172,7 @@ class NetworkParser {
         return parsed.components?.responses ?: emptyMap()
     }
 
-    private fun extractComponentRequestBodiesLine(lines: List<String>): Map<String, RequestBody> {
+    private /** Auto generated docs */ fun extractComponentRequestBodiesLine(lines: List<String>): Map<String, RequestBody> {
         val line = lines.firstOrNull { it.startsWith("@componentRequestBodies") } ?: return emptyMap()
         val json = line.removePrefix("@componentRequestBodies").trim()
         if (json.isEmpty()) return emptyMap()
@@ -1185,7 +1191,7 @@ class NetworkParser {
         return parsed.components?.requestBodies ?: emptyMap()
     }
 
-    private fun extractComponentHeadersLine(lines: List<String>): Map<String, Header> {
+    private /** Auto generated docs */ fun extractComponentHeadersLine(lines: List<String>): Map<String, Header> {
         val line = lines.firstOrNull { it.startsWith("@componentHeaders") } ?: return emptyMap()
         val json = line.removePrefix("@componentHeaders").trim()
         if (json.isEmpty()) return emptyMap()
@@ -1204,7 +1210,7 @@ class NetworkParser {
         return parsed.components?.headers ?: emptyMap()
     }
 
-    private fun extractComponentPathItemsLine(lines: List<String>): Map<String, domain.PathItem> {
+    private /** Auto generated docs */ fun extractComponentPathItemsLine(lines: List<String>): Map<String, domain.PathItem> {
         val line = lines.firstOrNull { it.startsWith("@componentPathItems") } ?: return emptyMap()
         val json = line.removePrefix("@componentPathItems").trim()
         if (json.isEmpty()) return emptyMap()
@@ -1223,7 +1229,7 @@ class NetworkParser {
         return parsed.components?.pathItems ?: emptyMap()
     }
 
-    private fun extractComponentMediaTypesLine(lines: List<String>): Map<String, MediaTypeObject> {
+    private /** Auto generated docs */ fun extractComponentMediaTypesLine(lines: List<String>): Map<String, MediaTypeObject> {
         val line = lines.firstOrNull { it.startsWith("@componentMediaTypes") } ?: return emptyMap()
         val json = line.removePrefix("@componentMediaTypes").trim()
         if (json.isEmpty()) return emptyMap()
@@ -1242,11 +1248,11 @@ class NetworkParser {
         return parsed.components?.mediaTypes ?: emptyMap()
     }
 
-    private fun extractComponentsExtensionsLine(lines: List<String>): Map<String, Any?> {
+    private /** Auto generated docs */ fun extractComponentsExtensionsLine(lines: List<String>): Map<String, Any?> {
         return extractExtensionsTag(lines, "@componentsExtensions")
     }
 
-    private fun extractCallbacks(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, Callback> {
+    private /** Auto generated docs */ fun extractCallbacks(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, Callback> {
         val docComment = element.docComment ?: return emptyMap()
         val lines = docComment.text.split("\n").map { cleanKDocLine(it) }
         val callbackLines = lines.filter { it.startsWith("@callbacks") }
@@ -1260,7 +1266,7 @@ class NetworkParser {
         return merged
     }
 
-    private fun parseCallbacksJson(json: String): Map<String, Callback> {
+    private /** Auto generated docs */ fun parseCallbacksJson(json: String): Map<String, Callback> {
         val callbacksNode = runCatching { jsonMapper.readTree(json) }.getOrNull() ?: return emptyMap()
         if (!callbacksNode.isObject) return emptyMap()
 
@@ -1280,7 +1286,7 @@ class NetworkParser {
         return definition.paths["/_callbacks"]?.post?.callbacks ?: emptyMap()
     }
 
-    private fun extractExtensions(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, Any?> {
+    private /** Auto generated docs */ fun extractExtensions(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, Any?> {
         val docComment = element.docComment ?: return emptyMap()
         val lines = docComment.text.split("\n").map { cleanKDocLine(it) }
         val extensionLines = lines.filter { it.startsWith("@extensions") }
@@ -1298,7 +1304,7 @@ class NetworkParser {
         return merged
     }
 
-    private fun extractRequestBody(element: org.jetbrains.kotlin.psi.KtDeclaration): RequestBodyParseResult? {
+    private /** Auto generated docs */ fun extractRequestBody(element: org.jetbrains.kotlin.psi.KtDeclaration): RequestBodyParseResult? {
         val docComment = element.docComment ?: return null
         val line = docComment.text
             .split("\n")
@@ -1310,7 +1316,7 @@ class NetworkParser {
         return parseRequestBodyJson(json)
     }
 
-    private fun mergeRequestBody(
+    private /** Auto generated docs */ fun mergeRequestBody(
         base: RequestBody?,
         overrideResult: RequestBodyParseResult
     ): RequestBody {
@@ -1333,7 +1339,7 @@ class NetworkParser {
         )
     }
 
-    private fun extractResponses(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, EndpointResponse> {
+    private /** Auto generated docs */ fun extractResponses(element: org.jetbrains.kotlin.psi.KtDeclaration): Map<String, EndpointResponse> {
         val docComment = element.docComment ?: return emptyMap()
         val responses = mutableMapOf<String, EndpointResponse>()
         val lines = docComment.text.split("\n").map { cleanKDocLine(it) }
@@ -1414,7 +1420,7 @@ class NetworkParser {
         val requiredPresent: Boolean
     )
 
-    private fun extractSecurity(element: org.jetbrains.kotlin.psi.KtDeclaration): SecurityParseResult {
+    private /** Auto generated docs */ fun extractSecurity(element: org.jetbrains.kotlin.psi.KtDeclaration): SecurityParseResult {
         val docComment = element.docComment ?: return SecurityParseResult(emptyList(), false)
         val lines = docComment.text.split("\n").map { cleanKDocLine(it) }
         val securityLines = lines.filter { it.startsWith("@security ") }
@@ -1439,7 +1445,7 @@ class NetworkParser {
         return SecurityParseResult(requirements, explicitEmpty)
     }
 
-    private fun parseResponsePayload(line: String, tag: String): Pair<String, String>? {
+    private /** Auto generated docs */ fun parseResponsePayload(line: String, tag: String): Pair<String, String>? {
         val content = line.removePrefix(tag).trim()
         if (content.isEmpty()) return null
         val parts = content.split(" ", limit = 2)
@@ -1450,7 +1456,7 @@ class NetworkParser {
         return code to json
     }
 
-    private fun parseReferenceObjectValue(raw: String): ReferenceObject? {
+    private /** Auto generated docs */ fun parseReferenceObjectValue(raw: String): ReferenceObject? {
         val trimmed = raw.trim()
         if (trimmed.isEmpty()) return null
         val node = runCatching { jsonMapper.readTree(trimmed) }.getOrNull()
@@ -1469,7 +1475,7 @@ class NetworkParser {
         return ReferenceObject(ref = trimmed)
     }
 
-    private fun parseHeadersJson(json: String): Map<String, Header> {
+    private /** Auto generated docs */ fun parseHeadersJson(json: String): Map<String, Header> {
         val node = runCatching { jsonMapper.readTree(json) }.getOrNull() ?: return emptyMap()
         if (!node.isObject) return emptyMap()
         return node.fields().asSequence().associate { (name, raw) ->
@@ -1477,7 +1483,7 @@ class NetworkParser {
         }
     }
 
-    private fun parseLinksJson(json: String): Map<String, Link> {
+    private /** Auto generated docs */ fun parseLinksJson(json: String): Map<String, Link> {
         val node = runCatching { jsonMapper.readTree(json) }.getOrNull() ?: return emptyMap()
         if (!node.isObject) return emptyMap()
         return node.fields().asSequence().associate { (name, raw) ->
@@ -1485,17 +1491,17 @@ class NetworkParser {
         }
     }
 
-    private fun parseContentJson(json: String): Map<String, MediaTypeObject> {
+    private /** Auto generated docs */ fun parseContentJson(json: String): Map<String, MediaTypeObject> {
         val node = runCatching { jsonMapper.readTree(json) }.getOrNull() ?: return emptyMap()
         return parseContentNode(node)
     }
 
-    private fun parseRequestBodyJson(json: String): RequestBodyParseResult? {
+    private /** Auto generated docs */ fun parseRequestBodyJson(json: String): RequestBodyParseResult? {
         val node = runCatching { jsonMapper.readTree(json) }.getOrNull() ?: return null
         return parseRequestBodyNode(node)
     }
 
-    private fun parseRequestBodyNode(node: JsonNode): RequestBodyParseResult {
+    private /** Auto generated docs */ fun parseRequestBodyNode(node: JsonNode): RequestBodyParseResult {
         val obj = node.asObject() ?: return RequestBodyParseResult(RequestBody(), false)
         val ref = obj.text("\$ref")
         if (ref != null) {
@@ -1521,12 +1527,12 @@ class NetworkParser {
         )
     }
 
-    private fun resolveTypeFromContent(content: Map<String, MediaTypeObject>): String? {
+    private /** Auto generated docs */ fun resolveTypeFromContent(content: Map<String, MediaTypeObject>): String? {
         val schema = selectSchema(content) ?: return null
         return TypeMappers.mapType(schema)
     }
 
-    private fun selectSchema(content: Map<String, MediaTypeObject>): SchemaProperty? {
+    private /** Auto generated docs */ fun selectSchema(content: Map<String, MediaTypeObject>): SchemaProperty? {
         if (content.isEmpty()) return null
         val preferred = selectPreferredMediaTypeEntry(content).value
         preferred.schema?.let { return it }
@@ -1535,7 +1541,7 @@ class NetworkParser {
             ?: preferred.ref?.let { SchemaProperty(ref = it) }
     }
 
-    private fun wrapItemSchemaAsArray(itemSchema: SchemaProperty): SchemaProperty {
+    private /** Auto generated docs */ fun wrapItemSchemaAsArray(itemSchema: SchemaProperty): SchemaProperty {
         return SchemaProperty(types = setOf("array"), items = itemSchema)
     }
 
@@ -1546,7 +1552,7 @@ class NetworkParser {
         val key: String
     )
 
-    private fun selectPreferredMediaTypeEntry(
+    private /** Auto generated docs */ fun selectPreferredMediaTypeEntry(
         content: Map<String, MediaTypeObject>
     ): Map.Entry<String, MediaTypeObject> {
         if (content.isEmpty()) {
@@ -1569,7 +1575,7 @@ class NetworkParser {
         return scored.maxWithOrNull(comparator)?.first ?: entries.first()
     }
 
-    private fun mediaTypeScore(raw: String): MediaTypeScore {
+    private /** Auto generated docs */ fun mediaTypeScore(raw: String): MediaTypeScore {
         val main = raw.trim().substringBefore(";").trim().lowercase()
         val parts = main.split("/")
         if (parts.size != 2) {
@@ -1593,7 +1599,7 @@ class NetworkParser {
         )
     }
 
-    private fun parseHeaderNode(node: JsonNode): Header {
+    private /** Auto generated docs */ fun parseHeaderNode(node: JsonNode): Header {
         val obj = node.asObject()
         val ref = obj?.text("\$ref")
         if (ref != null) {
@@ -1630,7 +1636,7 @@ class NetworkParser {
         )
     }
 
-    private fun parseLinkNode(node: JsonNode): Link {
+    private /** Auto generated docs */ fun parseLinkNode(node: JsonNode): Link {
         val obj = node.asObject() ?: return Link()
         val ref = obj.text("\$ref")
         if (ref != null) {
@@ -1658,14 +1664,14 @@ class NetworkParser {
         )
     }
 
-    private fun parseContentNode(node: JsonNode?): Map<String, MediaTypeObject> {
+    private /** Auto generated docs */ fun parseContentNode(node: JsonNode?): Map<String, MediaTypeObject> {
         val obj = node.asObject() ?: return emptyMap()
         return obj.fields().asSequence().associate { (name, raw) ->
             name to parseMediaTypeNode(raw)
         }
     }
 
-    private fun parseMediaTypeNode(node: JsonNode): MediaTypeObject {
+    private /** Auto generated docs */ fun parseMediaTypeNode(node: JsonNode): MediaTypeObject {
         val obj = node.asObject() ?: return MediaTypeObject()
         val ref = obj.text("\$ref")
         if (ref != null) {
@@ -1689,19 +1695,19 @@ class NetworkParser {
         )
     }
 
-    private fun parseEncodingMapNode(node: JsonNode?): Map<String, EncodingObject> {
+    private /** Auto generated docs */ fun parseEncodingMapNode(node: JsonNode?): Map<String, EncodingObject> {
         val obj = node.asObject() ?: return emptyMap()
         return obj.fields().asSequence().associate { (name, raw) ->
             name to parseEncodingNode(raw)
         }
     }
 
-    private fun parseEncodingArrayNode(node: JsonNode?): List<EncodingObject> {
+    private /** Auto generated docs */ fun parseEncodingArrayNode(node: JsonNode?): List<EncodingObject> {
         val array = node.asArray() ?: return emptyList()
         return array.map { parseEncodingNode(it) }
     }
 
-    private fun parseEncodingNode(node: JsonNode): EncodingObject {
+    private /** Auto generated docs */ fun parseEncodingNode(node: JsonNode): EncodingObject {
         val obj = node.asObject() ?: return EncodingObject()
         return EncodingObject(
             contentType = obj.text("contentType"),
@@ -1716,21 +1722,21 @@ class NetworkParser {
         )
     }
 
-    private fun parseHeadersNode(node: JsonNode?): Map<String, Header> {
+    private /** Auto generated docs */ fun parseHeadersNode(node: JsonNode?): Map<String, Header> {
         val obj = node.asObject() ?: return emptyMap()
         return obj.fields().asSequence().associate { (name, raw) ->
             name to parseHeaderNode(raw)
         }
     }
 
-    private fun parseExampleMapNode(node: JsonNode?): Map<String, ExampleObject> {
+    private /** Auto generated docs */ fun parseExampleMapNode(node: JsonNode?): Map<String, ExampleObject> {
         val obj = node.asObject() ?: return emptyMap()
         return obj.fields().asSequence().associate { (name, raw) ->
             name to parseExampleObjectNode(raw)
         }
     }
 
-    private fun parseExampleObjectNode(node: JsonNode): ExampleObject {
+    private /** Auto generated docs */ fun parseExampleObjectNode(node: JsonNode): ExampleObject {
         val obj = node.asObject() ?: return ExampleObject(value = nodeToValue(node))
         val ref = obj.text("\$ref")
         if (ref != null) {
@@ -1751,7 +1757,7 @@ class NetworkParser {
         )
     }
 
-    private fun parseSchemaPropertyNode(node: JsonNode): SchemaProperty {
+    private /** Auto generated docs */ fun parseSchemaPropertyNode(node: JsonNode): SchemaProperty {
         if (node.isBoolean) {
             return SchemaProperty(booleanSchema = node.booleanValue())
         }
@@ -1827,19 +1833,19 @@ class NetworkParser {
         )
     }
 
-    private fun parseSchemaProperties(node: JsonNode?): Map<String, SchemaProperty> {
+    private /** Auto generated docs */ fun parseSchemaProperties(node: JsonNode?): Map<String, SchemaProperty> {
         val obj = node.asObject() ?: return emptyMap()
         return obj.fields().asSequence().associate { (name, raw) ->
             name to parseSchemaPropertyNode(raw)
         }
     }
 
-    private fun parseSchemaPropertyList(node: JsonNode?): List<SchemaProperty> {
+    private /** Auto generated docs */ fun parseSchemaPropertyList(node: JsonNode?): List<SchemaProperty> {
         val array = node.asArray() ?: return emptyList()
         return array.map { parseSchemaPropertyNode(it) }
     }
 
-    private fun parseAdditionalProperties(node: JsonNode?): SchemaProperty? {
+    private /** Auto generated docs */ fun parseAdditionalProperties(node: JsonNode?): SchemaProperty? {
         return when {
             node == null -> null
             node.isBoolean -> SchemaProperty(booleanSchema = node.booleanValue())
@@ -1848,7 +1854,7 @@ class NetworkParser {
         }
     }
 
-    private fun parseDependentRequired(node: JsonNode?): Map<String, List<String>> {
+    private /** Auto generated docs */ fun parseDependentRequired(node: JsonNode?): Map<String, List<String>> {
         val obj = node.asObject() ?: return emptyMap()
         return obj.fields().asSequence().associate { (key, raw) ->
             val list = raw.asArray()?.mapNotNull { it.textValue() } ?: emptyList()
@@ -1856,17 +1862,17 @@ class NetworkParser {
         }
     }
 
-    private fun parseEnumValues(node: JsonNode?): List<Any?>? {
+    private /** Auto generated docs */ fun parseEnumValues(node: JsonNode?): List<Any?>? {
         val array = node.asArray() ?: return null
         return array.map { nodeToValue(it) }
     }
 
-    private fun parseSchemaExamplesList(node: JsonNode?): List<Any?>? {
+    private /** Auto generated docs */ fun parseSchemaExamplesList(node: JsonNode?): List<Any?>? {
         if (node == null || !node.isArray) return null
         return node.map { nodeToValue(it) }
     }
 
-    private fun parseDiscriminatorNode(node: JsonNode?): Discriminator? {
+    private /** Auto generated docs */ fun parseDiscriminatorNode(node: JsonNode?): Discriminator? {
         val obj = node.asObject() ?: return null
         return Discriminator(
             propertyName = obj.text("propertyName") ?: "type",
@@ -1878,7 +1884,7 @@ class NetworkParser {
         )
     }
 
-    private fun parseInfoNode(node: JsonNode?): Info? {
+    private /** Auto generated docs */ fun parseInfoNode(node: JsonNode?): Info? {
         val obj = node.asObject() ?: return null
         val title = obj.text("title") ?: return null
         val version = obj.text("version") ?: return null
@@ -1894,7 +1900,7 @@ class NetworkParser {
         )
     }
 
-    private fun parseContactNode(node: JsonNode?): Contact? {
+    private /** Auto generated docs */ fun parseContactNode(node: JsonNode?): Contact? {
         val obj = node.asObject() ?: return null
         return Contact(
             name = obj.text("name"),
@@ -1904,7 +1910,7 @@ class NetworkParser {
         )
     }
 
-    private fun parseLicenseNode(node: JsonNode?): License? {
+    private /** Auto generated docs */ fun parseLicenseNode(node: JsonNode?): License? {
         val obj = node.asObject() ?: return null
         val name = obj.text("name") ?: return null
         return License(
@@ -1915,7 +1921,7 @@ class NetworkParser {
         )
     }
 
-    private fun parseTagNode(node: JsonNode?): Tag? {
+    private /** Auto generated docs */ fun parseTagNode(node: JsonNode?): Tag? {
         val obj = node.asObject() ?: return null
         val name = obj.text("name") ?: return null
         return Tag(
@@ -1929,7 +1935,7 @@ class NetworkParser {
         )
     }
 
-    private fun parseExternalDocsNode(node: JsonNode?): ExternalDocumentation? {
+    private /** Auto generated docs */ fun parseExternalDocsNode(node: JsonNode?): ExternalDocumentation? {
         val obj = node.asObject() ?: return null
         val url = obj.text("url") ?: return null
         return ExternalDocumentation(
@@ -1939,7 +1945,7 @@ class NetworkParser {
         )
     }
 
-    private fun parseXmlNode(node: JsonNode?): Xml? {
+    private /** Auto generated docs */ fun parseXmlNode(node: JsonNode?): Xml? {
         val obj = node.asObject() ?: return null
         return Xml(
             name = obj.text("name"),
@@ -1952,7 +1958,7 @@ class NetworkParser {
         )
     }
 
-    private fun parseServerNode(node: JsonNode): Server? {
+    private /** Auto generated docs */ fun parseServerNode(node: JsonNode): Server? {
         val obj = node.asObject() ?: return null
         return Server(
             url = obj.text("url") ?: "/",
@@ -1963,7 +1969,7 @@ class NetworkParser {
         )
     }
 
-    private fun parseServerVariables(node: JsonNode?): Map<String, ServerVariable> {
+    private /** Auto generated docs */ fun parseServerVariables(node: JsonNode?): Map<String, ServerVariable> {
         val obj = node.asObject() ?: return emptyMap()
         return obj.fields().asSequence().associate { (name, raw) ->
             val value = raw.asObject()
@@ -1977,7 +1983,7 @@ class NetworkParser {
         }
     }
 
-    private fun parseTypes(obj: JsonNode?): Set<String> {
+    private /** Auto generated docs */ fun parseTypes(obj: JsonNode?): Set<String> {
         val node = obj?.get("type") ?: return emptySet()
         return when {
             node.isTextual -> setOf(node.asText())
@@ -1986,21 +1992,21 @@ class NetworkParser {
         }
     }
 
-    private fun parseCustomSchemaKeywords(node: JsonNode?): Map<String, Any?> {
+    private /** Auto generated docs */ fun parseCustomSchemaKeywords(node: JsonNode?): Map<String, Any?> {
         val obj = node.asObject() ?: return emptyMap()
         return obj.fields().asSequence()
             .filterNot { (key, _) -> key.startsWith("x-") || schemaKnownKeys.contains(key) }
             .associate { (key, value) -> key to nodeToValue(value) }
     }
 
-    private fun parseExtensions(node: JsonNode?): Map<String, Any?> {
+    private /** Auto generated docs */ fun parseExtensions(node: JsonNode?): Map<String, Any?> {
         val obj = node.asObject() ?: return emptyMap()
         return obj.fields().asSequence()
             .filter { (key, _) -> key.startsWith("x-") }
             .associate { (key, value) -> key to nodeToValue(value) }
     }
 
-    private fun nodeToValue(node: JsonNode): Any? {
+    private /** Auto generated docs */ fun nodeToValue(node: JsonNode): Any? {
         return when {
             node.isNull -> null
             node.isTextual -> node.asText()
@@ -2012,7 +2018,7 @@ class NetworkParser {
         }
     }
 
-    private fun extractDescription(element: org.jetbrains.kotlin.psi.KtDeclaration): String? {
+    private /** Auto generated docs */ fun extractDescription(element: org.jetbrains.kotlin.psi.KtDeclaration): String? {
         val docComment = element.docComment ?: return null
         val descLine = docComment.text
             .split("\n")
@@ -2022,7 +2028,7 @@ class NetworkParser {
         return descLine.removePrefix("@description").trim().ifEmpty { null }
     }
 
-    private fun extractOperationIdOmitted(element: org.jetbrains.kotlin.psi.KtDeclaration): Boolean {
+    private /** Auto generated docs */ fun extractOperationIdOmitted(element: org.jetbrains.kotlin.psi.KtDeclaration): Boolean {
         val docComment = element.docComment ?: return false
         return docComment.text
             .split("\n")
@@ -2030,7 +2036,7 @@ class NetworkParser {
             .any { it == "@operationIdOmitted" || it.startsWith("@operationIdOmitted ") }
     }
 
-    private fun extractDeprecated(element: org.jetbrains.kotlin.psi.KtDeclaration): Boolean {
+    private /** Auto generated docs */ fun extractDeprecated(element: org.jetbrains.kotlin.psi.KtDeclaration): Boolean {
         val docComment = element.docComment
         val hasDocTag = docComment?.text
             ?.split("\n")
@@ -2044,7 +2050,7 @@ class NetworkParser {
         return hasDocTag || hasAnnotation
     }
 
-    private fun parseParameterStyle(value: String): domain.ParameterStyle? {
+    private /** Auto generated docs */ fun parseParameterStyle(value: String): domain.ParameterStyle? {
         return when (value.lowercase()) {
             "matrix" -> domain.ParameterStyle.MATRIX
             "label" -> domain.ParameterStyle.LABEL
@@ -2058,11 +2064,11 @@ class NetworkParser {
         }
     }
 
-    private fun parseParamStyle(value: String?): domain.ParameterStyle? {
+    private /** Auto generated docs */ fun parseParamStyle(value: String?): domain.ParameterStyle? {
         return value?.let { parseParameterStyle(it) }
     }
 
-    private fun parseBooleanTagValue(value: String?): Boolean? {
+    private /** Auto generated docs */ fun parseBooleanTagValue(value: String?): Boolean? {
         return when (value?.lowercase()) {
             null -> true
             "true" -> true
@@ -2071,13 +2077,13 @@ class NetworkParser {
         }
     }
 
-    private fun contentForType(type: String?): Map<String, MediaTypeObject> {
+    private /** Auto generated docs */ fun contentForType(type: String?): Map<String, MediaTypeObject> {
         if (type.isNullOrBlank() || type == "Unit") return emptyMap()
         val schema = TypeMappers.kotlinToSchemaProperty(type)
         return mapOf("application/json" to MediaTypeObject(schema = schema))
     }
 
-    private fun cleanKDocLine(line: String): String {
+    private /** Auto generated docs */ fun cleanKDocLine(line: String): String {
         return line.trim()
             .replace("/**", "")
             .replace("*/", "")
