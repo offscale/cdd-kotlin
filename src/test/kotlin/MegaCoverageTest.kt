@@ -8,7 +8,7 @@ class MegaCoverageTest {
     fun `mega coverage via petstore`() {
         val outDir = File("build/tmp/mega-out")
         outDir.mkdirs()
-        val spec = File("petstore.yaml")
+        val spec = File("petstore.json")
         if (spec.exists()) {
             ApiGenerator.generate(spec.absolutePath, outDir, "com.mega")
         }
