@@ -9,13 +9,14 @@ class CliTest {
     @Test
     fun `test from_openapi generates scaffold`(@TempDir tempDir: Path) {
         val outDir = File(tempDir.toFile(), "out")
-        val input = File(tempDir.toFile(), "spec.json")
-        input.writeText("{}") // dummy
+        val input = File("petstore.yaml")
         val outArg = outDir.absolutePath
         val inArg = input.absolutePath
-        try {
-            CddKotlin().subcommands(FromOpenApi(), ToOpenApi()).main(arrayOf("from_openapi", "-i", inArg, "-o", outArg, "--clientName", "TestClient", "--dateType", "string", "--enumStyle", "sealed"))
-        } catch (e: Exception) {}
+        CddKotlin().subcommands(FromOpenApi(), ToOpenApi()).main(arrayOf("from_openapi", "-i", inArg, "-o", outArg, "--clientName", "TestClient", "--dateType", "string", "--enumStyle", "sealed"))
+        
+        // Also run to_openapi on the generated output to get 100% round-trip CLI coverage!
+        val generatedSrc = File(outDir, "composeApp/src/commonMain/kotlin")
+        CddKotlin().subcommands(FromOpenApi(), ToOpenApi()).main(arrayOf("to_openapi", "-f", generatedSrc.absolutePath, "--format", "json"))
     }
 
     @Test
