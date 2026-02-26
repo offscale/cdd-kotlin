@@ -130,9 +130,113 @@ class ToOpenApi : CliktCommand(name = "to_openapi", help = "Generate an OpenAPI 
 }
 
 /**
+ * Subcommand to merge an OpenAPI spec into an existing Kotlin codebase.
+ */
+class MergeOpenApi : CliktCommand(name = "merge_openapi", help = "Merge an OpenAPI specification into an existing Kotlin codebase") {
+    /** Input OpenAPI specification file. */
+    val spec by option("-s", "--spec", help = "Path to the new OpenAPI specification file").required()
+    /** Directory containing the existing Kotlin codebase. */
+    val dir by option("-d", "--dir", help = "Directory containing the existing Kotlin codebase").required()
+
+    /** Executes the merge_openapi logic. */
+    override fun run() {
+        val specFile = File(spec)
+        val srcDir = File(dir)
+        
+        if (!specFile.exists()) {
+            println("Spec file not found: ${specFile.absolutePath}")
+            return
+        }
+        if (!srcDir.exists() || !srcDir.isDirectory) {
+            println("Source directory not found or is not a directory: ${srcDir.absolutePath}")
+            return
+        }
+
+        org.jetbrains.kotlin.cli.common.environment.setIdeaIoUseFallback()
+        val disposable = org.jetbrains.kotlin.com.intellij.openapi.util.Disposer.newDisposable()
+
+        try {
+            psi.PsiInfrastructure.project // initialize
+            val parser = openapi.OpenApiParser()
+            val document = parser.parseFile(specFile)
+            
+            val dtoMerger = psi.DtoMerger()
+            val networkMerger = psi.NetworkMerger()
+            val networkGenerator = psi.NetworkGenerator()
+            val networkParser = psi.NetworkParser()
+
+            // 1. Merge DTOs
+            println("Merging Models...")
+            val dtoFiles = srcDir.walk().filter { it.isFile && it.extension == "kt" }.toList()
+            document.components?.schemas?.forEach { (schemaName, schema) ->
+                val enrichedSchema = schema.copy(name = schemaName)
+                val targetFile = dtoFiles.find { it.name == "$schemaName.kt" }
+                if (targetFile != null) {
+                    val existingCode = targetFile.readText()
+                    try {
+                        val mergedCode = dtoMerger.mergeDto(existingCode, enrichedSchema)
+                        if (mergedCode != existingCode) {
+                            targetFile.writeText(mergedCode)
+                            println("  Updated $schemaName in ${targetFile.name}")
+                        }
+                    } catch (e: Exception) {
+                        println("  Failed to merge $schemaName: ${e.message}\nCODE WAS:\n$existingCode")
+                    }
+                }
+            }
+
+            // 2. Merge Network Clients
+            println("Merging Network Clients...")
+            val endpointsByTag = document.paths.flatMap { (path, item) ->
+                val list = mutableListOf<domain.EndpointDefinition>()
+                item.get?.let { list.add(it) }
+                item.post?.let { list.add(it) }
+                item.put?.let { list.add(it) }
+                item.delete?.let { list.add(it) }
+                item.options?.let { list.add(it) }
+                item.head?.let { list.add(it) }
+                item.patch?.let { list.add(it) }
+                item.trace?.let { list.add(it) }
+                list
+            }.groupBy { it.tags.firstOrNull() ?: "Default" }
+
+            val apiFiles = srcDir.walk().filter { it.isFile && it.extension == "kt" && it.name.endsWith("Api.kt") }.toList()
+            
+            endpointsByTag.forEach { (tag, specEndpoints) ->
+                val safeName = tag.replace(Regex("[^a-zA-Z0-9]"), "").replaceFirstChar { it.uppercase() } + "Api"
+                val targetFile = apiFiles.find { it.name == "${safeName}.kt" }
+                
+                if (targetFile != null) {
+                    val existingCode = targetFile.readText()
+                    try {
+                        val existingEndpoints = networkParser.parse(existingCode)
+                        val mergedEndpoints = networkMerger.mergeEndpoints(existingEndpoints, specEndpoints)
+                        
+                        val packageName = existingCode.lines().find { it.startsWith("package ") }?.removePrefix("package ")?.trim() ?: "api"
+                        
+                        val ktFile = networkGenerator.generateApi(packageName, safeName, mergedEndpoints, document.servers)
+                        targetFile.writeText(ktFile.text)
+                        println("  Updated ${safeName}.kt")
+                    } catch (e: Exception) {
+                        println("  Failed to merge $safeName: ${e.message}")
+                    }
+                }
+            }
+            
+            println("Merge complete.")
+        } catch (e: Exception) {
+            println("❌ merge_openapi failed: ${e.message}")
+            e.printStackTrace()
+        } finally {
+            org.jetbrains.kotlin.com.intellij.openapi.util.Disposer.dispose(disposable)
+        }
+    }
+}
+
+/**
  * Main entry point for the cdd-kotlin executable.
  * @param args The command line arguments
  */
 fun main(args: Array<String>) {
-    CddKotlin().subcommands(FromOpenApi(), ToOpenApi()).main(args)
+    CddKotlin().subcommands(FromOpenApi(), ToOpenApi(), MergeOpenApi()).main(args)
 }
