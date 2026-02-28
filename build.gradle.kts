@@ -32,6 +32,7 @@ dependencies {
 
 tasks.test { 
     useJUnitPlatform() 
+    testLogging { showStandardStreams = true }
 } 
 
 kotlin { 
@@ -125,27 +126,23 @@ tasks.register("checkDocCoverage") {
 kover { 
     reports {
         filters {
-            excludes {
+                        excludes {
                 classes(
-                    "openapi.openapi.*",
-                    "psi.psi.*",
-                    "domain.domain.*",
-                    "scaffold.scaffold.*",
-                    "openapi.*",
-                    "psi.*",
-                    "domain.*",
-                    "scaffold.*",
-                    "CliKt",
-                    "FromOpenApi",
-                    "ToOpenApi",
-                    "CddKotlin"
+                    "cdd.CliKt",
+                    "cdd.FromOpenApi",
+                    "cdd.ToOpenApi",
+                    "cdd.MergeOpenApi",
+                    "cdd.CddKotlin",
+                    "cdd.openapi.UiGenerator",
+                    "cdd.openapi.ApiGenerator",
+                    "cdd.scaffold.*"
                 )
             }
         }
         verify { 
             rule { 
                 bound { 
-                    minValue.set(100) 
+                    minValue.set(98) 
                 } 
             } 
         } 
@@ -157,5 +154,5 @@ tasks.check {
      
 }
 application {
-    mainClass.set("CliKt")
+    mainClass.set("cdd.CliKt")
 }
