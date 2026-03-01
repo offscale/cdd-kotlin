@@ -26,4 +26,7 @@ jobs:
           gradle-version: '8.7'
 
       - name: Run Tests and Checks
-        run: gradle test --stacktrace
+        run: gradle test checkDocCoverage koverVerify --stacktrace
+
+      - name: Try Build WASM
+        run: make build_wasm || true

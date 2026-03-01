@@ -167,7 +167,7 @@ class CliTest {
     fun `test to_docs_json generates expected json`(@TempDir tempDir: Path) {
         val input = File(tempDir.toFile(), "spec.json")
         input.writeText("{}")
-        CddKotlin().subcommands(FromOpenApi(), ToOpenApi(), MergeOpenApi(), ToDocsJson()).main(arrayOf("to_docs_json", "-i", input.absolutePath))
+        CddKotlin().subcommands(FromOpenApi(), ToOpenApi(), MergeOpenApi(), ToDocsJson()).main(arrayOf("to_docs_json", "--no-imports", "--no-wrapping", "-i", input.absolutePath))
     }
 
 }

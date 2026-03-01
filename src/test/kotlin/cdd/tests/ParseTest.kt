@@ -9,7 +9,8 @@ class TestsParseTest {
     /** Auto generated docs */
     fun `test parse`() {
         val instance = TestsParse()
-        instance.parse()
-        assertTrue(true)
+        val testCode = "fun `test getUsers`() {"
+        val res = instance.parse(testCode)
+        assertTrue(res.isNotEmpty())
     }
 }

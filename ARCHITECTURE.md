@@ -4,9 +4,10 @@
 <!-- Replace these placeholders with your repository-specific badges -->
 [![License](https://img.shields.io/badge/license-Apache--2.0%20OR%20MIT-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![CI/CD](https://github.com/offscale/cdd-kotlin/workflows/CI/badge.svg)](https://github.com/offscale/cdd-kotlin/actions)
+[![Coverage](https://codecov.io/gh/offscale/cdd-kotlin/branch/master/graph/badge.svg)](https://codecov.io/gh/offscale/cdd-kotlin)
 <!-- BADGES_END -->
 
-The project is built around the `kotlin-compiler-embeddable` artifact to manipulate source code programmatically. It acts as a dedicated compiler and transpiler. Its fundamental architecture follows standard compiler design principles, divided into three distinct phases: **Frontend (Parsing)**, **Intermediate Representation (IR)**, and **Backend (Emitting)**.
+The **cdd-kotlin** tool acts as a dedicated compiler and transpiler. Its fundamental architecture follows standard compiler design principles, divided into three distinct phases: **Frontend (Parsing)**, **Intermediate Representation (IR)**, and **Backend (Emitting)**.
 
 This decoupled design ensures that any format capable of being parsed into the IR can subsequently be emitted into any supported output format, whether that is a server-side route, a client-side SDK, a database ORM, or an OpenAPI specification.
 
@@ -14,74 +15,41 @@ This decoupled design ensures that any format capable of being parsed into the I
 
 ```mermaid
 graph TD
-%% ==========================================
-%% 1. STYLE DEFINITIONS
-%% ==========================================
-%% Define specific classes for consistency
-    classDef nodeSpec fill:#ea4335,stroke:#20344b,stroke-width:2px,color:#fff
-    classDef nodeLogic fill:#57caff,stroke:#20344b,stroke-width:1px,color:#20344b
-    classDef nodeIR fill:#ffffff,stroke:#34a853,stroke-width:3px,color:#20344b
-    classDef nodeGen fill:#ffd427,stroke:#20344b,stroke-width:1px,color:#20344b
-    classDef nodeRev fill:#5cdb6d,stroke:#20344b,stroke-width:1px,color:#20344b
-    classDef nodeKt fill:#20344b,stroke:#20344b,stroke-width:1px,color:#fff
+    %% Styling Definitions
+    classDef frontend fill:#57caff,stroke:#4285f4,stroke-width:2px,color:#20344b,font-family:Roboto Mono
+    classDef core fill:#ffd427,stroke:#f9ab00,stroke-width:3px,color:#20344b,font-family:Google Sans,font-weight:bold
+    classDef backend fill:#5cdb6d,stroke:#34a853,stroke-width:2px,color:#20344b,font-family:Roboto Mono
+    classDef endpoint fill:#ffffff,stroke:#20344b,stroke-width:1px,color:#20344b,font-family:Google Sans
 
-%% ==========================================
-%% 2. NODE DEFINITIONS
-%% ==========================================
-
-%% TOP: OpenAPI
-    OpenAPI(["<div style='line-height:1.2; padding:5px'><b>OpenAPI Spec</b><br/><span style='font-size:10px; font-family:monospace'>/users/#123;id#125;</span></div>"]):::nodeSpec
-
-%% MIDDLE: IR (The Hub)
-    IR{{"<div style='line-height:1.2; padding:5px'><b>Domain Models (IR)</b><br/><span style='font-size:10px; font-family:monospace'>EndpointDefinition</span></div>"}}:::nodeIR
-
-%% LOGIC NODES (Left = Forward, Right = Reverse)
-    Parser["<b>Spec Parser</b>"]:::nodeLogic
-    Spec_Gen["<b>Spec Generator</b>"]:::nodeRev
-
-    Generator["<b>PSI Generators</b>"]:::nodeGen
-    Rev_Parser["<b>PSI Parsers</b>"]:::nodeRev
-
-%% BOTTOM: KOTLIN SUBGRAPH
-    subgraph KMP [<b>KOTLIN MULTIPLATFORM</b>]
-    %% Keep these horizontal to create a 'footer' foundation
-        direction LR
-
-        Note_Net["<b>Network</b><br/><span style='font-size:9px'>Ktor Client</span>"]:::nodeKt
-        Note_Data["<b>Data</b><br/><span style='font-size:9px'>Serializable</span>"]:::nodeKt
-        Note_UI["<b>Compose</b><br/><span style='font-size:9px'>UI Screen</span>"]:::nodeKt
+    subgraph Frontend [Parsers]
+        A[OpenAPI .yaml/.json]:::endpoint --> P1(OpenAPI Parser):::frontend
+        B[Kotlin Models / Source]:::endpoint --> P2(Kotlin Parser):::frontend
+        C[Server Routes / Frameworks]:::endpoint --> P3(Framework Parser):::frontend
+        D[Client SDKs / ORMs]:::endpoint --> P4(Ext Parser):::frontend
     end
 
-%% ==========================================
-%% 3. THE MAIN SPINE (High Weight Links)
-%% ==========================================
-%% Using thick visible links for the main flow
+    subgraph Core [Intermediate Representation]
+        IR((CDD IR)):::core
+    end
 
-    OpenAPI ==> Parser
-    Parser  ==> IR
-    IR      ==> Generator
+    subgraph Backend [Emitters]
+        E1(OpenAPI Emitter):::backend --> X[OpenAPI .yaml/.json]:::endpoint
+        E2(Kotlin Emitter):::backend --> Y[Kotlin Models / Structs]:::endpoint
+        E3(Server Emitter):::backend --> Z[Server Routes / Controllers]:::endpoint
+        E4(Client Emitter):::backend --> W[Client SDKs / API Calls]:::endpoint
+        E5(Data Emitter):::backend --> V[ORM Models / CLI Parsers]:::endpoint
+    end
 
-%% Generator feeds into the 3 Kotlin nodes
-    Generator --> Note_Net
-    Generator --> Note_Data
-    Generator --> Note_UI
+    P1 --> IR
+    P2 --> IR
+    P3 --> IR
+    P4 --> IR
 
-%% ==========================================
-%% 4. THE REVERSE LOOP (Low Weight Links)
-%% ==========================================
-%% Dotted lines for feedback loop
-
-%% Kotlin -> Reverse Parser
-    Note_Data -.-> Rev_Parser
-    Note_Net  -.-> Rev_Parser
-    Note_UI   -.-> Rev_Parser
-
-%% Reverse Parser -> IR
-    Rev_Parser -.-> IR
-
-%% IR -> Spec Generator -> OpenAPI
-    IR -.-> Spec_Gen
-    Spec_Gen -.-> OpenAPI
+    IR --> E1
+    IR --> E2
+    IR --> E3
+    IR --> E4
+    IR --> E5
 ```
 
 ## 🧩 Core Components
@@ -117,25 +85,6 @@ The Backend's responsibility is to take the universal IR and generate valid targ
 Because of the IR-centric design, adding support for a new `Kotlin` framework (e.g., a new Client library, Web framework, or ORM) requires minimal effort:
 1. **To support parsing a new framework**: Write a parser that converts the framework's AST/DSL into the CDD IR. Once written, the framework can automatically be exported to OpenAPI, Client SDKs, CLI parsers, or any other existing output target.
 2. **To support emitting a new framework**: Write an emitter that converts the CDD IR into the framework's DSL/AST. Once written, the framework can automatically be generated from OpenAPI or any other supported input.
-
-## Supported Mappings
-
-### Types
-
-The `TypeMappers` ensure correct conversion between abstract types and Kotlin specific implementations.
-
-| Abstract  | Format  | Kotlin type              |
-|-----------|---------|--------------------------|
-| `string`  | -       | `String`                 |
-| `integer` | `int32` | `Int`                    |
-| `integer` | `int64` | `Long`                   |
-| `number`  | -       | `Double`                 |
-| `boolean` | -       | `Boolean`                |
-| `array`   | -       | `List<T>`                |
-| `object`  | -       | `Data Class` (Reference) |
-| `object`  | `additionalProperties` | `Map<String, T>` |
-
-Top-level primitive and array schemas are generated as Kotlin `typealias` declarations (and parsed back), preserving formats such as `date-time` and array item types. `$ref` and `$dynamicRef` in Schema Objects resolve to Kotlin type names during code generation. When a Schema Object omits `type`, the generator infers a Kotlin type from JSON Schema keywords (e.g., `properties` -> object, `items` -> array, numeric/string constraints -> number/string) to preserve strong typing.
 
 ## 🛡 Design Principles
 

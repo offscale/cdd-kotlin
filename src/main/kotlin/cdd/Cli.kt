@@ -21,7 +21,7 @@ import java.io.File
 /**
  * Root command for the cdd-kotlin CLI.
  */
-class CddKotlin : CliktCommand(name = "cdd_kotlin", help = "OpenAPI ↔ Kotlin") {
+class CddKotlin : CliktCommand(name = "cdd-kotlin", help = "OpenAPI ↔ Kotlin") {
     init {
         versionOption("1.0.0")
     }
@@ -177,9 +177,9 @@ class MergeOpenApi : CliktCommand(name = "merge_openapi", help = "Merge an OpenA
             val funcsEmit = cdd.functions.FunctionsEmit()
             val funcsParse = cdd.functions.FunctionsParse()
 
-            mocksParse.parse()
-            testsParse.parse()
-            funcsParse.parse()
+            mocksParse.parse("")
+            testsParse.parse("")
+            funcsParse.parse("")
 
             // 1. Merge DTOs
             println("Merging Models...")
@@ -343,6 +343,9 @@ import com.example.auto.api.$apiClassName"""
     }
 }
 
+/**
+ * Main entry point.
+ */
 
 fun main(args: Array<String>) {
     CddKotlin().subcommands(FromOpenApi(), ToOpenApi(), MergeOpenApi(), ToDocsJson()).main(args)
