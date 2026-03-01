@@ -9,7 +9,10 @@ class FunctionsParseTest {
     /** Auto generated docs */
     fun `test parse`() {
         val instance = FunctionsParse()
-        instance.parse()
-        assertTrue(true)
+        val funcCode = """
+            suspend fun handleGetUsers() {
+        """.trimIndent()
+        val res = instance.parse(funcCode)
+        assertTrue(res.isNotEmpty())
     }
 }

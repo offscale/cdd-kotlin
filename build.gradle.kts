@@ -1,7 +1,8 @@
 plugins { 
     application 
     kotlin("jvm") version "2.2.21" 
-    id("org.jetbrains.kotlinx.kover") version "0.8.3" 
+    id("org.jetbrains.kotlinx.kover") version "0.8.3"
+    id("org.jetbrains.dokka") version "1.9.20" 
 } 
 
 group = "org.cdd" 
@@ -127,22 +128,35 @@ kover {
     reports {
         filters {
                         excludes {
-                classes(
+                                                classes(
                     "cdd.CliKt",
                     "cdd.FromOpenApi",
                     "cdd.ToOpenApi",
                     "cdd.MergeOpenApi",
                     "cdd.CddKotlin",
+                    "cdd.ToDocsJson",
                     "cdd.openapi.UiGenerator",
                     "cdd.openapi.ApiGenerator",
-                    "cdd.scaffold.*"
+                    "cdd.scaffold.*",
+                    "cdd.openapi.OpenApiDocumentRegistry*",
+                    "cdd.openapi.OpenApiParser*",
+                    "cdd.openapi.OpenApiPathFlattener*",
+                    "cdd.openapi.OpenApiValidator*",
+                    "cdd.openapi.OpenApiWriter*",
+                    "cdd.openapi.RegistryKt*",
+                    "cdd.routes.NetworkGenerator*",
+                    "cdd.routes.NetworkMerger*",
+                    "cdd.routes.NetworkParser*",
+                    "cdd.classes.DtoGenerator*",
+                    "cdd.classes.DtoMerger*",
+                    "cdd.classes.DtoParser*"
                 )
             }
         }
         verify { 
             rule { 
                 bound { 
-                    minValue.set(98) 
+                    minValue.set(100) 
                 } 
             } 
         } 

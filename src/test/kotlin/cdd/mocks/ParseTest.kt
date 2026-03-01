@@ -9,7 +9,10 @@ class MocksParseTest {
     /** Auto generated docs */
     fun `test parse`() {
         val instance = MocksParse()
-        instance.parse()
-        assertTrue(true)
+        val mockCode = """
+            path.matches(Regex("^/users/(.+)$")) && method == HttpMethod.GET
+        """.trimIndent()
+        val res = instance.parse(mockCode)
+        assertTrue(res.isNotEmpty())
     }
 }
