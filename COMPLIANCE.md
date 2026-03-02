@@ -1,12 +1,4 @@
-# COMPLIANCE
+# OpenAPI 3.2.0 Compliance
 
-This repository complies with the OpenAPI 3.2.0 Specification.
-Efforts are continuously made to achieve full compliance across parsing and emitting for JSON/YAML.
-
-Features tracked for compliance:
-- Data Types mapping
-- Operation definitions
-- Security schemas
-- Components reuse
-
-Currently we aim for 100% compliance across supported generation targets.
+- OpenAPI version is 3.2.0: ✅
+- Rest: In Progress

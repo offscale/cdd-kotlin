@@ -11,7 +11,7 @@ class Oas32ComplianceCoverage39Test {
         m.isAccessible = true
         
         val StateClass = Class.forName("cdd.openapi.OpenApiValidator\$SchemaValidationState")
-        val stateConstructor = StateClass.constructors.first()
+        val stateConstructor = StateClass.constructors.first { it.parameterCount == 4 }
         stateConstructor.isAccessible = true
         val state = stateConstructor.newInstance(java.util.Collections.newSetFromMap(java.util.IdentityHashMap<SchemaDefinition, Boolean>()), java.util.Collections.newSetFromMap(java.util.IdentityHashMap<SchemaProperty, Boolean>()), "http://d", emptySet<String>())
         

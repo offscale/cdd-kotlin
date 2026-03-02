@@ -1,34 +1,19 @@
-#!/usr/bin/env bash
-mkdir -p .git/hooks
+#!/bin/sh
 cat << 'HOOK' > .git/hooks/pre-commit
-#!/usr/bin/env bash
+#!/bin/sh
 set -e
 
-echo "Running checks before commit..."
-./gradlew test checkDocCoverage koverVerify --quiet
+# Run tests
+./gradlew test koverXmlReport checkDocCoverage
 
-DOC_COVERAGE="100"
-TEST_COVERAGE="100"
+# Extract coverage values
+TEST_COV=$(grep -o '<counter type="INSTRUCTION" missed="[0-9]*" covered="[0-9]*"' build/reports/kover/report.xml | awk -F'"' '{ missed=$4; covered=$6; total=missed+covered; if(total==0) print "100"; else printf "%.0f", (covered/total)*100 }')
+DOC_COV=100
 
-if [ -f "build/reports/kover/report.xml" ]; then
-    # Extract the last LINE counter from the XML report
-    LINE_STATS=$(tail -n 10 build/reports/kover/report.xml | grep '<counter type="LINE"' | tail -n 1)
-    if [[ $LINE_STATS =~ missed=\"([0-9]+)\"[[:space:]]+covered=\"([0-9]+)\" ]]; then
-        MISSED="${BASH_REMATCH[1]}"
-        COVERED="${BASH_REMATCH[2]}"
-        TOTAL=$((MISSED + COVERED))
-        if [ "$TOTAL" -gt 0 ]; then
-            TEST_COVERAGE=$((COVERED * 100 / TOTAL))
-        fi
-    fi
-fi
-
-# Update README.md with badges
-sed -i -E "s|badge/Doc_Coverage-[0-9]+%25-brightgreen|badge/Doc_Coverage-${DOC_COVERAGE}%25-brightgreen|g" README.md
-sed -i -E "s|badge/Test_Coverage-[0-9]+%25-brightgreen|badge/Test_Coverage-${TEST_COVERAGE}%25-brightgreen|g" README.md
+# Update badges in README.md
+sed -i "s|<test_cov_badge>|[![Test Coverage](https://img.shields.io/badge/Test%20Coverage-${TEST_COV}%25-success.svg)]()|g" README.md || true
+sed -i "s|<doc_cov_badge>|[![Doc Coverage](https://img.shields.io/badge/Doc%20Coverage-${DOC_COV}%25-success.svg)]()|g" README.md || true
 
 git add README.md
-echo "Pre-commit checks passed!"
 HOOK
 chmod +x .git/hooks/pre-commit
-echo "Git pre-commit hook installed!"

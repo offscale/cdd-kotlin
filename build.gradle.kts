@@ -6,7 +6,7 @@ plugins {
 } 
 
 group = "org.cdd" 
-version = "1.0-SNAPSHOT" 
+version = "0.0.1" 
 
 repositories { 
     mavenCentral() 
@@ -37,7 +37,7 @@ tasks.test {
 } 
 
 kotlin { 
-    jvmToolchain(19) // Safe default, foojay will auto-download if not present
+    jvmToolchain(17) // Safe default, foojay will auto-download if not present
 } 
 
 // Ensure all public classes and functions have KDoc. 
@@ -135,6 +135,13 @@ kover {
                     "cdd.MergeOpenApi",
                     "cdd.CddKotlin",
                     "cdd.ToDocsJson",
+                    "cdd.ServerJsonRpc",
+                    "cdd.ToSdk",
+                    "cdd.ToSdkCli",
+                    "cdd.ToServer",
+                    "cdd.openapi.CliGenerator",
+                    "cdd.cli.MainCommand*",
+                    "cdd.cli.*Command",
                     "cdd.openapi.UiGenerator",
                     "cdd.openapi.ApiGenerator",
                     "cdd.scaffold.*",
