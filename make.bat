@@ -1,36 +1,34 @@
 @echo off
-setlocal
-
-set TARGET=%1
-if "%TARGET%"=="" set TARGET=help
-
-if "%TARGET%"=="help" goto help
-if "%TARGET%"=="all" goto help
-if "%TARGET%"=="install_base" goto install_base
-if "%TARGET%"=="install_deps" goto install_deps
-if "%TARGET%"=="build_docs" goto build_docs
-if "%TARGET%"=="build" goto build
-if "%TARGET%"=="build_wasm" goto build_wasm
-if "%TARGET%"=="test" goto test
-if "%TARGET%"=="run" goto run
-
-echo Unknown target: %TARGET%
+if "%1"=="" goto help
+if "%1"=="help" goto help
+if "%1"=="all" goto help
+if "%1"=="install_base" goto install_base
+if "%1"=="install_deps" goto install_deps
+if "%1"=="build_docs" goto build_docs
+if "%1"=="build" goto build
+if "%1"=="build_wasm" goto build_wasm
+if "%1"=="build_docker" goto build_docker
+if "%1"=="run_docker" goto run_docker
+if "%1"=="test" goto test
+if "%1"=="run" goto run
 goto help
 
 :help
-echo Available targets:
-echo   install_base   Install language runtime hints
-echo   install_deps   Fetch dependencies via Gradle
-echo   build_docs     Build the API docs (Dokka) to docs/ directory or DOCS_DIR
-echo   build          Build the CLI binary, optionally to BIN_DIR
-echo   build_wasm     Build a WASM binary (Currently unsupported in Kotlin CLI)
-echo   test           Run tests locally
-echo   run            Run the built CLI. Usage: make.bat run --help
-echo   all            Show help text
+echo Available tasks:
+echo   install_base   - Install language runtime (Java/Gradle)
+echo   install_deps   - Install local dependencies
+echo   build_docs     - Build API docs (optional: docs_dir=path)
+echo   build          - Build the CLI binary
+echo   build_wasm     - Build the WASM output
+echo   build_docker   - Build alpine and debian Docker images
+echo   run_docker     - Run the docker container
+echo   test           - Run tests locally
+echo   run            - Run the CLI (builds if necessary)
+echo   help / all     - Show this help text
 goto end
 
 :install_base
-echo Please ensure Java 19+ is installed.
+echo Please install Java (JDK 17+) to run Gradle.
 goto end
 
 :install_deps
@@ -38,24 +36,27 @@ call gradlew.bat dependencies
 goto end
 
 :build_docs
-call gradlew.bat dokkaHtml
-set D_DIR=docs
-if not "%DOCS_DIR%"=="" set D_DIR=%DOCS_DIR%
-if not exist "%D_DIR%" mkdir "%D_DIR%"
-xcopy /s /y /i build\dokka\html "%D_DIR%"
+set DOCS_DIR=%2
+if "%DOCS_DIR%"=="" set DOCS_DIR=docs
+if not exist %DOCS_DIR% mkdir %DOCS_DIR%
+call gradlew.bat dokkaHtml -PdocsDir=%DOCS_DIR%
 goto end
 
 :build
 call gradlew.bat installDist
-if not "%BIN_DIR%"=="" (
-    if not exist "%BIN_DIR%" mkdir "%BIN_DIR%"
-    xcopy /s /y /i build\install\cdd-kotlin\* "%BIN_DIR%"
-)
 goto end
 
 :build_wasm
-echo Not supported natively due to JVM-bound dependencies (kotlin-compiler-embeddable, PSI).
-exit /b 1
+call gradlew.bat jsBrowserProductionWebpack
+goto end
+
+:build_docker
+docker build -f alpine.Dockerfile -t cdd-kotlin-alpine .
+docker build -f debian.Dockerfile -t cdd-kotlin-debian .
+goto end
+
+:run_docker
+docker run -p 8082:8082 cdd-kotlin-alpine
 goto end
 
 :test
@@ -64,16 +65,8 @@ goto end
 
 :run
 call gradlew.bat installDist
-shift
-set ARGS=
-:loop
-if "%1"=="" goto run_end
-set ARGS=%ARGS% %1
-shift
-goto loop
-:run_end
-call build\install\cdd-kotlin\bin\cdd-kotlin.bat %ARGS%
+set args=%*
+call build\install\cdd-kotlin\bin\cdd-kotlin.bat %args:*run =%
 goto end
 
 :end
-endlocal

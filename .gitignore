@@ -39,3 +39,10 @@ bin/
 
 ### Mac OS ###
 .DS_Store
+# AI scratch scripts and test artifacts
+*.py
+/test_*.kts
+/run*.kts
+*prompt*.md
+TO_DOCS_JSON.md
+help.txt

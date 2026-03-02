@@ -22,11 +22,11 @@ class CliTest {
         val input = File("petstore.json")
         val outArg = outDir.absolutePath
         val inArg = input.absolutePath
-        CddKotlin().subcommands(FromOpenApi(), ToOpenApi(), MergeOpenApi()).main(arrayOf("from_openapi", "-i", inArg, "-o", outArg, "--clientName", "TestClient", "--dateType", "string", "--enumStyle", "sealed"))
+        CddKotlin().subcommands(FromOpenApi().subcommands(ToSdk(), ToSdkCli(), ToServer()), ToOpenApi(), MergeOpenApi(), ToDocsJson()).main(arrayOf("from_openapi", "to_sdk", "-i", inArg, "-o", outArg))
         
         // Run to_openapi on the generated output to get 100% round-trip CLI coverage!
         val generatedSrc = File(outDir, "composeApp/src/commonMain/kotlin")
-        CddKotlin().subcommands(FromOpenApi(), ToOpenApi(), MergeOpenApi()).main(arrayOf("to_openapi", "-f", generatedSrc.absolutePath, "--format", "json"))
+        CddKotlin().subcommands(FromOpenApi().subcommands(ToSdk(), ToSdkCli(), ToServer()), ToOpenApi(), MergeOpenApi(), ToDocsJson()).main(arrayOf("to_openapi", "-f", generatedSrc.absolutePath, "--format", "json"))
         
         // Remove a property from User.kt to trigger `mergedCode != existingCode`
         val userKt = generatedSrc.walk().find { it.name == "User.kt" }
@@ -66,7 +66,7 @@ class CliTest {
         }
 
         // And run merge_openapi on the generated output to test the merge logic
-        CddKotlin().subcommands(FromOpenApi(), ToOpenApi(), MergeOpenApi()).main(arrayOf("merge_openapi", "-s", inArg, "-d", generatedSrc.absolutePath))
+        CddKotlin().subcommands(FromOpenApi().subcommands(ToSdk(), ToSdkCli(), ToServer()), ToOpenApi(), MergeOpenApi(), ToDocsJson()).main(arrayOf("merge_openapi", "-s", inArg, "-d", generatedSrc.absolutePath))
         
         // Restore writability for cleanup
         if (storeApiKt != null) {
@@ -75,12 +75,12 @@ class CliTest {
 
         // test merging with bad inputs inside this happy path to ensure it's executed, or run it again:
         try {
-            CddKotlin().subcommands(FromOpenApi(), ToOpenApi(), MergeOpenApi()).main(arrayOf("merge_openapi", "-s", inArg, "-d", "does_not_exist"))
+            CddKotlin().subcommands(FromOpenApi().subcommands(ToSdk(), ToSdkCli(), ToServer()), ToOpenApi(), MergeOpenApi(), ToDocsJson()).main(arrayOf("merge_openapi", "-s", inArg, "-d", "does_not_exist"))
         } catch (e: Exception) {}
 
         // Cover !srcDir.isDirectory
         try {
-            CddKotlin().subcommands(FromOpenApi(), ToOpenApi(), MergeOpenApi()).main(arrayOf("merge_openapi", "-s", inArg, "-d", inArg))
+            CddKotlin().subcommands(FromOpenApi().subcommands(ToSdk(), ToSdkCli(), ToServer()), ToOpenApi(), MergeOpenApi(), ToDocsJson()).main(arrayOf("merge_openapi", "-s", inArg, "-d", inArg))
         } catch (e: Exception) {}
 
         // Create dummy OpenAPI spec with all methods and invalid JSON to trigger top-level catch
@@ -109,11 +109,11 @@ class CliTest {
         val defaultApiKt = File(dummySrc, "DefaultApi.kt")
         defaultApiKt.writeText("package api\ninterface DefaultApi {}")
         
-        CddKotlin().subcommands(FromOpenApi(), ToOpenApi(), MergeOpenApi()).main(arrayOf("merge_openapi", "-s", allMethodsSpec.absolutePath, "-d", dummySrc.absolutePath))
+        CddKotlin().subcommands(FromOpenApi().subcommands(ToSdk(), ToSdkCli(), ToServer()), ToOpenApi(), MergeOpenApi(), ToDocsJson()).main(arrayOf("merge_openapi", "-s", allMethodsSpec.absolutePath, "-d", dummySrc.absolutePath))
 
         // Trigger top-level exception by passing a directory as spec file
         try {
-            CddKotlin().subcommands(FromOpenApi(), ToOpenApi(), MergeOpenApi()).main(arrayOf("merge_openapi", "-s", generatedSrc.absolutePath, "-d", generatedSrc.absolutePath))
+            CddKotlin().subcommands(FromOpenApi().subcommands(ToSdk(), ToSdkCli(), ToServer()), ToOpenApi(), MergeOpenApi(), ToDocsJson()).main(arrayOf("merge_openapi", "-s", generatedSrc.absolutePath, "-d", generatedSrc.absolutePath))
         } catch (e: Exception) {}
     }
 
@@ -123,7 +123,7 @@ class CliTest {
         input.writeText("{}") // dummy
         val inArg = input.absolutePath
         try {
-            CddKotlin().subcommands(FromOpenApi(), ToOpenApi(), MergeOpenApi()).main(arrayOf("from_openapi", "-i", inArg))
+            CddKotlin().subcommands(FromOpenApi().subcommands(ToSdk(), ToSdkCli(), ToServer()), ToOpenApi(), MergeOpenApi(), ToDocsJson()).main(arrayOf("from_openapi", "to_sdk", "-i", inArg, "-o", tempDir.toFile().absolutePath))
         } catch (e: Exception) {}
     }
 
@@ -131,13 +131,13 @@ class CliTest {
     fun `test to_openapi fails gracefully on bad input`(@TempDir tempDir: Path) {
         val badFile = File(tempDir.toFile(), "bad")
         try {
-            CddKotlin().subcommands(FromOpenApi(), ToOpenApi(), MergeOpenApi()).main(arrayOf("to_openapi", "-f", badFile.absolutePath, "--format", "json"))
+            CddKotlin().subcommands(FromOpenApi().subcommands(ToSdk(), ToSdkCli(), ToServer()), ToOpenApi(), MergeOpenApi(), ToDocsJson()).main(arrayOf("to_openapi", "-f", badFile.absolutePath, "--format", "json"))
         } catch (e: Exception) {}
         
         val emptyDir = File(tempDir.toFile(), "empty")
         emptyDir.mkdirs()
         try {
-            CddKotlin().subcommands(FromOpenApi(), ToOpenApi(), MergeOpenApi()).main(arrayOf("to_openapi", "-f", emptyDir.absolutePath, "--format", "yaml"))
+            CddKotlin().subcommands(FromOpenApi().subcommands(ToSdk(), ToSdkCli(), ToServer()), ToOpenApi(), MergeOpenApi(), ToDocsJson()).main(arrayOf("to_openapi", "-f", emptyDir.absolutePath, "--format", "yaml"))
         } catch (e: Exception) {}
     }
 
@@ -146,19 +146,19 @@ class CliTest {
         val badSpec = File(tempDir.toFile(), "badSpec")
         val badDir = File(tempDir.toFile(), "badDir")
         try {
-            CddKotlin().subcommands(FromOpenApi(), ToOpenApi(), MergeOpenApi()).main(arrayOf("merge_openapi", "-s", badSpec.absolutePath, "-d", badDir.absolutePath))
+            CddKotlin().subcommands(FromOpenApi().subcommands(ToSdk(), ToSdkCli(), ToServer()), ToOpenApi(), MergeOpenApi(), ToDocsJson()).main(arrayOf("merge_openapi", "-s", badSpec.absolutePath, "-d", badDir.absolutePath))
         } catch (e: Exception) {}
         
         val goodSpec = File(tempDir.toFile(), "spec.json")
         goodSpec.writeText("{}")
         try {
-            CddKotlin().subcommands(FromOpenApi(), ToOpenApi(), MergeOpenApi()).main(arrayOf("merge_openapi", "-s", goodSpec.absolutePath, "-d", badDir.absolutePath))
+            CddKotlin().subcommands(FromOpenApi().subcommands(ToSdk(), ToSdkCli(), ToServer()), ToOpenApi(), MergeOpenApi(), ToDocsJson()).main(arrayOf("merge_openapi", "-s", goodSpec.absolutePath, "-d", badDir.absolutePath))
         } catch (e: Exception) {}
         
         val goodDir = File(tempDir.toFile(), "src")
         goodDir.mkdirs()
         try {
-            CddKotlin().subcommands(FromOpenApi(), ToOpenApi(), MergeOpenApi()).main(arrayOf("merge_openapi", "-s", goodSpec.absolutePath, "-d", goodDir.absolutePath))
+            CddKotlin().subcommands(FromOpenApi().subcommands(ToSdk(), ToSdkCli(), ToServer()), ToOpenApi(), MergeOpenApi(), ToDocsJson()).main(arrayOf("merge_openapi", "-s", goodSpec.absolutePath, "-d", goodDir.absolutePath))
         } catch (e: Exception) {}
     }
 
@@ -167,7 +167,7 @@ class CliTest {
     fun `test to_docs_json generates expected json`(@TempDir tempDir: Path) {
         val input = File(tempDir.toFile(), "spec.json")
         input.writeText("{}")
-        CddKotlin().subcommands(FromOpenApi(), ToOpenApi(), MergeOpenApi(), ToDocsJson()).main(arrayOf("to_docs_json", "--no-imports", "--no-wrapping", "-i", input.absolutePath))
+        CddKotlin().subcommands(FromOpenApi().subcommands(ToSdk(), ToSdkCli(), ToServer()), ToOpenApi(), MergeOpenApi(), ToDocsJson()).main(arrayOf("to_docs_json", "--no-imports", "--no-wrapping", "-i", input.absolutePath))
     }
 
 }

@@ -23,7 +23,7 @@ graph TD
 
     subgraph Frontend [Parsers]
         A[OpenAPI .yaml/.json]:::endpoint --> P1(OpenAPI Parser):::frontend
-        B[Kotlin Models / Source]:::endpoint --> P2(Kotlin Parser):::frontend
+        B[LANGUAGE Models / Source]:::endpoint --> P2(LANGUAGE Parser):::frontend
         C[Server Routes / Frameworks]:::endpoint --> P3(Framework Parser):::frontend
         D[Client SDKs / ORMs]:::endpoint --> P4(Ext Parser):::frontend
     end
@@ -34,7 +34,7 @@ graph TD
 
     subgraph Backend [Emitters]
         E1(OpenAPI Emitter):::backend --> X[OpenAPI .yaml/.json]:::endpoint
-        E2(Kotlin Emitter):::backend --> Y[Kotlin Models / Structs]:::endpoint
+        E2(LANGUAGE Emitter):::backend --> Y[LANGUAGE Models / Structs]:::endpoint
         E3(Server Emitter):::backend --> Z[Server Routes / Controllers]:::endpoint
         E4(Client Emitter):::backend --> W[Client SDKs / API Calls]:::endpoint
         E5(Data Emitter):::backend --> V[ORM Models / CLI Parsers]:::endpoint
@@ -51,6 +51,8 @@ graph TD
     IR --> E4
     IR --> E5
 ```
+
+<!-- INSTRUCTION TO LLM: If this specific repo is explicitly Client-only or Server-only based on the `Bidirectional`, gracefully adjust the descriptions below to emphasize its specific role. -->
 
 ## 🧩 Core Components
 

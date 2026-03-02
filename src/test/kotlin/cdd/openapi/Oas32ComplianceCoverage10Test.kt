@@ -30,7 +30,7 @@ class Oas32ComplianceCoverage10Test {
         )
 
         val issues = mutableListOf<OpenApiIssue>()
-        val constructor = Class.forName("cdd.openapi.OpenApiValidator\$SchemaValidationState").declaredConstructors[0]
+        val constructor = Class.forName("cdd.openapi.OpenApiValidator\$SchemaValidationState").declaredConstructors.first { it.parameterCount == 4 }
         constructor.isAccessible = true
         val state = constructor.newInstance(mutableSetOf<SchemaDefinition>(), mutableSetOf<SchemaProperty>(), "dialect", emptySet<String>())
         

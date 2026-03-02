@@ -49,7 +49,7 @@ class DirectCoverageTest {
         }
 
         val stateClass = Class.forName("cdd.openapi.OpenApiValidator\$SchemaValidationState")
-        val state = stateClass.constructors[0].newInstance(java.util.Collections.newSetFromMap(IdentityHashMap<Any, Boolean>()), java.util.Collections.newSetFromMap(IdentityHashMap<Any, Boolean>()), "3.2.0", emptySet<String>())
+        val state = stateClass.constructors.first { it.parameterCount == 4 }.newInstance(java.util.Collections.newSetFromMap(IdentityHashMap<Any, Boolean>()), java.util.Collections.newSetFromMap(IdentityHashMap<Any, Boolean>()), "3.2.0", emptySet<String>())
         
         val schema = SchemaDefinition(name="n", ref="#/components/schemas/s", type="string")
         val mSchema = validator.javaClass.declaredMethods.firstOrNull { it.name.startsWith("validateSchemaDefinition") && it.parameterCount == 4 }

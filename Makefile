@@ -1,48 +1,60 @@
-.PHONY: help install_base install_deps build_docs build test run all build_wasm
+.PHONY: install_base install_deps build_docs build test run help all build_wasm build_docker run_docker
 
 help:
-	@echo "Available targets:"
-	@echo "  install_base   Install language runtime hints"
-	@echo "  install_deps   Fetch dependencies via Gradle"
-	@echo "  build_docs     Build the API docs (Dokka) to docs/ directory, or a specific directory via DOCS_DIR="
-	@echo "  build          Build the CLI binary, optionally specific directory via BIN_DIR="
-	@echo "  build_wasm     Build a WASM binary (Currently unsupported in Kotlin CLI)"
-	@echo "  test           Run tests locally"
-	@echo "  run            Run the built CLI. Usage: make run ARGS=\"--help\""
-	@echo "  all            Show help text"
+	@echo "Available tasks:"
+	@echo "  install_base   - Install language runtime (Java/Gradle)"
+	@echo "  install_deps   - Install local dependencies"
+	@echo "  build_docs     - Build API docs (optional: docs_dir=path)"
+	@echo "  build          - Build the CLI binary (optional: bin_dir=path)"
+	@echo "  build_wasm     - Build the WASM output"
+	@echo "  build_docker   - Build alpine and debian Docker images"
+	@echo "  run_docker     - Run the docker container"
+	@echo "  test           - Run tests locally"
+	@echo "  run            - Run the CLI (builds if necessary)"
+	@echo "  help / all     - Show this help text"
 
 all: help
 
+: 
+	@echo "Available tasks:"
+	@echo "  install_base   - Install language runtime (Java/Gradle)"
+	@echo "  install_deps   - Install local dependencies"
+	@echo "  build_docs     - Build API docs (optional: docs_dir=path)"
+	@echo "  build          - Build the CLI binary (optional: bin_dir=path)"
+	@echo "  build_wasm     - Build the WASM output"
+	@echo "  build_docker   - Build alpine and debian Docker images"
+	@echo "  run_docker     - Run the docker container"
+	@echo "  test           - Run tests locally"
+	@echo "  run            - Run the CLI (builds if necessary)"
+	@echo "  help / all     - Show this help text"
+
 install_base:
-	@echo "Please ensure Java 19+ is installed."
-	@echo "If using sdkman, run: sdk install java 19.0.2-tem"
+	@echo "Please install Java (JDK 17+) to run Gradle."
 
 install_deps:
 	./gradlew dependencies
 
 build_docs:
-	./gradlew dokkaHtml
-	@if [ -n "$(DOCS_DIR)" ]; then \
-		mkdir -p $(DOCS_DIR) && cp -r build/dokka/html/* $(DOCS_DIR)/; \
-	else \
-		mkdir -p docs && cp -r build/dokka/html/* docs/; \
-	fi
+	docs_dir=$${docs_dir:-docs} && mkdir -p $$docs_dir && ./gradlew dokkaHtml -PdocsDir=$$docs_dir
 
 build:
-	./gradlew installDist
-	@if [ -n "$(BIN_DIR)" ]; then \
-		mkdir -p $(BIN_DIR) && cp -r build/install/cdd-kotlin/* $(BIN_DIR)/; \
-	fi
+	bin_dir=$${bin_dir:-build/install/cdd-kotlin/bin} && ./gradlew installDist -PbinDir=$$bin_dir
 
 build_wasm:
-	@echo "Not supported natively due to JVM-bound dependencies (kotlin-compiler-embeddable, PSI)."
-	@exit 1
+	./gradlew jsBrowserProductionWebpack
+
+build_docker:
+	docker build -f alpine.Dockerfile -t cdd-kotlin-alpine .
+	docker build -f debian.Dockerfile -t cdd-kotlin-debian .
+
+run_docker:
+	docker run -p 8082:8082 cdd-kotlin-alpine
 
 test:
 	./gradlew test
 
 run: build
-	./build/install/cdd-kotlin/bin/cdd-kotlin $(ARGS)
+	./build/install/cdd-kotlin/bin/cdd-kotlin $(filter-out $@,$(MAKECMDGOALS))
 
-:
-	@make help
+%:
+	@:
