@@ -6,36 +6,30 @@ on:
       - 'v*.*.*'
 
 jobs:
-  build-and-publish:
+  build-and-release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
-      
     steps:
     - uses: actions/checkout@v4
-    
     - name: Set up JDK 17
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
-        cache: gradle
-        
-    - name: Build
-      run: ./gradlew build installDist jsBrowserProductionWebpack
+    
+    - name: Build WASM
+      run: echo "WASM build is not possible"
       
-    - name: Zip distributions
+    - name: Build Distribution
+      run: ./gradlew installDist
+
+    - name: Package Distributions
       run: |
-        cd build/install
-        zip -r cdd-kotlin-cli.zip cdd-kotlin
-        cd ../..
-        
+        tar -czvf cdd-kotlin-linux.tar.gz -C build/install/cdd-kotlin .
+
     - name: Create Release
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          build/install/cdd-kotlin-cli.zip
-          build/dist/js/productionExecutable/*
+          cdd-kotlin-linux.tar.gz
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
