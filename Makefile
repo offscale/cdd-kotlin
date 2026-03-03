@@ -41,7 +41,7 @@ build:
 	bin_dir=$${bin_dir:-build/install/cdd-kotlin/bin} && ./gradlew installDist -PbinDir=$$bin_dir
 
 build_wasm:
-	./gradlew jsBrowserProductionWebpack
+	@echo "WASM build is not supported for cdd-kotlin (see WASM.md for details)"
 
 build_docker:
 	docker build -f alpine.Dockerfile -t cdd-kotlin-alpine .

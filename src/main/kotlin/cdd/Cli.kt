@@ -165,11 +165,15 @@ class ToOpenApi : CliktCommand(name = "to_openapi", help = "Generate an OpenAPI 
 
             val schemas = dtoParser.parse(sourceCode)
             val endpoints = networkParser.parse(sourceCode)
+            val cliEndpoints = cdd.routes.CliParser().parse(sourceCode)
+            
+            // Deduplicate/merge by operationId
+            val allEndpoints = (endpoints + cliEndpoints).associateBy { it.operationId }.values.toList()
 
             val definition = assembler.assemble(
                 info = Info(title = "Generated API", version = "1.0.0"),
                 schemas = schemas,
-                endpoints = endpoints
+                endpoints = allEndpoints
             )
 
             val outText = if (format == "json") {
@@ -507,4 +511,10 @@ import com.example.auto.api.$apiClassName"""
 fun main(args: Array<String>) {
     val fromOpenApi = FromOpenApi().subcommands(ToSdk(), ToSdkCli(), ToServer())
     CddKotlin().subcommands(fromOpenApi, ToOpenApi(), MergeOpenApi(), ToDocsJson(), ServerJsonRpc()).main(args)
+}
+
+/** Entry point for testing without exiting the JVM */
+fun parse(args: Array<String>) {
+    val fromOpenApi = FromOpenApi().subcommands(ToSdk(), ToSdkCli(), ToServer())
+    CddKotlin().subcommands(fromOpenApi, ToOpenApi(), MergeOpenApi(), ToDocsJson(), ServerJsonRpc()).parse(args)
 }
