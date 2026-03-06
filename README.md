@@ -1,5 +1,7 @@
-# cdd-kotlin
+cdd-kotlin
+==========
 
+[![Kotlin Integration](https://github.com/offscale/cdd-kotlin/actions/workflows/integration.yml/badge.svg)](https://github.com/offscale/cdd-kotlin/actions/workflows/integration.yml)
 ![Doc Coverage](https://img.shields.io/badge/doc_coverage-100%25-brightgreen)
 ![Test Coverage](https://img.shields.io/badge/test_coverage-100%25-brightgreen)
 
