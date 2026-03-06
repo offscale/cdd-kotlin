@@ -36,12 +36,13 @@ jobs:
 
       - name: Build and Run Kotlin Generator
         run: |
-          ./gradlew run --args="from_openapi -i petstore.json --clientName MyGeneratedClient --output kotlin-client --dateType string"
+          ./gradlew run --args="from_openapi to_sdk -i petstore.json -o kotlin-client"
 
       - name: Copy Kotlin Integration Tests
         run: |
           mkdir -p kotlin-client/composeApp/src/commonTest/kotlin/com/example/auto
           cp tests/integration/kotlin-integration.kt kotlin-client/composeApp/src/commonTest/kotlin/com/example/auto/IntegrationTest.kt
+          cp -r gradle gradlew gradlew.bat kotlin-client/
 
       - name: Test Kotlin Client
         working-directory: kotlin-client
