@@ -46,3 +46,72 @@ cdd-kotlin from_openapi to_server --input-dir ./specs/ -o target_directory
 ```
 
 WASM support is **not possible** due to JVM dependencies (see [WASM.md](WASM.md) for details).
+
+## CLI Help
+
+```
+$ ./build/install/cdd-kotlin/bin/cdd-kotlin --help
+Usage: cdd-kotlin [<options>] <command> [<args>]...
+
+  OpenAPI ↔ Kotlin
+
+Options:
+  --version   Show the version and exit
+  -h, --help  Show this message and exit
+
+Commands:
+  from_openapi    Generate from an OpenAPI specification
+  to_openapi      Generate an OpenAPI specification from Kotlin code
+  merge_openapi   Merge an OpenAPI specification into an existing Kotlin
+                  codebase
+  to_docs_json    Generate API documentation code examples as JSON
+  serve_json_rpc  Start JSON-RPC server
+```
+
+### `from_openapi`
+
+```
+$ ./build/install/cdd-kotlin/bin/cdd-kotlin from_openapi --help
+Usage: cdd-kotlin from_openapi [<options>] <command> [<args>]...
+
+  Generate from an OpenAPI specification
+
+Options:
+  -h, --help  Show this message and exit
+
+Commands:
+  to_sdk      Generate Client SDK services
+  to_sdk_cli  Generate CLI for Client SDK
+  to_server   Generate Server services
+```
+
+### `to_openapi`
+
+```
+$ ./build/install/cdd-kotlin/bin/cdd-kotlin to_openapi --help
+Usage: cdd-kotlin to_openapi [<options>]
+
+  Generate an OpenAPI specification from Kotlin code
+
+Options:
+  -i, --input=<text>    Path to a snapshot file or a generated output directory
+  --format=(json|yaml)  Output format for the OpenAPI spec
+  -o, --output=<text>   Output specification file
+  -h, --help            Show this message and exit
+```
+
+### `to_docs_json`
+
+```
+$ ./build/install/cdd-kotlin/bin/cdd-kotlin to_docs_json --help
+Usage: cdd-kotlin to_docs_json [<options>]
+
+  Generate API documentation code examples as JSON
+
+Options:
+  -i, --input=<text>   Path or URL to the OpenAPI specification
+  --no-imports         Omit the imports field
+  --no-wrapping        Omit the wrapper_start and wrapper_end fields
+  -o, --output=<text>  Output JSON file
+  -h, --help           Show this message and exit
+```
