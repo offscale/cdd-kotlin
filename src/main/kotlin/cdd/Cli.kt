@@ -138,14 +138,14 @@ class ToServer : CliktCommand(name = "to_server", help = "Generate Server servic
 /** Subcommand to generate an OpenAPI specification from Kotlin code */
 class ToOpenApi : CliktCommand(name = "to_openapi", help = "Generate an OpenAPI specification from Kotlin code") {
     /** Path to a file or directory containing the generated project. */
-    val file by option("-f", "--file", envvar = "CDD_KOTLIN_FILE", help = "Path to a snapshot file or a generated output directory").required()
+    val input by option("-i", "--input", envvar = "CDD_KOTLIN_INPUT", help = "Path to a snapshot file or a generated output directory").required()
     /** Format of the output OpenAPI specification. */
     val format by option("--format", envvar = "CDD_KOTLIN_FORMAT", help = "Output format for the OpenAPI spec").choice("json", "yaml").default("yaml")
     val output by option("-o", "--output", envvar = "CDD_KOTLIN_OUTPUT", help = "Output specification file")
 
     /** Executes the to_openapi parser logic. */
     override fun run() {
-        val srcDir = File(file)
+        val srcDir = File(input)
         if (!srcDir.exists()) {
             println("File or directory not found: ${srcDir.absolutePath}")
             return
