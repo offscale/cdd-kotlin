@@ -1,8 +1,6 @@
 plugins { 
-    application 
     kotlin("jvm") version "2.2.21" 
-    id("org.jetbrains.kotlinx.kover") version "0.8.3"
-    id("org.jetbrains.dokka") version "1.9.20" 
+    id("org.jetbrains.kotlinx.kover") version "0.8.3" 
 } 
 
 group = "org.cdd" 
@@ -23,7 +21,6 @@ dependencies {
     // OpenAPI JSON/YAML parsing (tree model) 
     implementation("com.fasterxml.jackson.core:jackson-databind:2.17.2") 
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.17.2") 
-    implementation("com.github.ajalt.clikt:clikt:4.2.2") 
 
     // Testing
     testImplementation(platform("org.junit:junit-bom:5.10.0")) 
@@ -33,11 +30,10 @@ dependencies {
 
 tasks.test { 
     useJUnitPlatform() 
-    testLogging { showStandardStreams = true }
 } 
 
 kotlin { 
-    jvmToolchain(17) // Safe default, foojay will auto-download if not present
+    jvmToolchain(21) // Safe default, foojay will auto-download if not present
 } 
 
 // Ensure all public classes and functions have KDoc. 
@@ -125,41 +121,7 @@ tasks.register("checkDocCoverage") {
 } 
 
 kover { 
-    reports {
-        filters {
-                        excludes {
-                                                classes(
-                    "cdd.CliKt",
-                    "cdd.FromOpenApi",
-                    "cdd.ToOpenApi",
-                    "cdd.MergeOpenApi",
-                    "cdd.CddKotlin",
-                    "cdd.ToDocsJson",
-                    "cdd.ServerJsonRpc",
-                    "cdd.ToSdk",
-                    "cdd.ToSdkCli",
-                    "cdd.ToServer",
-                    "cdd.openapi.CliGenerator",
-                    "cdd.cli.MainCommand*",
-                    "cdd.cli.*Command",
-                    "cdd.openapi.UiGenerator",
-                    "cdd.openapi.ApiGenerator",
-                    "cdd.scaffold.*",
-                    "cdd.openapi.OpenApiDocumentRegistry*",
-                    "cdd.openapi.OpenApiParser*",
-                    "cdd.openapi.OpenApiPathFlattener*",
-                    "cdd.openapi.OpenApiValidator*",
-                    "cdd.openapi.OpenApiWriter*",
-                    "cdd.openapi.RegistryKt*",
-                    "cdd.routes.NetworkGenerator*",
-                    "cdd.routes.NetworkMerger*",
-                    "cdd.routes.NetworkParser*",
-                    "cdd.classes.DtoGenerator*",
-                    "cdd.classes.DtoMerger*",
-                    "cdd.classes.DtoParser*"
-                )
-            }
-        }
+    reports { 
         verify { 
             rule { 
                 bound { 
@@ -171,23 +133,6 @@ kover {
 } 
 
 tasks.check { 
-     
-     
-}
-application {
-    mainClass.set("cdd.CliKt")
-}
-
-dependencies {
-    // Adding ORM as requested
-    implementation("org.jetbrains.exposed:exposed-core:0.56.0")
-    implementation("org.jetbrains.exposed:exposed-dao:0.56.0")
-    implementation("org.jetbrains.exposed:exposed-jdbc:0.56.0")
-    implementation("org.postgresql:postgresql:42.7.4")
-    
-    // Server framework as requested
-    implementation("io.ktor:ktor-server-core:3.0.1")
-    implementation("io.ktor:ktor-server-netty:3.0.1")
-    implementation("io.ktor:ktor-server-content-negotiation:3.0.1")
-    implementation("io.ktor:ktor-serialization-jackson:3.0.1")
+    dependsOn("checkDocCoverage") 
+    dependsOn("koverVerify") 
 }
