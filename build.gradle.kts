@@ -39,6 +39,12 @@ kotlin {
         val wasmWasiMain by getting {
             kotlin.srcDir("src/wasmMain/kotlin")
         }
+        val wasmWasiTest by getting {
+            kotlin.srcDir("src/wasmTest/kotlin")
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
     }
 }
 
@@ -53,6 +59,8 @@ tasks.register("checkDocCoverage") {
     doLast { 
         val sourceFiles = fileTree("src/main/kotlin") { 
             include("**/*.kt") 
+        } + fileTree("src/wasmMain/kotlin") {
+            include("**/*.kt")
         } 
 
         val missing = mutableListOf<String>() 
