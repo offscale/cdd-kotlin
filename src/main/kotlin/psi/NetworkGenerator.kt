@@ -1292,6 +1292,7 @@ class NetworkGenerator {
         val hasMutualTls = schemes.values.any { it.type == "mutualTLS" }
 
         val usedNames = mutableSetOf<String>()
+        /** Local helper doc */
         fun uniqueName(base: String): String {
             val normalized = base.ifBlank { "auth" }
             var name = normalized

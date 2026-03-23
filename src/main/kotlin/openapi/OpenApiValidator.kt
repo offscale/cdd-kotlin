@@ -726,6 +726,7 @@ class OpenApiValidator {
     ) {
         if (booleanSchema != null) return
 
+        /** Local helper doc */
         fun checkNonNegative(value: Int?, keyword: String) {
             if (value != null && value < 0) {
                 issues += OpenApiIssue(
@@ -736,6 +737,7 @@ class OpenApiValidator {
             }
         }
 
+        /** Local helper doc */
         fun checkMinMaxOrder(min: Int?, max: Int?, label: String, minKey: String, maxKey: String) {
             if (min != null && max != null && min > max) {
                 issues += OpenApiIssue(
@@ -1724,6 +1726,7 @@ class OpenApiValidator {
     private fun validateComponents(components: Components?, basePath: String, issues: MutableList<OpenApiIssue>) {
         if (components == null) return
 
+        /** Local helper doc */
         fun validateKeys(keys: Set<String>, componentPath: String) {
             keys.filterNot { componentKeyRegex.matches(it) }.forEach { key ->
                 issues += OpenApiIssue(
@@ -2311,6 +2314,7 @@ class OpenApiValidator {
         val operationIds = operations.filter { it.operationIdExplicit }.map { it.operationId }.toSet()
         val operationRefs = collectOperationRefs(definition)
 
+        /** Local helper doc */
         fun validateLinkTarget(link: Link, path: String) {
             if (link.ref != null || link.reference != null) return
             val operationId = link.operationId
@@ -2950,6 +2954,7 @@ class OpenApiValidator {
     private fun collectOperationRefs(definition: OpenApiDefinition): Set<String> {
         val refs = LinkedHashSet<String>()
 
+        /** Local helper doc */
         fun addPathItemRefs(base: String, key: String, item: PathItem) {
             val encodedKey = encodeJsonPointerSegment(key)
             val prefix = "$base/$encodedKey"

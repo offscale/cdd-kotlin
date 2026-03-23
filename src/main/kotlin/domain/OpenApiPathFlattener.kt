@@ -27,6 +27,7 @@ fun interface PathItemRefResolver {
     fun resolve(baseUri: String?, key: String): PathItemResolution? 
 } 
 
+/** Local helper doc */
 object OpenApiPathFlattener { 
 
     /** 
@@ -340,6 +341,7 @@ object OpenApiPathFlattener {
         if (opParams.isEmpty()) return pathParams
 
         val merged = LinkedHashMap<String, EndpointParameter>() 
+        /** Local helper doc */
         fun key(param: EndpointParameter): String = "${param.location}:${param.name}" 
 
         pathParams.forEach { merged[key(it)] = it } 
