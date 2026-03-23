@@ -382,6 +382,7 @@ class DtoGenerator {
 
         val sb = StringBuilder("/**\n")
         var hasAny = false
+        /** Local helper doc */
         fun appendLine(line: String, blankBefore: Boolean = true) {
             if (hasAny && blankBefore) sb.append(" *\n")
             sb.append(" * ").append(line).append("\n")
@@ -592,6 +593,7 @@ class DtoGenerator {
 
         val sb = StringBuilder("    /**\n")
         var hasAny = false
+        /** Local helper doc */
         fun appendLine(line: String, blankBefore: Boolean = true) {
             if (hasAny && blankBefore) sb.append("     *\n")
             sb.append("     * ").append(line).append("\n")

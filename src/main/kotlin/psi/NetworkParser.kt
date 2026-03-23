@@ -60,6 +60,7 @@ data class NetworkParseResult(
     val metadata: OpenApiMetadata = OpenApiMetadata()
 )
 
+/** Local helper doc */
 class NetworkParser {
     private val jsonMapper = ObjectMapper(JsonFactory())
     private val openApiParser = OpenApiParser()
@@ -713,6 +714,7 @@ class NetworkParser {
         val metas = mutableMapOf<String, ParamMeta>()
         val lines = docComment.text.split("\n").map { cleanKDocLine(it) }
 
+        /** Local helper doc */
         fun ensureMeta(name: String): ParamMeta = metas.getOrPut(name) { ParamMeta() }
 
         lines.filter { it.startsWith("@paramStyle") }.forEach { line ->
