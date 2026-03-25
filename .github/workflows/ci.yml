@@ -26,4 +26,4 @@ jobs:
           gradle-version: '8.7'
 
       - name: Run Tests and Checks
-        run: gradle test --stacktrace
+        run: gradle check allTests --stacktrace
