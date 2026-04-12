@@ -74,7 +74,7 @@ object ReferenceResolver {
             bytes[byteCount++] = ch.code.toByte()
             i += 1
         }
-        return bytes.copyOf(byteCount).toString(Charsets.UTF_8)
+        return bytes.copyOf(byteCount).decodeToString()
     }
 
     private fun hexToInt(ch: Char): Int {

@@ -17,10 +17,20 @@ kotlin {
     jvm()
     wasmWasi {
         nodejs()
+
+        
         binaries.executable()
     }
 
     sourceSets {
+        val commonMain by getting { 
+            kotlin.srcDir("src/commonMain/kotlin") 
+            dependencies { 
+                implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3") 
+                implementation("org.jetbrains.kotlinx:kotlinx-io-core:0.3.3") 
+            } 
+        } 
+
         val jvmMain by getting {
             kotlin.srcDir("src/main/kotlin")
             dependencies {

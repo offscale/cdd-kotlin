@@ -1,5 +1,7 @@
-import java.io.File
-import kotlin.system.exitProcess
+
+
+import writeToFile
+
 import openapi.OpenApiParser
 import openapi.OpenApiDocument
 import domain.EndpointDefinition
@@ -15,7 +17,8 @@ import scaffold.ScaffoldGenerator
  * @param args Command-line arguments.
  */
 fun main(args: Array<String>) {
-    val exitCode = runCli(args)
+    val actualArgs = if (args.isEmpty()) arrayOf("to_docs_json", "-i", "spec.json") else args
+    val exitCode = runCli(actualArgs)
     if (exitCode != 0) {
         throw RuntimeException("CLI exited with code $exitCode")
     }
@@ -33,11 +36,11 @@ fun runCli(args: Array<String>): Int {
         return 0
     }
 
-    val command = args[0]
+    val command = if (args.size > 1 && args[0] == "from_openapi") args[1] else args[0]
     if (command == "demo") {
         val generator = ScaffoldGenerator()
-        val outputDir = File(System.getProperty("user.dir"), "generated-project")
-        println("Generating KMP Scaffold into: ${outputDir.absolutePath}...")
+        val outputDir = getEnvVar("PWD") ?: "."
+        println("Generating KMP Scaffold into: ${outputDir}...")
         val appInfo = Info(
             title = "My Generated App",
             version = "2.4.1",
@@ -57,6 +60,7 @@ fun runCli(args: Array<String>): Int {
     }
 
     if (command == "to_docs_json") {
+
         var inputFile = ""
         var noImports = false
         var noWrapping = false
@@ -71,23 +75,29 @@ fun runCli(args: Array<String>): Int {
             i++
         }
 
-        if (inputFile.isEmpty()) {
-            inputFile = System.getenv("CDD_INPUT") ?: ""
-        }
+        if (inputFile.startsWith("/")) inputFile = inputFile.substring(1)
 
         if (inputFile.isEmpty()) {
-            System.err.println("Missing -i <spec.json>")
+            inputFile = getEnvVar("CDD_INPUT") ?: ""
+        }
+
+        if (inputFile.startsWith("/")) inputFile = inputFile.substring(1)
+
+        if (inputFile.isEmpty()) {
+            println("Missing -i <spec.json>")
             return 1
         }
 
-        val jsonStr = File(inputFile).readText()
+
+        val jsonStr = readFile(inputFile)
         val parser = OpenApiParser()
-        val result = parser.parseDocumentString(jsonStr)
+
+        val result = try { parser.parseDocumentString(jsonStr) } catch(e: Throwable) { println("PARSE ERROR: " + e.message); throw e }
 
         val doc = when (result) {
             is OpenApiDocument.OpenApi -> result.definition
             else -> {
-                System.err.println("Not an OpenAPI document")
+                println("Not an OpenAPI document")
                 return 1
             }
         }
@@ -164,6 +174,6 @@ fun runCli(args: Array<String>): Int {
         return 0
     }
     
-    System.err.println("Unknown command: $command")
+    println("Unknown command: $command")
     return 1
 }
