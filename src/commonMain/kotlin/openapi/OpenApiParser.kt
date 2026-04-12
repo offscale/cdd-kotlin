@@ -1,9 +1,5 @@
 package openapi
 
-import com.fasterxml.jackson.core.JsonFactory
-import com.fasterxml.jackson.databind.JsonNode
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import domain.Callback
 import domain.Components
 import domain.Contact
@@ -36,8 +32,6 @@ import domain.Tag
 import domain.Xml
 import psi.ReferenceResolver
 import psi.TypeMappers
-import java.io.File
-import java.net.URI
 
 /**
  * Parses OpenAPI 3.2 JSON/YAML documents into the domain IR models.
@@ -45,10 +39,7 @@ import java.net.URI
  * This parser is intentionally lenient: missing required fields are defaulted
  * where possible to keep round-trip workflows resilient.
  */
-class OpenApiParser(
-    private val jsonMapper: ObjectMapper = ObjectMapper(JsonFactory()),
-    private val yamlMapper: ObjectMapper = ObjectMapper(YAMLFactory())
-) {
+class OpenApiParser() {
     private val schemaKnownKeys = setOf(
         "\$ref",
         "\$dynamicRef",
@@ -114,23 +105,18 @@ class OpenApiParser(
     )
 
     private var currentSelfBase: String? = null
-    private var currentRegistry: OpenApiDocumentRegistry? = null
 
     private inline fun <T> withSelfBase(
         self: String?,
         baseUri: String?,
-        registry: OpenApiDocumentRegistry?,
         block: () -> T
     ): T {
         val previous = currentSelfBase
-        val previousRegistry = currentRegistry
         currentSelfBase = resolveSelfBase(self, baseUri)
-        currentRegistry = registry
         return try {
             block()
         } finally {
             currentSelfBase = previous
-            currentRegistry = previousRegistry
         }
     }
 
@@ -154,7 +140,7 @@ class OpenApiParser(
 
     private fun isAbsoluteUri(value: String): Boolean {
         return try {
-            URI(value).isAbsolute
+            isAbsoluteUri(value)
         } catch (_: Exception) {
             false
         }
@@ -192,11 +178,10 @@ class OpenApiParser(
         source: String,
         formatHint: Format = Format.AUTO,
         baseUri: String? = null,
-        registry: OpenApiDocumentRegistry? = null
     ): OpenApiDefinition {
         val format = resolveFormat(source, formatHint, null)
         val root = readTree(source, format)
-        return parseOpenApi(root, baseUri, registry)
+        return parseOpenApi(root, baseUri)
     }
 
     /**
@@ -208,17 +193,6 @@ class OpenApiParser(
      * @param registry Optional registry for resolving external $ref targets without network access.
      * @return Parsed [OpenApiDefinition].
      */
-    fun parseFile(
-        file: File,
-        formatHint: Format = Format.AUTO,
-        baseUri: String? = null,
-        registry: OpenApiDocumentRegistry? = null
-    ): OpenApiDefinition {
-        val content = file.readText()
-        val format = resolveFormat(content, formatHint, file.name)
-        val root = readTree(content, format)
-        return parseOpenApi(root, baseUri, registry)
-    }
 
     /**
      * Parses a raw document string into either an OpenAPI document or a Schema document.
@@ -230,11 +204,10 @@ class OpenApiParser(
         source: String,
         formatHint: Format = Format.AUTO,
         baseUri: String? = null,
-        registry: OpenApiDocumentRegistry? = null
     ): OpenApiDocument {
         val format = resolveFormat(source, formatHint, null)
         val root = readTree(source, format)
-        return parseDocument(root, baseUri, registry)
+        return parseDocument(root, baseUri)
     }
 
     /**
@@ -243,17 +216,6 @@ class OpenApiParser(
      * @param baseUri Optional base URI for resolving relative $ref values and relative `$self` bases.
      * @param registry Optional registry for resolving external $ref targets without network access.
      */
-    fun parseDocumentFile(
-        file: File,
-        formatHint: Format = Format.AUTO,
-        baseUri: String? = null,
-        registry: OpenApiDocumentRegistry? = null
-    ): OpenApiDocument {
-        val content = file.readText()
-        val format = resolveFormat(content, formatHint, file.name)
-        val root = readTree(content, format)
-        return parseDocument(root, baseUri, registry)
-    }
 
     /**
      * Parses a raw document string as a Schema Object, throwing if it is not a Schema document.
@@ -262,9 +224,8 @@ class OpenApiParser(
         source: String,
         formatHint: Format = Format.AUTO,
         baseUri: String? = null,
-        registry: OpenApiDocumentRegistry? = null
     ): SchemaProperty {
-        return when (val doc = parseDocumentString(source, formatHint, baseUri, registry)) {
+        return when (val doc = parseDocumentString(source, formatHint, baseUri)) {
             is OpenApiDocument.Schema -> doc.schema
             is OpenApiDocument.OpenApi ->
                 throw IllegalArgumentException("Document is an OpenAPI Object, not a Schema Object")
@@ -274,18 +235,6 @@ class OpenApiParser(
     /**
      * Parses a file as a Schema Object, throwing if it is not a Schema document.
      */
-    fun parseSchemaFile(
-        file: File,
-        formatHint: Format = Format.AUTO,
-        baseUri: String? = null,
-        registry: OpenApiDocumentRegistry? = null
-    ): SchemaProperty {
-        return when (val doc = parseDocumentFile(file, formatHint, baseUri, registry)) {
-            is OpenApiDocument.Schema -> doc.schema
-            is OpenApiDocument.OpenApi ->
-                throw IllegalArgumentException("Document is an OpenAPI Object, not a Schema Object")
-        }
-    }
 
     private fun resolveFormat(source: String, hint: Format, fileName: String?): Format {
         if (hint != Format.AUTO) return hint
@@ -297,18 +246,17 @@ class OpenApiParser(
     }
 
     private fun readTree(source: String, format: Format): JsonNode {
-        val mapper = if (format == Format.JSON) jsonMapper else yamlMapper
-        return mapper.readTree(source)
+         
+        return kotlinx.serialization.json.Json.parseToJsonElement(source)
     }
 
     private fun parseDocument(
         root: JsonNode,
         baseUri: String?,
-        registry: OpenApiDocumentRegistry?
     ): OpenApiDocument {
         val obj = root.asObject()
         return if (obj != null && obj.has("openapi")) {
-            OpenApiDocument.OpenApi(parseOpenApi(root, baseUri, registry))
+            OpenApiDocument.OpenApi(parseOpenApi(root, baseUri))
         } else {
             OpenApiDocument.Schema(parseSchemaRoot(root))
         }
@@ -324,10 +272,9 @@ class OpenApiParser(
     private fun parseOpenApi(
         root: JsonNode,
         baseUri: String?,
-        registry: OpenApiDocumentRegistry?
     ): OpenApiDefinition {
         val self = root.text("\$self")
-        return withSelfBase(self, baseUri, registry) {
+        return withSelfBase(self, baseUri) {
             val components = parseComponents(root.get("components"))
             val pathsResult = parsePaths(root.get("paths"), components)
             val webhooksResult = parsePaths(root.get("webhooks"), components)
@@ -514,7 +461,7 @@ class OpenApiParser(
         components: Components?
     ): EndpointDefinition {
         val operationIdNode = node.get("operationId")
-        val operationIdExplicit = operationIdNode != null && !operationIdNode.isNull
+        val operationIdExplicit = operationIdNode != null && !operationIdNode.isNullNode
         val operationId = operationIdNode?.textValue() ?: defaultOperationId(methodToken, path)
         val requestBody = parseRequestBody(node.get("requestBody"), components)
         val responses = parseResponses(node.get("responses"), components)
@@ -1415,7 +1362,7 @@ class OpenApiParser(
         if (node == null) return null
         if (node.isArray) {
             val map = LinkedHashMap<String, Any?>()
-            node.forEachIndexed { index, item ->
+            node.elements().forEachIndexed { index, item ->
                 map["example${index + 1}"] = nodeToValue(item)
             }
             return map
@@ -1428,7 +1375,7 @@ class OpenApiParser(
 
     private fun parseSchemaExamplesList(node: JsonNode?): List<Any?>? {
         if (node == null || !node.isArray) return null
-        return node.map { nodeToValue(it) }
+        return node.elements().map { nodeToValue(it) }
     }
 
     private fun parseCustomSchemaKeywords(obj: JsonNode?): Map<String, Any?> {
@@ -1613,8 +1560,8 @@ class OpenApiParser(
     private fun parseTypes(obj: JsonNode?): Set<String> {
         val node = obj?.get("type") ?: return emptySet()
         return when {
-            node.isTextual -> setOf(node.asText())
-            node.isArray -> node.mapNotNull { it.textValue() }.toSet()
+            node.isTextual -> setOf(node.asText() ?: "")
+            node.isArray -> node.elements().mapNotNull { it.textValue() }.toSet()
             else -> emptySet()
         }
     }
@@ -1682,7 +1629,7 @@ class OpenApiParser(
                 item.isTextual -> "string"
                 item.isNumber -> "number"
                 item.isBoolean -> "boolean"
-                item.isNull -> "null"
+                item.isNullNode -> "null"
                 item.isArray -> "array"
                 item.isObject -> "object"
                 else -> null
@@ -1874,7 +1821,7 @@ class OpenApiParser(
         val resolvedComponents = when {
             componentRef.base == null -> localComponents
             baseMatches && localComponents != null -> localComponents
-            else -> currentRegistry?.resolveOpenApi(componentRef.base)?.components
+            else -> null
         } ?: return null
         val effectiveBase = componentRef.base ?: normalizeSelfBase(contextBase) ?: contextBase
         return ComponentLookup(componentRef.key, resolvedComponents, effectiveBase)
@@ -1907,7 +1854,7 @@ class OpenApiParser(
 
     private fun resolveAgainstBase(base: String, ref: String): String {
         return try {
-            URI(base).resolve(ref).toString()
+            resolveUri(base, ref)
         } catch (_: Exception) {
             ref
         }
@@ -1937,7 +1884,7 @@ class OpenApiParser(
             bytes[byteCount++] = ch.code.toByte()
             i += 1
         }
-        return bytes.copyOf(byteCount).toString(Charsets.UTF_8)
+        return bytes.copyOf(byteCount).decodeToString()
     }
 
     private fun hexToInt(ch: Char): Int {
@@ -1999,11 +1946,11 @@ class OpenApiParser(
 
     private fun nodeToValue(node: JsonNode): Any? {
         return when {
-            node.isNull -> null
+            node.isNullNode -> null
             node.isTextual -> node.asText()
             node.isNumber -> node.numberValue()
             node.isBoolean -> node.booleanValue()
-            node.isArray -> node.map { nodeToValue(it) }
+            node.isArray -> node.elements().map { nodeToValue(it) }
             node.isObject -> node.fields().asSequence().associate { (k, v) -> k to nodeToValue(v) }
             else -> node.toString()
         }
@@ -2013,9 +1960,9 @@ class OpenApiParser(
 
 private fun JsonNode?.asObject(): JsonNode? = if (this != null && this.isObject) this else null
 
-private fun JsonNode?.asArray(): List<JsonNode>? = if (this != null && this.isArray) this.toList() else null
+private fun JsonNode?.asArray(): List<JsonNode>? = if (this != null && this.isArray) this.elements() else null
 
-private fun JsonNode.text(field: String): String? = this.get(field)?.takeIf { !it.isNull }?.asText()
+private fun JsonNode.text(field: String): String? = this.get(field)?.takeIf { !it.isNullNode }?.asText()
 
 private fun JsonNode.boolean(field: String): Boolean? = this.get(field)?.takeIf { it.isBoolean }?.booleanValue()
 

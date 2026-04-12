@@ -1,6 +1,6 @@
 package domain
 
-import java.net.URI
+
 
 /** 
  * Utility to flatten OpenAPI Paths/PathItems into a list of EndpointDefinitions. 
@@ -41,7 +41,7 @@ object OpenApiPathFlattener {
      * 
      * External component refs can be resolved via [refResolver] when provided. 
      */ 
-    @JvmOverloads
+    
     fun flattenPaths( 
         paths: Map<String, PathItem>, 
         components: Components? = null, 
@@ -62,7 +62,7 @@ object OpenApiPathFlattener {
      * The same Path Item resolution rules apply (including component pathItems refs and `$self`-aware matching), 
      * with optional external resolution via [refResolver]. 
      */ 
-    @JvmOverloads
+    
     fun flattenWebhooks( 
         webhooks: Map<String, PathItem>, 
         components: Components? = null, 
@@ -76,7 +76,7 @@ object OpenApiPathFlattener {
      * Flattens both Paths and Webhooks into a single EndpointDefinitions list. 
      * External component refs can be resolved via [refResolver] when provided. 
      */ 
-    @JvmOverloads
+    
     fun flattenAll( 
         paths: Map<String, PathItem>, 
         webhooks: Map<String, PathItem>, 
@@ -258,7 +258,7 @@ object OpenApiPathFlattener {
             bytes[byteCount++] = ch.code.toByte() 
             i += 1
         } 
-        return bytes.copyOf(byteCount).toString(Charsets.UTF_8) 
+        return bytes.copyOf(byteCount).decodeToString() 
     } 
 
     private fun hexToInt(ch: Char): Int { 

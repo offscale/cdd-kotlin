@@ -1,6 +1,6 @@
 package domain
 
-import java.util.IdentityHashMap
+
 
 /**
  * Holds the dynamic anchor state for a single schema resource.
@@ -160,7 +160,7 @@ private fun percentDecode(value: String): String {
         bytes[byteCount++] = ch.code.toByte()
         index += 1
     }
-    return bytes.copyOf(byteCount).toString(Charsets.UTF_8)
+    return bytes.copyOf(byteCount).decodeToString()
 }
 
 private fun hexToInt(ch: Char): Int {

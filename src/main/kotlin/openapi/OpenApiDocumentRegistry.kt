@@ -4,7 +4,7 @@ import domain.OpenApiDefinition
 import domain.SchemaProperty
 import domain.PathItemRefResolver
 import domain.PathItemResolution
-import java.net.URI
+
 
 /**
  * In-memory registry for OpenAPI/Schema documents to resolve $ref targets without network access.
@@ -123,7 +123,7 @@ private fun resolveRelative(reference: String?, baseUri: String?): String? {
 
 private fun isAbsoluteUri(value: String): Boolean {
     return try {
-        URI(value).isAbsolute
+        isAbsoluteUri(value)
     } catch (_: Exception) {
         false
     }

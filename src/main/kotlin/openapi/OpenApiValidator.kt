@@ -21,9 +21,9 @@ import domain.DynamicAnchorContext
 import domain.DynamicAnchorScope
 import domain.buildDynamicAnchorContext
 import domain.extractDynamicAnchorName
-import java.net.URI
-import java.util.Collections
-import java.util.IdentityHashMap
+
+
+
 
 /**
  * Validates OpenAPI 3.2 documents for common specification constraints.
@@ -85,8 +85,8 @@ class OpenApiValidator {
     }
 
     private data class SchemaValidationState(
-        val definitions: MutableSet<SchemaDefinition> = Collections.newSetFromMap(IdentityHashMap()),
-        val properties: MutableSet<SchemaProperty> = Collections.newSetFromMap(IdentityHashMap()),
+        val definitions: MutableSet<SchemaDefinition> = mutableSetOf(),
+        val properties: MutableSet<SchemaProperty> = mutableSetOf(),
         val defaultDialect: String,
         val componentSchemaKeys: Set<String>
     )
@@ -2771,7 +2771,7 @@ class OpenApiValidator {
             bytes[byteCount++] = ch.code.toByte()
             i += 1
         }
-        return bytes.copyOf(byteCount).toString(Charsets.UTF_8)
+        return bytes.copyOf(byteCount).decodeToString()
     }
 
     private fun hexToInt(ch: Char): Int {
@@ -3003,7 +3003,7 @@ class OpenApiValidator {
 
     private fun resolveAgainstBase(base: String, ref: String): String {
         return try {
-            URI(base).resolve(ref).toString()
+            resolveUri(base, ref)
         } catch (_: Exception) {
             ref
         }
@@ -3011,7 +3011,7 @@ class OpenApiValidator {
 
     private fun isAbsoluteUri(value: String): Boolean {
         return try {
-            URI(value).isAbsolute
+            isAbsoluteUri(value)
         } catch (_: Exception) {
             false
         }
