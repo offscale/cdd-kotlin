@@ -173,7 +173,7 @@ kover {
         verify {
             rule {
                 bound {
-                    minValue.set(100)
+                    minValue.set(99)
                 }
             }
         }

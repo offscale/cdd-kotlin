@@ -24,7 +24,7 @@ class ScaffoldGeneratorTest {
         val outputDir = tempDir.toFile()
 
         // Act
-        generator.generate(outputDir, projectName, packageName)
+        generator.generate(outputDir.absolutePath, projectName, packageName)
 
         // Assert - Root files
         assertTrue(File(outputDir, "build.gradle.kts").exists(), "Root build.gradle.kts missing")
@@ -52,7 +52,7 @@ class ScaffoldGeneratorTest {
         val outputDir = tempDir.toFile()
 
         // Act
-        generator.generate(outputDir, "DepTest", "com.dep.test")
+        generator.generate(outputDir.absolutePath, "DepTest", "com.dep.test")
 
         // Assert - Version Catalog content
         val catalogContent = File(outputDir, "gradle/libs.versions.toml").readText()
@@ -75,7 +75,7 @@ class ScaffoldGeneratorTest {
         val packageName = "com.custom.pkg"
 
         // Act
-        generator.generate(outputDir, "SourceTest", packageName)
+        generator.generate(outputDir.absolutePath, "SourceTest", packageName)
 
         // Assert
         val appKt = File(outputDir, "composeApp/src/commonMain/kotlin/com/custom/pkg/App.kt")
@@ -93,8 +93,8 @@ class ScaffoldGeneratorTest {
         val outputDir = tempDir.toFile()
 
         // Act - Run twice
-        generator.generate(outputDir, "IdempotentTest", "com.test")
-        generator.generate(outputDir, "IdempotentTest", "com.test")
+        generator.generate(outputDir.absolutePath, "IdempotentTest", "com.test")
+        generator.generate(outputDir.absolutePath, "IdempotentTest", "com.test")
 
         // Assert
         assertTrue(File(outputDir, "settings.gradle.kts").exists())
@@ -116,7 +116,7 @@ class ScaffoldGeneratorTest {
         )
 
         // Act
-        generator.generate(outputDir, "VersionTest", "com.test.v", info)
+        generator.generate(outputDir.absolutePath, "VersionTest", "com.test.v", info)
 
         // Assert - Root build.gradle.kts
         val rootBuild = File(outputDir, "build.gradle.kts").readText()
@@ -134,7 +134,7 @@ class ScaffoldGeneratorTest {
         val outputDir = tempDir.toFile()
 
         // Act
-        generator.generate(outputDir, "DefaultVersionTest", "com.test.d", null)
+        generator.generate(outputDir.absolutePath, "DefaultVersionTest", "com.test.d", null)
 
         // Assert
         val rootBuild = File(outputDir, "build.gradle.kts").readText()

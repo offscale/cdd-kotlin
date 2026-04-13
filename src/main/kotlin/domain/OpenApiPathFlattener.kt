@@ -1,6 +1,6 @@
 package domain
 
-
+import java.net.URI
 
 /** 
  * Utility to flatten OpenAPI Paths/PathItems into a list of EndpointDefinitions. 

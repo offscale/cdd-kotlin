@@ -1,6 +1,6 @@
 package domain
 
-
+import java.util.IdentityHashMap
 
 /**
  * Holds the dynamic anchor state for a single schema resource.

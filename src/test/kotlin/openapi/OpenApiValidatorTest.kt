@@ -74,7 +74,7 @@ class OpenApiValidatorTest {
 
         val issues = validator.validate(definition) 
         val messages = issues.map { it.message } 
-        assertTrue(messages.any { it.contains("OpenAPI version") }) 
+        println(messages); assertTrue(messages.any { it.contains("OpenAPI version") }) 
     } 
 
     @Test
@@ -113,8 +113,8 @@ class OpenApiValidatorTest {
         val issues = validator.validate(definition) 
         val messages = issues.map { it.message } 
         // Our runtime-expression check correctly fails bad pointers
-        assertTrue(messages.any { it.contains("invalid runtime expression '\$request.body#bad/pointer'") }) 
-        assertTrue(messages.any { it.contains("invalid runtime expression '\$request.body#/bad~2escape'") }) 
+        println(messages); assertTrue(messages.any { it.contains("invalid runtime expression '\$request.body#bad/pointer'") }) 
+        println(messages); assertTrue(messages.any { it.contains("invalid runtime expression '\$request.body#/bad~2escape'") }) 
     } 
 
     @Test
@@ -210,7 +210,7 @@ class OpenApiValidatorTest {
 
         val issues = validator.validate(definition) 
         val messages = issues.map { it.message } 
-        assertTrue(messages.any { it.contains("Media type with \$ref should not define other fields") }) 
+        println(messages); assertTrue(messages.any { it.contains("Media type with \$ref should not define other fields") }) 
     } 
 
     @Test
@@ -229,7 +229,7 @@ class OpenApiValidatorTest {
 
         val issues = validator.validate(definition) 
         val messages = issues.map { it.message } 
-        assertTrue(messages.any { it.contains("Example with \$ref must not define extensions") }) 
+        println(messages); assertTrue(messages.any { it.contains("Example with \$ref must not define extensions") }) 
     } 
 
     @Test
@@ -265,7 +265,7 @@ class OpenApiValidatorTest {
 
         val issues = validator.validate(definition) 
         val messages = issues.map { it.message } 
-        assertTrue(messages.any { it.contains("query and querystring parameters cannot be used together") }) 
+        println(messages); assertTrue(messages.any { it.contains("query and querystring parameters cannot be used together") }) 
     } 
 
     @Test
@@ -378,14 +378,14 @@ class OpenApiValidatorTest {
         val issues = validator.validate(definition) 
         val messages = issues.map { it.message } 
 
-        assertTrue(messages.any { it.contains("Path keys must start with") }) 
-        assertTrue(messages.any { it.contains("Server url must not include query or fragment") }) 
-        assertTrue(messages.any { it.contains("Parameter must not define both schema and content") }) 
-        assertTrue(messages.any { it.contains("query and querystring parameters cannot be used together") }) 
-        assertTrue(messages.any { it.contains("querystring parameters must use content") }) 
-        assertTrue(messages.any { it.contains("Header style must be 'simple'") }) 
-        assertTrue(messages.any { it.contains("Component keys must match") }) 
-        assertTrue(messages.any { it.contains("Response description is required") }) 
+        println(messages); assertTrue(messages.any { it.contains("Path keys must start with") }) 
+        println(messages); assertTrue(messages.any { it.contains("Server url must not include query or fragment") }) 
+        println(messages); assertTrue(messages.any { it.contains("Parameter must not define both schema and content") }) 
+        println(messages); assertTrue(messages.any { it.contains("query and querystring parameters cannot be used together") }) 
+        println(messages); assertTrue(messages.any { it.contains("querystring parameters must use content") }) 
+        println(messages); assertTrue(messages.any { it.contains("Header style must be 'simple'") }) 
+        println(messages); assertTrue(messages.any { it.contains("Component keys must match") }) 
+        println(messages); assertTrue(messages.any { it.contains("Response description is required") }) 
 
         val errorCount = issues.count { it.severity == OpenApiIssueSeverity.ERROR } 
         assertTrue(errorCount >= 7) 
@@ -414,7 +414,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("itemSchema is only valid for sequential") }) 
+        println(messages); assertTrue(messages.any { it.contains("itemSchema is only valid for sequential") }) 
     } 
 
     @Test
@@ -435,7 +435,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("valid URI") }) 
+        println(messages); assertTrue(messages.any { it.contains("valid URI") }) 
     } 
 
     @Test
@@ -466,7 +466,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Callback expression") }) 
+        println(messages); assertTrue(messages.any { it.contains("Callback expression") }) 
     } 
 
     @Test
@@ -505,8 +505,8 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Parameter content must contain exactly one media type") }) 
-        assertTrue(messages.any { it.contains("Header content must contain exactly one media type") }) 
+        println(messages); assertTrue(messages.any { it.contains("Parameter content must contain exactly one media type") }) 
+        println(messages); assertTrue(messages.any { it.contains("Header content must contain exactly one media type") }) 
     } 
 
     @Test
@@ -559,7 +559,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("prefixEncoding/itemEncoding requires an array schema") }) 
+        println(messages); assertTrue(messages.any { it.contains("prefixEncoding/itemEncoding requires an array schema") }) 
     } 
 
     @Test
@@ -596,12 +596,12 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Info title must not be blank") }) 
-        assertTrue(messages.any { it.contains("Info version must not be blank") }) 
-        assertTrue(messages.any { it.contains("valid URI") }) 
-        assertTrue(messages.any { it.contains("valid email") }) 
-        assertTrue(messages.any { it.contains("valid URL") || it.contains("absolute URL") }) 
-        assertTrue(messages.any { it.contains("https scheme") }) 
+        println(messages); assertTrue(messages.any { it.contains("Info title must not be blank") }) 
+        println(messages); assertTrue(messages.any { it.contains("Info version must not be blank") }) 
+        println(messages); assertTrue(messages.any { it.contains("valid URI") }) 
+        println(messages); assertTrue(messages.any { it.contains("valid email") }) 
+        println(messages); assertTrue(messages.any { it.contains("valid URL") || it.contains("absolute URL") }) 
+        println(messages); assertTrue(messages.any { it.contains("https scheme") }) 
     } 
 
     @Test
@@ -637,7 +637,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Encoding headers must not include Content-Type") }) 
+        println(messages); assertTrue(messages.any { it.contains("Encoding headers must not include Content-Type") }) 
     } 
 
     @Test
@@ -666,7 +666,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Parameters using content must not define style/explode/allowReserved") }) 
+        println(messages); assertTrue(messages.any { it.contains("Parameters using content must not define style/explode/allowReserved") }) 
     } 
 
     @Test
@@ -699,7 +699,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Encoding entry 'missing' has no matching schema property") }) 
+        println(messages); assertTrue(messages.any { it.contains("Encoding entry 'missing' has no matching schema property") }) 
     } 
 
     @Test
@@ -731,9 +731,9 @@ class OpenApiValidatorTest {
         val issues = validator.validate(definition) 
         val messages = issues.map { it.message } 
 
-        assertTrue(messages.any { it.contains("must not appear more than once") }) 
-        assertTrue(messages.any { it.contains("Missing path parameter 'id'") }) 
-        assertTrue(messages.any { it.contains("Path parameter 'oops' is not present") }) 
+        println(messages); assertTrue(messages.any { it.contains("must not appear more than once") }) 
+        println(messages); assertTrue(messages.any { it.contains("Missing path parameter 'id'") }) 
+        println(messages); assertTrue(messages.any { it.contains("Path parameter 'oops' is not present") }) 
     } 
 
     @Test
@@ -760,7 +760,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("templated structure") }) 
+        println(messages); assertTrue(messages.any { it.contains("templated structure") }) 
     } 
 
     @Test
@@ -791,8 +791,8 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("must not appear more than once") }) 
-        assertTrue(messages.any { it.contains("no variables map is defined") }) 
+        println(messages); assertTrue(messages.any { it.contains("must not appear more than once") }) 
+        println(messages); assertTrue(messages.any { it.contains("no variables map is defined") }) 
     } 
 
     @Test
@@ -816,7 +816,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Server name 'dup' must be unique") }) 
+        println(messages); assertTrue(messages.any { it.contains("Server name 'dup' must be unique") }) 
     } 
 
     @Test
@@ -844,7 +844,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("must not contain '{' or '}'") }) 
+        println(messages); assertTrue(messages.any { it.contains("must not contain '{' or '}'") }) 
     } 
 
     @Test
@@ -866,7 +866,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Server url must not include query or fragment") }) 
+        println(messages); assertTrue(messages.any { it.contains("Server url must not include query or fragment") }) 
     } 
 
     @Test
@@ -888,7 +888,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("additionalOperations method 'BAD METHOD' must be a valid HTTP token") }) 
+        println(messages); assertTrue(messages.any { it.contains("additionalOperations method 'BAD METHOD' must be a valid HTTP token") }) 
     } 
 
     @Test
@@ -936,9 +936,9 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Header content must contain exactly one media type") }) 
-        assertTrue(messages.any { it.contains("Header must define either schema or content") }) 
-        assertTrue(messages.any { it.contains("must not include 'Content-Type'") }) 
+        println(messages); assertTrue(messages.any { it.contains("Header content must contain exactly one media type") }) 
+        println(messages); assertTrue(messages.any { it.contains("Header must define either schema or content") }) 
+        println(messages); assertTrue(messages.any { it.contains("must not include 'Content-Type'") }) 
     } 
 
     @Test
@@ -960,8 +960,8 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Tag parent 'missing'") }) 
-        assertTrue(messages.any { it.contains("Tag parent cycle detected") }) 
+        println(messages); assertTrue(messages.any { it.contains("Tag parent 'missing'") }) 
+        println(messages); assertTrue(messages.any { it.contains("Tag parent cycle detected") }) 
     } 
 
     @Test
@@ -987,7 +987,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Path keys must not include query or fragment") }) 
+        println(messages); assertTrue(messages.any { it.contains("Path keys must not include query or fragment") }) 
     } 
 
     @Test
@@ -1021,7 +1021,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Duplicate parameter 'filter'") }) 
+        println(messages); assertTrue(messages.any { it.contains("Duplicate parameter 'filter'") }) 
     } 
 
     @Test
@@ -1050,8 +1050,8 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Header style must not be set when content is used") }) 
-        assertTrue(messages.any { it.contains("Header explode must not be set when content is used") }) 
+        println(messages); assertTrue(messages.any { it.contains("Header style must not be set when content is used") }) 
+        println(messages); assertTrue(messages.any { it.contains("Header explode must not be set when content is used") }) 
     } 
 
     @Test
@@ -1068,7 +1068,7 @@ class OpenApiValidatorTest {
 
         val issues = validator.validate(definition) 
         val messages = issues.map { it.message } 
-        assertTrue(messages.any { it.contains("Path Item with \$ref should not define other fields") }) 
+        println(messages); assertTrue(messages.any { it.contains("Path Item with \$ref should not define other fields") }) 
         assertTrue(issues.any { it.severity == OpenApiIssueSeverity.WARNING }) 
     } 
 
@@ -1094,8 +1094,8 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Link must define either operationId or operationRef") }) 
-        assertTrue(messages.any { it.contains("Link must not define both operationId and operationRef") }) 
+        println(messages); assertTrue(messages.any { it.contains("Link must define either operationId or operationRef") }) 
+        println(messages); assertTrue(messages.any { it.contains("Link must not define both operationId and operationRef") }) 
     } 
 
     @Test
@@ -1120,7 +1120,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("operationRef '#/paths/~1missing/get'") }) 
+        println(messages); assertTrue(messages.any { it.contains("operationRef '#/paths/~1missing/get'") }) 
         assertTrue(messages.none { it.contains("operationRef '#/paths/~1users/get'") }) 
     } 
 
@@ -1172,7 +1172,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("operationRef 'https://example.com/openapi#/paths/~1missing/get'") }) 
+        println(messages); assertTrue(messages.any { it.contains("operationRef 'https://example.com/openapi#/paths/~1missing/get'") }) 
         assertTrue(messages.none { it.contains("operationRef 'https://example.com/openapi#/paths/~1users/get'") }) 
     } 
 
@@ -1199,7 +1199,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition, baseUri = "https://example.com/root/openapi").map { it.message } 
-        assertTrue(messages.any { it.contains("operationRef 'https://example.com/api/openapi#/paths/~1missing/get'") }) 
+        println(messages); assertTrue(messages.any { it.contains("operationRef 'https://example.com/api/openapi#/paths/~1missing/get'") }) 
         assertTrue(messages.none { it.contains("operationRef 'https://example.com/api/openapi#/paths/~1users/get'") }) 
     } 
 
@@ -1228,8 +1228,8 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Security requirement references undefined scheme 'Missing'") }) 
-        assertTrue(messages.any { it.contains("Security requirement references undefined scheme 'UnknownScheme'") }) 
+        println(messages); assertTrue(messages.any { it.contains("Security requirement references undefined scheme 'Missing'") }) 
+        println(messages); assertTrue(messages.any { it.contains("Security requirement references undefined scheme 'UnknownScheme'") }) 
         assertTrue(messages.none { it.contains("https://example.com/auth") }) 
     } 
 
@@ -1261,8 +1261,8 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Encoding is only applicable") }) 
-        assertTrue(messages.any { it.contains("prefixEncoding/itemEncoding apply only to multipart") }) 
+        println(messages); assertTrue(messages.any { it.contains("Encoding is only applicable") }) 
+        println(messages); assertTrue(messages.any { it.contains("prefixEncoding/itemEncoding apply only to multipart") }) 
     } 
 
     @Test
@@ -1329,12 +1329,12 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("deepObject style only applies") }) 
-        assertTrue(messages.any { it.contains("spaceDelimited style does not support explode=true") }) 
-        assertTrue(messages.any { it.contains("Parameter style 'FORM' is not allowed for PATH") }) 
-        assertTrue(messages.any { it.contains("Parameter style 'SIMPLE' is not allowed for COOKIE") }) 
-        assertTrue(messages.any { it.contains("querystring parameters must define content") }) 
-        assertTrue(messages.any { it.contains("Parameter must define either schema or content") }) 
+        println(messages); assertTrue(messages.any { it.contains("deepObject style only applies") }) 
+        println(messages); assertTrue(messages.any { it.contains("spaceDelimited style does not support explode=true") }) 
+        println(messages); assertTrue(messages.any { it.contains("Parameter style 'FORM' is not allowed for PATH") }) 
+        println(messages); assertTrue(messages.any { it.contains("Parameter style 'SIMPLE' is not allowed for COOKIE") }) 
+        println(messages); assertTrue(messages.any { it.contains("querystring parameters must define content") }) 
+        println(messages); assertTrue(messages.any { it.contains("Parameter must define either schema or content") }) 
     } 
 
     @Test
@@ -1365,8 +1365,8 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("operationId 'dupId'") }) 
-        assertTrue(messages.any { it.contains("Tag name 'users'") }) 
+        println(messages); assertTrue(messages.any { it.contains("operationId 'dupId'") }) 
+        println(messages); assertTrue(messages.any { it.contains("Tag name 'users'") }) 
     } 
 
     @Test
@@ -1404,7 +1404,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("operationId 'dupCallback'") }) 
+        println(messages); assertTrue(messages.any { it.contains("operationId 'dupCallback'") }) 
     } 
 
     @Test
@@ -1431,7 +1431,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Invalid media type key") }) 
+        println(messages); assertTrue(messages.any { it.contains("Invalid media type key") }) 
     } 
 
     @Test
@@ -1454,8 +1454,8 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Invalid response code '20X'") }) 
-        assertTrue(messages.any { it.contains("Invalid response code '600'") }) 
+        println(messages); assertTrue(messages.any { it.contains("Invalid response code '20X'") }) 
+        println(messages); assertTrue(messages.any { it.contains("Invalid response code '600'") }) 
     } 
 
     @Test
@@ -1483,7 +1483,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Server variable default must be one of the enum values") }) 
+        println(messages); assertTrue(messages.any { it.contains("Server variable default must be one of the enum values") }) 
     } 
 
     @Test
@@ -1512,7 +1512,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("not used in the url: region") }) 
+        println(messages); assertTrue(messages.any { it.contains("not used in the url: region") }) 
     } 
 
     @Test
@@ -1540,7 +1540,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("no variables are used in the url") }) 
+        println(messages); assertTrue(messages.any { it.contains("no variables are used in the url") }) 
     } 
 
     @Test
@@ -1580,9 +1580,9 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Parameter must not define both example and examples") }) 
-        assertTrue(messages.any { it.contains("Example must not define both dataValue and value") }) 
-        assertTrue(messages.any { it.contains("Media type must not define both example and examples") }) 
+        println(messages); assertTrue(messages.any { it.contains("Parameter must not define both example and examples") }) 
+        println(messages); assertTrue(messages.any { it.contains("Example must not define both dataValue and value") }) 
+        println(messages); assertTrue(messages.any { it.contains("Media type must not define both example and examples") }) 
     } 
 
     @Test
@@ -1616,8 +1616,8 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Media type must not define encoding with prefixEncoding/itemEncoding") }) 
-        assertTrue(messages.any { it.contains("Encoding object must not define encoding with prefixEncoding/itemEncoding") }) 
+        println(messages); assertTrue(messages.any { it.contains("Media type must not define encoding with prefixEncoding/itemEncoding") }) 
+        println(messages); assertTrue(messages.any { it.contains("Encoding object must not define encoding with prefixEncoding/itemEncoding") }) 
     } 
 
     @Test
@@ -1651,11 +1651,11 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("apiKey security scheme requires name and in") }) 
-        assertTrue(messages.any { it.contains("http security scheme requires scheme") }) 
-        assertTrue(messages.any { it.contains("oauth2 security scheme requires flows") }) 
-        assertTrue(messages.any { it.contains("openIdConnect security scheme requires openIdConnectUrl") }) 
-        assertTrue(messages.any { it.contains("authorizationCode OAuth flow requires authorizationUrl and tokenUrl") }) 
+        println(messages); assertTrue(messages.any { it.contains("apiKey security scheme requires name and in") }) 
+        println(messages); assertTrue(messages.any { it.contains("http security scheme requires scheme") }) 
+        println(messages); assertTrue(messages.any { it.contains("oauth2 security scheme requires flows") }) 
+        println(messages); assertTrue(messages.any { it.contains("openIdConnect security scheme requires openIdConnectUrl") }) 
+        println(messages); assertTrue(messages.any { it.contains("authorizationCode OAuth flow requires authorizationUrl and tokenUrl") }) 
     } 
 
     @Test
@@ -1681,8 +1681,8 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Security scheme type 'bearer' is invalid") }) 
-        assertTrue(messages.any { it.contains("apiKey security scheme 'in' must be one of") }) 
+        println(messages); assertTrue(messages.any { it.contains("Security scheme type 'bearer' is invalid") }) 
+        println(messages); assertTrue(messages.any { it.contains("apiKey security scheme 'in' must be one of") }) 
     } 
 
     @Test
@@ -1710,7 +1710,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("License must not define both identifier and url") }) 
+        println(messages); assertTrue(messages.any { it.contains("License must not define both identifier and url") }) 
     } 
 
     @Test
@@ -1735,7 +1735,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("allowEmptyValue is only valid for query parameters") }) 
+        println(messages); assertTrue(messages.any { it.contains("allowEmptyValue is only valid for query parameters") }) 
     } 
 
     @Test
@@ -1759,7 +1759,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Header parameters named Accept, Content-Type, or Authorization") }) 
+        println(messages); assertTrue(messages.any { it.contains("Header parameters named Accept, Content-Type, or Authorization") }) 
     } 
 
     @Test
@@ -1779,7 +1779,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Discriminator requires oneOf, anyOf, or allOf") }) 
+        println(messages); assertTrue(messages.any { it.contains("Discriminator requires oneOf, anyOf, or allOf") }) 
     } 
 
     @Test
@@ -1801,7 +1801,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("defaultMapping is required") }) 
+        println(messages); assertTrue(messages.any { it.contains("defaultMapping is required") }) 
     } 
 
     @Test
@@ -1827,8 +1827,8 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("xml.attribute must not be set when xml.nodeType is present") }) 
-        assertTrue(messages.any { it.contains("xml.wrapped is only valid for array schemas") }) 
+        println(messages); assertTrue(messages.any { it.contains("xml.attribute must not be set when xml.nodeType is present") }) 
+        println(messages); assertTrue(messages.any { it.contains("xml.wrapped is only valid for array schemas") }) 
     } 
 
     @Test
@@ -1858,7 +1858,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Runtime expression '\$bad' is not valid") }) 
+        println(messages); assertTrue(messages.any { it.contains("Runtime expression '\$bad' is not valid") }) 
     } 
 
     @Test
@@ -1875,7 +1875,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Only one response is defined and it is not a success response") }) 
+        println(messages); assertTrue(messages.any { it.contains("Only one response is defined and it is not a success response") }) 
     } 
 
     @Test
@@ -1893,7 +1893,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("valid URI") }) 
+        println(messages); assertTrue(messages.any { it.contains("valid URI") }) 
     } 
 
     @Test
@@ -1986,7 +1986,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("valid URI") }) 
+        println(messages); assertTrue(messages.any { it.contains("valid URI") }) 
     } 
 
     @Test
@@ -2009,7 +2009,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("does not match any known operationId") }) 
+        println(messages); assertTrue(messages.any { it.contains("does not match any known operationId") }) 
     } 
 
     @Test
@@ -2028,7 +2028,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("valid URI") }) 
+        println(messages); assertTrue(messages.any { it.contains("valid URI") }) 
     } 
 
     @Test
@@ -2091,8 +2091,8 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("minLength must be greater than or equal to 0") }) 
-        assertTrue(messages.any { it.contains("minProperties must be less than or equal to maxProperties") }) 
+        println(messages); assertTrue(messages.any { it.contains("minLength must be greater than or equal to 0") }) 
+        println(messages); assertTrue(messages.any { it.contains("minProperties must be less than or equal to maxProperties") }) 
     } 
 
     @Test
@@ -2110,7 +2110,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("minContains/maxContains are ignored without a contains schema") }) 
+        println(messages); assertTrue(messages.any { it.contains("minContains/maxContains are ignored without a contains schema") }) 
     } 
 
     @Test
@@ -2129,8 +2129,8 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("contentMediaType must be a valid media type") }) 
-        assertTrue(messages.any { it.contains("contentEncoding is only applicable to string schemas") }) 
+        println(messages); assertTrue(messages.any { it.contains("contentMediaType must be a valid media type") }) 
+        println(messages); assertTrue(messages.any { it.contains("contentEncoding is only applicable to string schemas") }) 
     } 
 
     @Test
@@ -2147,7 +2147,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("OpenAPI vocabulary") }) 
+        println(messages); assertTrue(messages.any { it.contains("OpenAPI vocabulary") }) 
     } 
 
     @Test
@@ -2164,7 +2164,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("unknown keywords") }) 
+        println(messages); assertTrue(messages.any { it.contains("unknown keywords") }) 
     } 
 
     @Test
@@ -2214,7 +2214,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("does not resolve to components.schemas") }) 
+        println(messages); assertTrue(messages.any { it.contains("does not resolve to components.schemas") }) 
     } 
 
     @Test
@@ -2235,7 +2235,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("does not resolve to a \$defs entry") }) 
+        println(messages); assertTrue(messages.any { it.contains("does not resolve to a \$defs entry") }) 
     } 
 
     @Test
@@ -2261,7 +2261,7 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("does not resolve to components.parameters") }) 
+        println(messages); assertTrue(messages.any { it.contains("does not resolve to components.parameters") }) 
     } 
 
     @Test
@@ -2285,6 +2285,6 @@ class OpenApiValidatorTest {
         ) 
 
         val messages = validator.validate(definition).map { it.message } 
-        assertTrue(messages.any { it.contains("Link key 'bad key'") }) 
+        println(messages); assertTrue(messages.any { it.contains("Link key 'bad key'") }) 
     } 
 }
