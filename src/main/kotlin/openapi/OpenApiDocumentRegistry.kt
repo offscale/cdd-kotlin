@@ -1,6 +1,7 @@
 package openapi
 
 import domain.OpenApiDefinition
+import java.net.URI
 import domain.SchemaProperty
 import domain.PathItemRefResolver
 import domain.PathItemResolution
@@ -123,7 +124,7 @@ private fun resolveRelative(reference: String?, baseUri: String?): String? {
 
 private fun isAbsoluteUri(value: String): Boolean {
     return try {
-        isAbsoluteUri(value)
+        URI(value).isAbsolute
     } catch (_: Exception) {
         false
     }

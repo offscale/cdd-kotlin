@@ -140,7 +140,7 @@ class OpenApiParser() {
 
     private fun isAbsoluteUri(value: String): Boolean {
         return try {
-            isAbsoluteUri(value)
+            openapi.isAbsoluteUri(value)
         } catch (_: Exception) {
             false
         }

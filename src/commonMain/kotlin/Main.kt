@@ -17,8 +17,7 @@ import scaffold.ScaffoldGenerator
  * @param args Command-line arguments.
  */
 fun main(args: Array<String>) {
-    val actualArgs = if (args.isEmpty()) arrayOf("to_docs_json", "-i", "spec.json") else args
-    val exitCode = runCli(actualArgs)
+    val exitCode = runCli(args)
     if (exitCode != 0) {
         throw RuntimeException("CLI exited with code $exitCode")
     }
@@ -39,7 +38,7 @@ fun runCli(args: Array<String>): Int {
     val command = if (args.size > 1 && args[0] == "from_openapi") args[1] else args[0]
     if (command == "demo") {
         val generator = ScaffoldGenerator()
-        val outputDir = getEnvVar("PWD") ?: "."
+        val outputDir = (getEnvVar("PWD") ?: ".") + "/generated-project"
         println("Generating KMP Scaffold into: ${outputDir}...")
         val appInfo = Info(
             title = "My Generated App",
@@ -75,13 +74,13 @@ fun runCli(args: Array<String>): Int {
             i++
         }
 
-        if (inputFile.startsWith("/")) inputFile = inputFile.substring(1)
+
 
         if (inputFile.isEmpty()) {
             inputFile = getEnvVar("CDD_INPUT") ?: ""
         }
 
-        if (inputFile.startsWith("/")) inputFile = inputFile.substring(1)
+
 
         if (inputFile.isEmpty()) {
             println("Missing -i <spec.json>")

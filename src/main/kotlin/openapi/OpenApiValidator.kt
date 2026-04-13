@@ -1,5 +1,7 @@
 package openapi
 
+import java.util.Collections
+import java.util.IdentityHashMap
 import domain.Callback
 import domain.Components
 import domain.EndpointDefinition
@@ -3011,7 +3013,7 @@ class OpenApiValidator {
 
     private fun isAbsoluteUri(value: String): Boolean {
         return try {
-            isAbsoluteUri(value)
+            openapi.isAbsoluteUri(value)
         } catch (_: Exception) {
             false
         }

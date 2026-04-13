@@ -17,7 +17,7 @@ fun JsonNode.asDouble(defaultValue: Double = 0.0): Double = if (this is JsonPrim
 fun JsonNode.asBoolean(defaultValue: Boolean = false): Boolean = if (this is JsonPrimitive) this.booleanOrNull ?: defaultValue else defaultValue
 fun JsonNode.booleanValue(): Boolean = this.asBoolean()
 fun JsonNode.textValue(): String? = this.asText()
-fun JsonNode.numberValue(): Number? = if (this is JsonPrimitive) this.doubleOrNull else null
+fun JsonNode.numberValue(): Number? = if (this is JsonPrimitive) this.intOrNull ?: this.longOrNull ?: this.doubleOrNull else null
 fun JsonNode.intValue(): Int = this.asInt()
 fun JsonNode.doubleValue(): Double = this.asDouble()
 
