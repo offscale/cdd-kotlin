@@ -127,4 +127,26 @@ class MainTest {
         val result = runCli(arrayOf("to_docs_json", "--input", specFile.absolutePath, "--no-imports", "--no-wrapping"))
         assertEquals(0, result)
     }
+
+    @Test
+    fun `to_sdk generates kotlin sdk`(@TempDir tempDir: Path) {
+        withUserDir(tempDir) {
+            val outDir = tempDir.resolve("out").toFile()
+            outDir.mkdirs()
+            val result = runCli(arrayOf("to_sdk", "-o", outDir.absolutePath))
+            assertEquals(0, result)
+            assertTrue(File(outDir, "ApiClient.kt").exists())
+        }
+    }
+
+    @Test
+    fun `from_openapi to_sdk delegates correctly`(@TempDir tempDir: Path) {
+        withUserDir(tempDir) {
+            val outDir = tempDir.resolve("out2").toFile()
+            outDir.mkdirs()
+            val result = runCli(arrayOf("from_openapi", "to_sdk", "-o", outDir.absolutePath))
+            assertEquals(0, result)
+            assertTrue(File(outDir, "ApiClient.kt").exists())
+        }
+    }
 }

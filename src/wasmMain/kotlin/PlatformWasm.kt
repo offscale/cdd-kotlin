@@ -1,3 +1,4 @@
+import kotlinx.io.writeString
 import kotlinx.io.buffered
 import kotlinx.io.files.Path
 import kotlinx.io.files.SystemFileSystem
@@ -16,7 +17,8 @@ actual fun readFile(path: String): String {
     }
 }
 actual fun writeToFile(path: String, content: String) {
-    try {
-        val p = Path(path)
-    } catch (e: Throwable) {}
+    val p = Path(path)
+    val sink = SystemFileSystem.sink(p).buffered()
+    sink.writeString(content)
+    sink.close()
 }
