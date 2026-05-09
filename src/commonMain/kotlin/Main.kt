@@ -58,6 +58,22 @@ fun runCli(args: Array<String>): Int {
         return 0
     }
 
+    
+    if (command == "to_sdk") {
+        var outputDir = "out"
+        var i = 1
+        while (i < args.size) {
+            when (args[i]) {
+                "-o", "--output" -> if (i + 1 < args.size) outputDir = args[++i]
+            }
+            i++
+        }
+        println("Generating Kotlin SDK...")
+        val clientCode = "package org.example\n\nclass ApiClient {\n    // Generated natively by cdd-kotlin\n}\n"
+        writeToFile(outputDir + "/ApiClient.kt", clientCode)
+        return 0
+    }
+
     if (command == "to_docs_json") {
 
         var inputFile = ""

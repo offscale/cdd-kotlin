@@ -18,9 +18,7 @@ fun processWasmArgs(args: Array<String>): String {
  */
 @OptIn(kotlin.wasm.ExperimentalWasmInterop::class)
 @WasmExport
-fun from_openapi(): Int {
-    return runCli(arrayOf("from_openapi"))
-}
+fun from_openapi(): Int { return runCli(arrayOf("from_openapi", "to_sdk", "-o", "out")) }
 
 /**
  * Exported WASM function for to_openapi.
@@ -38,4 +36,13 @@ fun to_openapi(): Int {
 @WasmExport
 fun to_docs_json(): Int {
     return runCli(arrayOf("to_docs_json"))
+}
+
+/**
+ * Exported WASM function for to_sdk.
+ */
+@OptIn(kotlin.wasm.ExperimentalWasmInterop::class)
+@WasmExport
+fun to_sdk(): Int {
+    return runCli(arrayOf("to_sdk"))
 }
