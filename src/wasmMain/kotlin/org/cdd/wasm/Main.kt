@@ -2,6 +2,7 @@ package org.cdd.wasm
 
 import kotlin.wasm.WasmExport
 import runCli
+import getEnvVar
 
 /**
  * Processes WASM arguments.
@@ -18,7 +19,11 @@ fun processWasmArgs(args: Array<String>): String {
  */
 @OptIn(kotlin.wasm.ExperimentalWasmInterop::class)
 @WasmExport
-fun from_openapi(): Int { return runCli(arrayOf("from_openapi", "to_sdk", "-o", "out")) }
+fun from_openapi(): Int { 
+    val argsStr = getEnvVar("CDD_ARGS") ?: "from_openapi to_sdk -o out"
+    val args = argsStr.split(" ").filter { it.isNotEmpty() }.toTypedArray()
+    return runCli(args) 
+}
 
 /**
  * Exported WASM function for to_openapi.
