@@ -6,8 +6,55 @@ import kotlinx.io.readString
 import kotlin.wasm.WasmImport
 import kotlin.wasm.unsafe.withScopedMemoryAllocator
 import kotlin.wasm.unsafe.UnsafeWasmMemoryApi
+import kotlin.wasm.unsafe.Pointer
 
-actual fun getEnvVar(name: String): String? = null
+@OptIn(kotlin.wasm.ExperimentalWasmInterop::class)
+@WasmImport("wasi_snapshot_preview1", "environ_sizes_get")
+private external fun wasi_environ_sizes_get(environ_count_ptr: Int, environ_buf_size_ptr: Int): Int
+
+@OptIn(kotlin.wasm.ExperimentalWasmInterop::class)
+@WasmImport("wasi_snapshot_preview1", "environ_get")
+private external fun wasi_environ_get(environ_ptr: Int, environ_buf_ptr: Int): Int
+
+@OptIn(kotlin.wasm.unsafe.UnsafeWasmMemoryApi::class)
+actual fun getEnvVar(name: String): String? {
+    var count = 0
+    var bufSize = 0
+    withScopedMemoryAllocator { alloc ->
+        val countPtr = alloc.allocate(4)
+        val bufSizePtr = alloc.allocate(4)
+        if (wasi_environ_sizes_get(countPtr.address.toInt(), bufSizePtr.address.toInt()) != 0) return null
+        count = countPtr.loadInt()
+        bufSize = bufSizePtr.loadInt()
+    }
+    if (count == 0) return null
+
+    var res: String? = null
+    withScopedMemoryAllocator { alloc ->
+        val environPtr = alloc.allocate(count * 4)
+        val environBufPtr = alloc.allocate(bufSize)
+        if (wasi_environ_get(environPtr.address.toInt(), environBufPtr.address.toInt()) != 0) return null
+
+        for (i in 0 until count) {
+            val strPtrInt = (environPtr + i * 4).loadInt()
+            val strPtr = Pointer(strPtrInt.toUInt())
+            var len = 0
+            while ((strPtr + len).loadByte() != 0.toByte()) {
+                len++
+            }
+            val bytes = ByteArray(len)
+            for (j in 0 until len) {
+                bytes[j] = (strPtr + j).loadByte()
+            }
+            val str = bytes.decodeToString()
+            if (str.startsWith("$name=")) {
+                res = str.substring(name.length + 1)
+                break
+            }
+        }
+    }
+    return res
+}
 
 /**
  * Reads a file using kotlinx.io.

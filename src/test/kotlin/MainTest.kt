@@ -55,14 +55,88 @@ class MainTest {
     }
 
     @Test
-    fun `to_docs_json fails if missing input file`() {
-        val originalInput = System.getenv("CDD_INPUT")
+    fun `to_sdk handles CDD_INPUT env variable`(@TempDir tempDir: Path) {
+        val specFile = tempDir.resolve("spec.json").toFile()
+        specFile.writeText("{}")
+        val original = System.getenv("CDD_INPUT") ?: System.getProperty("CDD_INPUT")
         try {
-            val result = runCli(arrayOf("to_docs_json"))
-            if (originalInput.isNullOrEmpty()) {
-                assertEquals(1, result)
-            }
+            System.setProperty("CDD_INPUT", specFile.absolutePath)
+            val result = runCli(arrayOf("to_sdk"))
+            assertEquals(1, result) // Fails due to invalid JSON, but proves file was picked up
         } finally {
+            if (original != null) System.setProperty("CDD_INPUT", original) else System.clearProperty("CDD_INPUT")
+        }
+    }
+
+    @Test
+    fun `to_sdk handles INPUT env variable`(@TempDir tempDir: Path) {
+        val specFile = tempDir.resolve("spec.json").toFile()
+        specFile.writeText("{}")
+        val original = System.getenv("INPUT") ?: System.getProperty("INPUT")
+        try {
+            System.setProperty("INPUT", specFile.absolutePath)
+            val result = runCli(arrayOf("to_sdk"))
+            assertEquals(1, result) // Fails due to invalid JSON, but proves file was picked up
+        } finally {
+            if (original != null) System.setProperty("INPUT", original) else System.clearProperty("INPUT")
+        }
+    }
+
+    @Test
+    fun `to_sdk fails if missing input file`() {
+        val original = System.getProperty("CDD_INPUT")
+        val originalInput = System.getProperty("INPUT")
+        try {
+            System.clearProperty("CDD_INPUT")
+            System.clearProperty("INPUT")
+            val result = runCli(arrayOf("to_sdk"))
+            assertEquals(1, result)
+        } finally {
+            if (original != null) System.setProperty("CDD_INPUT", original)
+            if (originalInput != null) System.setProperty("INPUT", originalInput)
+        }
+    }
+
+    @Test
+    fun `to_docs_json fails if missing input file`() {
+        val original = System.getProperty("CDD_INPUT")
+        val originalInput = System.getProperty("INPUT")
+        try {
+            System.clearProperty("CDD_INPUT")
+            System.clearProperty("INPUT")
+            val result = runCli(arrayOf("to_docs_json"))
+            assertEquals(1, result)
+        } finally {
+            if (original != null) System.setProperty("CDD_INPUT", original)
+            if (originalInput != null) System.setProperty("INPUT", originalInput)
+        }
+    }
+
+    @Test
+    fun `to_docs_json handles CDD_INPUT env variable`(@TempDir tempDir: Path) {
+        val specFile = tempDir.resolve("spec.json").toFile()
+        specFile.writeText("{}")
+        val original = System.getenv("CDD_INPUT") ?: System.getProperty("CDD_INPUT")
+        try {
+            System.setProperty("CDD_INPUT", specFile.absolutePath)
+            val result = runCli(arrayOf("to_docs_json"))
+            assertEquals(1, result) // Fails due to invalid JSON, but proves file was picked up
+        } finally {
+            if (original != null) System.setProperty("CDD_INPUT", original) else System.clearProperty("CDD_INPUT")
+        }
+    }
+
+    @Test
+    fun `to_docs_json handles INPUT env variable`(@TempDir tempDir: Path) {
+        val specFile = tempDir.resolve("spec.json").toFile()
+        specFile.writeText("{}")
+        val original = System.getenv("INPUT") ?: System.getProperty("INPUT")
+        try {
+            System.setProperty("INPUT", specFile.absolutePath)
+            val result = runCli(arrayOf("to_docs_json"))
+            assertEquals(1, result) // Fails due to invalid JSON, but proves file was picked up
+        } finally {
+            if (original != null) System.setProperty("INPUT", original) else System.clearProperty("INPUT")
         }
     }
 
@@ -131,9 +205,29 @@ class MainTest {
     @Test
     fun `to_sdk generates kotlin sdk`(@TempDir tempDir: Path) {
         withUserDir(tempDir) {
+            val specFile = tempDir.resolve("spec.json").toFile()
+            specFile.writeText("""
+            {
+              "openapi": "3.0.0",
+              "info": {
+                "title": "Test API",
+                "version": "1.0.0"
+              },
+              "paths": {
+                "/test": {
+                  "get": {
+                    "operationId": "getTest",
+                    "responses": {
+                      "200": { "description": "OK" }
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent())
             val outDir = tempDir.resolve("out").toFile()
             outDir.mkdirs()
-            val result = runCli(arrayOf("to_sdk", "-o", outDir.absolutePath))
+            val result = runCli(arrayOf("to_sdk", "-i", specFile.absolutePath, "-o", outDir.absolutePath))
             assertEquals(0, result)
             assertTrue(File(outDir, "ApiClient.kt").exists())
         }
@@ -142,9 +236,29 @@ class MainTest {
     @Test
     fun `from_openapi to_sdk delegates correctly`(@TempDir tempDir: Path) {
         withUserDir(tempDir) {
+            val specFile = tempDir.resolve("spec.json").toFile()
+            specFile.writeText("""
+            {
+              "openapi": "3.0.0",
+              "info": {
+                "title": "Test API",
+                "version": "1.0.0"
+              },
+              "paths": {
+                "/test": {
+                  "get": {
+                    "operationId": "getTest",
+                    "responses": {
+                      "200": { "description": "OK" }
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent())
             val outDir = tempDir.resolve("out2").toFile()
             outDir.mkdirs()
-            val result = runCli(arrayOf("from_openapi", "to_sdk", "-o", outDir.absolutePath))
+            val result = runCli(arrayOf("from_openapi", "to_sdk", "-i", specFile.absolutePath, "-o", outDir.absolutePath))
             assertEquals(0, result)
             assertTrue(File(outDir, "ApiClient.kt").exists())
         }
