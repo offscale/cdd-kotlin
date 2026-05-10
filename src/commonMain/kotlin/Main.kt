@@ -30,13 +30,14 @@ fun main(args: Array<String>) {
  * @return the exit code (0 for success, non-zero for failure).
  */
 fun runCli(args: Array<String>): Int {
-    if (args.isEmpty()) {
-        println("cdd-kotlin CLI")
-        return 0
-    }
+    try {
+        if (args.isEmpty()) {
+            println("cdd-kotlin CLI")
+            return 0
+        }
 
-    val command = if (args.size > 1 && args[0] == "from_openapi") args[1] else args[0]
-    if (command == "demo") {
+        val command = if (args.size > 1 && args[0] == "from_openapi") args[1] else args[0]
+        if (command == "demo") {
         val generator = ScaffoldGenerator()
         val outputDir = (getEnvVar("PWD") ?: ".") + "/generated-project"
         println("Generating KMP Scaffold into: ${outputDir}...")
@@ -259,6 +260,11 @@ fun runCli(args: Array<String>): Int {
         return 0
     }
     
-    println("Unknown command: $command")
-    return 1
+        println("Unknown command: $command")
+        return 1
+    } catch (e: Throwable) {
+        println("Execution failed: " + e.message)
+        e.printStackTrace()
+        return 1
+    }
 }
