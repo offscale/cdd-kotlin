@@ -152,6 +152,7 @@ kover {
         filters {
             excludes {
                 classes(
+                    "MainKt",
                     "openapi.OpenApiValidator*",
                     "openapi.OpenApiParser*",
                     "openapi.OpenApiWriter*",
