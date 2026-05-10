@@ -61,16 +61,86 @@ fun runCli(args: Array<String>): Int {
     
     if (command == "to_sdk") {
         var outputDir = "out"
+        var inputFile = ""
         var i = 1
         while (i < args.size) {
             when (args[i]) {
                 "-o", "--output" -> if (i + 1 < args.size) outputDir = args[++i]
+                "-i", "--input" -> if (i + 1 < args.size) inputFile = args[++i]
             }
             i++
         }
+
+        if (inputFile.isEmpty()) {
+            inputFile = getEnvVar("CDD_INPUT") ?: ""
+        }
+
+        if (inputFile.isEmpty()) {
+            println("Missing -i <spec.json>")
+            return 1
+        }
+
+        val jsonStr = readFile(inputFile)
+        val parser = OpenApiParser()
+        val result = try { parser.parseDocumentString(jsonStr) } catch(e: Throwable) { println("PARSE ERROR: " + e.message); throw e }
+
+        val doc = when (result) {
+            is OpenApiDocument.OpenApi -> result.definition
+            else -> {
+                println("Not an OpenAPI document")
+                return 1
+            }
+        }
+
         println("Generating Kotlin SDK...")
-        val clientCode = "package org.example\n\nclass ApiClient {\n    // Generated natively by cdd-kotlin\n}\n"
-        writeToFile(outputDir + "/ApiClient.kt", clientCode)
+        
+        val sb = StringBuilder()
+        sb.append("package org.example\n\n")
+        sb.append("import io.ktor.client.*\n")
+        sb.append("import io.ktor.client.request.*\n")
+        sb.append("import io.ktor.client.statement.*\n\n")
+        sb.append("class ApiClient(val baseUrl: String = \"https://api.example.com\") {\n")
+        sb.append("    val client = HttpClient()\n\n")
+        
+        for ((path, pathItem) in doc.paths) {
+            val methods = mapOf(
+                "get" to pathItem.get,
+                "put" to pathItem.put,
+                "post" to pathItem.post,
+                "delete" to pathItem.delete,
+                "options" to pathItem.options,
+                "head" to pathItem.head,
+                "patch" to pathItem.patch,
+                "trace" to pathItem.trace
+            )
+            for ((methodName, operation) in methods) {
+                if (operation == null) continue
+                
+                val opId = operation.operationId ?: "${methodName}${path.replace("/", "").replace("{", "").replace("}", "")}"
+                
+                var urlPath = path
+                urlPath = urlPath.replace(Regex("\\{([^}]+)\\}")) { matchResult ->
+                    "$" + "{${matchResult.groupValues[1]}}"
+                }
+                
+                val paramsStr = mutableListOf<String>()
+                val pathParams = Regex("\\{([^}]+)\\}").findAll(path).map { it.groupValues[1] }.toList()
+                for (param in pathParams) {
+                    paramsStr.add("$param: String")
+                }
+                
+                val arguments = paramsStr.joinToString(", ")
+                
+                sb.append("    suspend fun $opId($arguments): HttpResponse {\n")
+                sb.append("        return client.${methodName}(\"\$baseUrl$urlPath\") {\n")
+                sb.append("            // Add parameters and body here\n")
+                sb.append("        }\n")
+                sb.append("    }\n\n")
+            }
+        }
+        sb.append("}\n")
+
+        writeToFile("$outputDir/ApiClient.kt", sb.toString())
         return 0
     }
 
