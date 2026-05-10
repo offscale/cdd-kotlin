@@ -72,7 +72,7 @@ fun runCli(args: Array<String>): Int {
         }
 
         if (inputFile.isEmpty()) {
-            inputFile = getEnvVar("CDD_INPUT") ?: ""
+            inputFile = getEnvVar("CDD_INPUT") ?: getEnvVar("INPUT") ?: ""
         }
 
         if (inputFile.isEmpty()) {
@@ -163,7 +163,7 @@ fun runCli(args: Array<String>): Int {
 
 
         if (inputFile.isEmpty()) {
-            inputFile = getEnvVar("CDD_INPUT") ?: ""
+            inputFile = getEnvVar("CDD_INPUT") ?: getEnvVar("INPUT") ?: ""
         }
 
 
