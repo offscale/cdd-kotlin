@@ -255,7 +255,7 @@ class OpenApiParser() {
         baseUri: String?,
     ): OpenApiDocument {
         val obj = root.asObject()
-        return if (obj != null && obj.has("openapi")) {
+        return if (obj != null && (obj.has("openapi") || obj.has("swagger"))) {
             OpenApiDocument.OpenApi(parseOpenApi(root, baseUri))
         } else {
             OpenApiDocument.Schema(parseSchemaRoot(root))

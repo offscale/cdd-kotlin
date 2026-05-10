@@ -57,23 +57,85 @@ actual fun getEnvVar(name: String): String? {
 }
 
 /**
- * Reads a file using kotlinx.io.
+ * Reads a file using WASI POSIX imports.
  * 
  * @param path The path of the file to read.
  * @return The contents of the file as a String.
  */
+@OptIn(kotlin.wasm.unsafe.UnsafeWasmMemoryApi::class)
 actual fun readFile(path: String): String {
     val cleanPath = if (path.startsWith("/")) path.substring(1) else path
-    try {
-        val p = Path(cleanPath)
-        val source = SystemFileSystem.source(p).buffered()
-        val text = source.readString()
-        source.close()
-        return text
-    } catch (e: Throwable) {
-        throw e
+    val pathBytes = cleanPath.encodeToByteArray()
+    var inFd = -1
+    var success = false
+    var lastErrno = -1
+    
+    withScopedMemoryAllocator { alloc ->
+        val pathPtr = alloc.allocate(pathBytes.size)
+        for (i in pathBytes.indices) {
+            (pathPtr + i).storeByte(pathBytes[i])
+        }
+        val inFdPtr = alloc.allocate(4)
+        
+        for (tryFd in 3..10) {
+            val errno = wasi_path_open(
+                fd = tryFd,
+                dirflags = 1, // SYMLINK_FOLLOW
+                path_ptr = pathPtr.address.toInt(),
+                path_len = pathBytes.size,
+                oflags = 0, // No O_CREAT
+                fs_rights_base = 2L, // RIGHT_FD_READ (2)
+                fs_rights_inheriting = 0L,
+                fdflags = 0,
+                opened_fd_ptr = inFdPtr.address.toInt()
+            )
+            if (errno == 0) {
+                inFd = inFdPtr.loadInt()
+                success = true
+                break
+            } else if (errno != 8) { // 8 is EBADF
+                lastErrno = errno
+            }
+        }
+        
+        if (!success) {
+            throw RuntimeException("Can't open $cleanPath for read: WASI errno $lastErrno")
+        }
     }
+    
+    val bufferSize = 8192
+    val resultBytes = mutableListOf<Byte>()
+    
+    withScopedMemoryAllocator { alloc ->
+        val dataPtr = alloc.allocate(bufferSize)
+        val iovsPtr = alloc.allocate(8)
+        iovsPtr.storeInt(dataPtr.address.toInt())
+        (iovsPtr + 4).storeInt(bufferSize)
+        val nreadPtr = alloc.allocate(4)
+        
+        while (true) {
+            val errno = wasi_fd_read(inFd, iovsPtr.address.toInt(), 1, nreadPtr.address.toInt())
+            if (errno != 0) {
+                wasi_fd_close(inFd)
+                throw RuntimeException("WASI fd_read failed for $cleanPath with errno $errno")
+            }
+            val nread = nreadPtr.loadInt()
+            if (nread == 0) {
+                break
+            }
+            for (i in 0 until nread) {
+                resultBytes.add((dataPtr + i).loadByte())
+            }
+        }
+    }
+    
+    wasi_fd_close(inFd)
+    return resultBytes.toByteArray().decodeToString()
 }
+
+@OptIn(kotlin.wasm.ExperimentalWasmInterop::class)
+@WasmImport("wasi_snapshot_preview1", "fd_read")
+private external fun wasi_fd_read(fd: Int, iovs_ptr: Int, iovs_len: Int, nread_ptr: Int): Int
 
 @OptIn(kotlin.wasm.ExperimentalWasmInterop::class)
 @WasmImport("wasi_snapshot_preview1", "path_open")
