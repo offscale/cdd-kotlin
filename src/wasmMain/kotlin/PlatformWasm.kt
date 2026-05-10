@@ -63,8 +63,9 @@ actual fun getEnvVar(name: String): String? {
  * @return The contents of the file as a String.
  */
 actual fun readFile(path: String): String {
+    val cleanPath = if (path.startsWith("/")) path.substring(1) else path
     try {
-        val p = Path(path)
+        val p = Path(cleanPath)
         val source = SystemFileSystem.source(p).buffered()
         val text = source.readString()
         source.close()
@@ -115,7 +116,8 @@ private fun logStderr(message: String) {
  */
 @OptIn(kotlin.wasm.unsafe.UnsafeWasmMemoryApi::class)
 actual fun writeToFile(path: String, content: String) {
-    val pathBytes = path.encodeToByteArray()
+    val cleanPath = if (path.startsWith("/")) path.substring(1) else path
+    val pathBytes = cleanPath.encodeToByteArray()
     var outFd = -1
     var success = false
     var lastErrno = -1
