@@ -1,4 +1,5 @@
 import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
@@ -229,7 +230,85 @@ class MainTest {
             outDir.mkdirs()
             val result = runCli(arrayOf("to_sdk", "-i", specFile.absolutePath, "-o", outDir.absolutePath))
             assertEquals(0, result)
-            assertTrue(File(outDir, "Client.kt").exists())
+            assertTrue(File(outDir, "src/main/kotlin/org/example/Client.kt").exists())
+            assertTrue(File(outDir, "build.gradle.kts").exists())
+            assertTrue(File(outDir, ".github/workflows/ci.yml").exists())
+        }
+    }
+
+    @Test
+    fun `to_sdk skips github actions when no-github-actions is passed`(@TempDir tempDir: Path) {
+        withUserDir(tempDir) {
+            val specFile = tempDir.resolve("spec.json").toFile()
+            specFile.writeText("""
+            {
+              "openapi": "3.0.0",
+              "info": {
+                "title": "Test API",
+                "version": "1.0.0"
+              }
+            }
+        """.trimIndent())
+            val outDir = tempDir.resolve("out").toFile()
+            outDir.mkdirs()
+            val result = runCli(arrayOf("to_sdk", "-i", specFile.absolutePath, "-o", outDir.absolutePath, "--no-github-actions"))
+            assertEquals(0, result)
+            assertFalse(File(outDir, ".github/workflows/ci.yml").exists())
+            assertTrue(File(outDir, "build.gradle.kts").exists())
+        }
+    }
+
+    @Test
+    fun `to_sdk skips build gradle when no-installable-package is passed`(@TempDir tempDir: Path) {
+        withUserDir(tempDir) {
+            val specFile = tempDir.resolve("spec.json").toFile()
+            specFile.writeText("""
+            {
+              "openapi": "3.0.0",
+              "info": {
+                "title": "Test API",
+                "version": "1.0.0"
+              }
+            }
+        """.trimIndent())
+            val outDir = tempDir.resolve("out").toFile()
+            outDir.mkdirs()
+            val result = runCli(arrayOf("to_sdk", "-i", specFile.absolutePath, "-o", outDir.absolutePath, "--no-installable-package"))
+            assertEquals(0, result)
+            assertTrue(File(outDir, ".github/workflows/ci.yml").exists())
+            assertFalse(File(outDir, "build.gradle.kts").exists())
+        }
+    }
+
+    @Test
+    fun `to_sdk generates mocks and tests when create-composable-tests-mocks is passed`(@TempDir tempDir: Path) {
+        withUserDir(tempDir) {
+            val specFile = tempDir.resolve("spec.json").toFile()
+            specFile.writeText("""
+            {
+              "openapi": "3.0.0",
+              "info": {
+                "title": "Test API",
+                "version": "1.0.0"
+              },
+              "paths": {
+                "/test": {
+                  "get": {
+                    "operationId": "getTest",
+                    "responses": {
+                      "200": { "description": "OK" }
+                    }
+                  }
+                }
+              }
+            }
+        """.trimIndent())
+            val outDir = tempDir.resolve("out").toFile()
+            outDir.mkdirs()
+            val result = runCli(arrayOf("to_sdk", "-i", specFile.absolutePath, "-o", outDir.absolutePath, "--tests"))
+            assertEquals(0, result)
+            assertTrue(File(outDir, "src/main/kotlin/org/example/Mocks.kt").exists())
+            assertTrue(File(outDir, "src/main/kotlin/org/example/Tests.kt").exists())
         }
     }
 
@@ -260,7 +339,8 @@ class MainTest {
             outDir.mkdirs()
             val result = runCli(arrayOf("from_openapi", "to_sdk", "-i", specFile.absolutePath, "-o", outDir.absolutePath))
             assertEquals(0, result)
-            assertTrue(File(outDir, "Client.kt").exists())
+            assertTrue(File(outDir, "src/main/kotlin/org/example/Client.kt").exists())
+            assertTrue(File(outDir, "build.gradle.kts").exists())
         }
     }
 }

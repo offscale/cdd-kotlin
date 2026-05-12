@@ -169,6 +169,36 @@ private fun logStderr(message: String) {
     }
 }
 
+@OptIn(kotlin.wasm.ExperimentalWasmInterop::class)
+@WasmImport("wasi_snapshot_preview1", "path_create_directory")
+private external fun wasi_path_create_directory(fd: Int, path_ptr: Int, path_len: Int): Int
+
+@OptIn(kotlin.wasm.unsafe.UnsafeWasmMemoryApi::class)
+private fun wasiMkdirs(path: String) {
+    val cleanPath = if (path.startsWith("/")) path.substring(1) else path
+    val parts = cleanPath.split("/")
+    var currentPath = ""
+    for (i in 0 until parts.size - 1) {
+        if (parts[i].isEmpty()) continue
+        currentPath = if (currentPath.isEmpty()) parts[i] else "$currentPath/${parts[i]}"
+        
+        val pathBytes = currentPath.encodeToByteArray()
+        withScopedMemoryAllocator { alloc ->
+            val pathPtr = alloc.allocate(pathBytes.size)
+            for (j in pathBytes.indices) {
+                (pathPtr + j).storeByte(pathBytes[j])
+            }
+            
+            for (tryFd in 3..10) {
+                val errno = wasi_path_create_directory(tryFd, pathPtr.address.toInt(), pathBytes.size)
+                if (errno == 0 || errno == 17 || errno == 20) { // 0 = SUCCESS, 17/20 = EEXIST
+                    break
+                }
+            }
+        }
+    }
+}
+
 /**
  * Writes content to a file, bypassing kotlinx.io and utilizing low-level POSIX imports 
  * ('@WasmImport') for 'fd_write'/'path_open' to properly handle restricted WASI preopen paths.
@@ -178,6 +208,7 @@ private fun logStderr(message: String) {
  */
 @OptIn(kotlin.wasm.unsafe.UnsafeWasmMemoryApi::class)
 actual fun writeToFile(path: String, content: String) {
+    wasiMkdirs(path)
     val cleanPath = if (path.startsWith("/")) path.substring(1) else path
     val pathBytes = cleanPath.encodeToByteArray()
     var outFd = -1
