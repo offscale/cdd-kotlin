@@ -94,14 +94,49 @@ fun runCli(args: Array<String>): Int {
         }
 
         println("Generating Kotlin SDK...")
+
+        // Generate Models.kt
+        val modelsSb = StringBuilder()
+        modelsSb.append("package org.example\n\n")
+        modelsSb.append("import kotlinx.serialization.Serializable\n\n")
         
-        val sb = StringBuilder()
-        sb.append("package org.example\n\n")
-        sb.append("import io.ktor.client.*\n")
-        sb.append("import io.ktor.client.request.*\n")
-        sb.append("import io.ktor.client.statement.*\n\n")
-        sb.append("class ApiClient(val baseUrl: String = \"https://api.example.com\") {\n")
-        sb.append("    val client = HttpClient()\n\n")
+        doc.components?.schemas?.forEach { (name, schema) ->
+            modelsSb.append("@Serializable\n")
+            modelsSb.append("data class $name(\n")
+            val props = mutableListOf<String>()
+            schema.properties.forEach { (propName, propDef) ->
+                // simplified type mapping
+                var kotlinType = "String"
+                if (propDef.types.contains("integer") || propDef.type == "integer") kotlinType = "Int"
+                else if (propDef.types.contains("boolean") || propDef.type == "boolean") kotlinType = "Boolean"
+                else if (propDef.types.contains("number") || propDef.type == "number") kotlinType = "Double"
+                else if (propDef.types.contains("array") || propDef.type == "array") {
+                    kotlinType = "List<Any>" // simplified
+                } else if (propDef.ref != null) {
+                    kotlinType = propDef.ref.split("/").last()
+                }
+                
+                if (!schema.required.contains(propName)) {
+                    kotlinType += "? = null"
+                }
+                props.add("    val $propName: $kotlinType")
+            }
+            modelsSb.append(props.joinToString(",\n"))
+            modelsSb.append("\n)\n\n")
+        }
+        
+        if (doc.components?.schemas?.isNotEmpty() == true) {
+            writeToFile("$outputDir/Models.kt", modelsSb.toString())
+        }
+
+        // Generate Client.kt
+        val clientSb = StringBuilder()
+        clientSb.append("package org.example\n\n")
+        clientSb.append("import io.ktor.client.*\n")
+        clientSb.append("import io.ktor.client.request.*\n")
+        clientSb.append("import io.ktor.client.statement.*\n\n")
+        clientSb.append("class Client(val baseUrl: String = \"https://api.example.com\") {\n")
+        clientSb.append("    val client = HttpClient()\n\n")
         
         for ((path, pathItem) in doc.paths) {
             val methods = mapOf(
@@ -132,16 +167,16 @@ fun runCli(args: Array<String>): Int {
                 
                 val arguments = paramsStr.joinToString(", ")
                 
-                sb.append("    suspend fun $opId($arguments): HttpResponse {\n")
-                sb.append("        return client.${methodName}(\"\$baseUrl$urlPath\") {\n")
-                sb.append("            // Add parameters and body here\n")
-                sb.append("        }\n")
-                sb.append("    }\n\n")
+                clientSb.append("    suspend fun $opId($arguments): HttpResponse {\n")
+                clientSb.append("        return client.${methodName}(\"\$baseUrl$urlPath\") {\n")
+                clientSb.append("            // Add parameters and body here\n")
+                clientSb.append("        }\n")
+                clientSb.append("    }\n\n")
             }
         }
-        sb.append("}\n")
+        clientSb.append("}\n")
 
-        writeToFile("$outputDir/ApiClient.kt", sb.toString())
+        writeToFile("$outputDir/Client.kt", clientSb.toString())
         return 0
     }
 

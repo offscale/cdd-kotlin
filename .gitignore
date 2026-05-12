@@ -1,49 +1,79 @@
+# Project specific
 generated-project
-
-build
-
-# gradle
-.gradle
-.gradle_home
-
-### IntelliJ IDEA ###
+build/
 out/
-!**/src/main/**/out/
-!**/src/test/**/out/
+bin/
+
+# Gradle
+.gradle/
+.gradle_home/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Kotlin
+.kotlin/
+
+# IDEs
+## IntelliJ IDEA
+.idea/
 *.iml
-*.idea
+*.iws
+*.ipr
 
-### Kotlin ###
-.kotlin
-
-### Eclipse ###
+## Eclipse
 .apt_generated
 .classpath
 .factorypath
 .project
-.settings
+.settings/
 .springBeans
 .sts4-cache
-bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
 
-### NetBeans ###
+## VS Code
+.vscode/
+*.code-workspace
+.history/
+
+## NetBeans
 /nbproject/private/
 /nbbuild/
 /dist/
 /nbdist/
 /.nb-gradle/
 
-### VS Code ###
-.vscode/
-
-### Mac OS ###
+# OS specific
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# Compiled/Generated
 *.wasm
-node_modules/
-__pycache__/
 *.o
 *.so
+*.class
+*.log
+*.sqlite
 target/
-.idea/
+node_modules/
+__pycache__/
+*.pyc
+
+# Local Environment
+.env
+.env.local
+*.local
+
+# Archives
+*.tar
+*.gz
+*.zip
+*.rar
+
+# Tmp files
+*~
+*.swp

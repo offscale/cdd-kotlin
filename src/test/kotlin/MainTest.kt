@@ -229,7 +229,7 @@ class MainTest {
             outDir.mkdirs()
             val result = runCli(arrayOf("to_sdk", "-i", specFile.absolutePath, "-o", outDir.absolutePath))
             assertEquals(0, result)
-            assertTrue(File(outDir, "ApiClient.kt").exists())
+            assertTrue(File(outDir, "Client.kt").exists())
         }
     }
 
@@ -260,7 +260,7 @@ class MainTest {
             outDir.mkdirs()
             val result = runCli(arrayOf("from_openapi", "to_sdk", "-i", specFile.absolutePath, "-o", outDir.absolutePath))
             assertEquals(0, result)
-            assertTrue(File(outDir, "ApiClient.kt").exists())
+            assertTrue(File(outDir, "Client.kt").exists())
         }
     }
 }

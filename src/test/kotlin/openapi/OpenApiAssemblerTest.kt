@@ -116,6 +116,10 @@ class OpenApiAssemblerTest {
                 ),
                 servers = listOf(Server(url = "https://pets.example.com")),
                 extensions = mapOf("x-path" to true)
+            ),
+            "/other" to PathItem(
+                summary = "Other",
+                extensions = mapOf("x-other" to true)
             )
         )
 
@@ -134,6 +138,10 @@ class OpenApiAssemblerTest {
         assertEquals("https://pets.example.com", item?.servers?.first()?.url)
         assertEquals(true, item?.extensions?.get("x-path"))
         assertEquals("listPets", item?.get?.operationId)
+        
+        val otherItem = definition.paths["/other"]
+        assertNotNull(otherItem)
+        assertEquals("Other", otherItem?.summary)
     }
 
     @Test
@@ -160,5 +168,29 @@ class OpenApiAssemblerTest {
         assertNotNull(item)
         assertEquals("#/components/pathItems/Pets", item?.ref)
         assertEquals(null, item?.get)
+    }
+    
+    @Test
+    fun `assemble merges path item metadata with existing extensions`() {
+        // Need to pass built paths with extensions and pathItems with extensions
+        // Currently OpenApiPathBuilder doesn't put extensions into PathItem easily
+        // But we can trigger mergeExtensions by having both
+        val definitions = OpenApiAssembler().assemble(
+            info = Info("Pets API", "1.0"),
+            endpoints = listOf(
+                EndpointDefinition(
+                    path = "/pets",
+                    method = HttpMethod.GET,
+                    operationId = "listPets"
+                )
+            ),
+            pathItems = mapOf(
+                "/pets" to PathItem(
+                    extensions = mapOf("x-new" to "value")
+                )
+            )
+        )
+        assertNotNull(definitions.paths["/pets"])
+        assertEquals("value", definitions.paths["/pets"]?.extensions?.get("x-new"))
     }
 }
