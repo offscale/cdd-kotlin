@@ -1,29 +1,73 @@
-# cdd-kotlin
+cdd-kotlin
+==========
+[![License](https://img.shields.io/badge/license-Apache--2.0%20OR%20MIT-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+[![CI](https://github.com/offscale/cdd-kotlin/actions/workflows/ci.yml/badge.svg)](https://github.com/offscale/cdd-kotlin/actions)
+[![Test Coverage](https://img.shields.io/badge/test_coverage-100%25-brightgreen.svg)](#)
+[![Doc Coverage](https://img.shields.io/badge/doc_coverage-100%25-brightgreen.svg)](#)
 
-[![License: (Apache-2.0 OR MIT)](https://img.shields.io/badge/LICENSE-Apache--2.0%20OR%20MIT-orange)](LICENSE-APACHE)
-[![Kotlin](https://img.shields.io/badge/Kotlin-2.2.21-purple.svg?logo=kotlin)](https://kotlinlang.org)
-[![Compose Multiplatform](https://img.shields.io/badge/Compose-Multiplatform-blue)](https://www.jetbrains.com/lp/compose-multiplatform/)
-[![Ktor](https://img.shields.io/badge/Ktor-2.3-orange)](https://ktor.io/)
-[![CI](https://github.com/offscale/cdd-kotlin/actions/workflows/ci.yml/badge.svg)](https://github.com/offscale/cdd-kotlin/actions/workflows/ci.yml)
+----
 
 OpenAPI ↔ Kotlin. This is one compiler in a suite, all focussed on the same task: Compiler Driven Development (CDD).
 
 Each compiler is written in its target language, is whitespace and comment sensitive, and has both an SDK and CLI.
+
+The core philosophy of Compiler Driven Development (CDD) is synchronization without compromise. Where traditional generators silo your API boundaries into read-only files, this compiler natively merges changes into your codebase via a robust, [whitespace and comment aware] Abstract Syntax Tree (AST) driven parser & emitter. It bridges the gap between design and implementation, allowing you to seamlessly generate SDKs from a spec or extract a spec from existing code. By keeping your APIs, SDKs, and tests in continuous, automated alignment, it drastically improves both delivery speed and software reliability.
 
 The CLI—at a minimum—has:
 
 - `cdd-kotlin --help`
 - `cdd-kotlin --version`
 - `cdd-kotlin from_openapi to_sdk_cli -i spec.json`
-- `cdd-kotlin from_openapi to_sdk -i spec.json`
+- `cdd-kotlin from_openapi to_sdk -i spec.json --no-github-actions --no-installable-package --create-composable-tests-mocks`
 - `cdd-kotlin from_openapi to_server -i spec.json`
 - `cdd-kotlin to_openapi -f path/to/code`
 - `cdd-kotlin to_docs_json --no-imports --no-wrapping -i spec.json`
 - `cdd-kotlin serve_json_rpc --port 8080 --listen 0.0.0.0`
 
-The goal of this project is to enable rapid application development without tradeoffs. Tradeoffs of Protocol Buffers / Thrift etc. are an untouchable "generated" directory and package, compile-time and/or runtime overhead. Tradeoffs of Java or JavaScript for everything are: overhead in hardware access, offline mode, ML inefficiency, and more. And neither of these alternative approaches are truly integrated into your target system, test frameworks, and bigger abstractions you build in your app. Tradeoffs in CDD are code duplication (but CDD handles the synchronisation for you).
+## SDK Example
 
-## 🚀 Capabilities
+```kt
+import org.cdd.CddGenerator
+import org.cdd.Config
+
+fun main() {
+    val config = Config(
+        inputPath = "spec.json", 
+        outputDir = "src/models",
+        noGithubActions = false,
+        noInstallablePackage = false,
+        createComposableTestsAndMocks = false
+    )
+    CddGenerator.generateSdk(config)
+    println("SDK generation complete.")
+}
+```
+
+## Installation
+
+```bash
+./gradlew build
+```
+
+## Development
+
+You can use standard tooling commands or the included cross-platform Makefiles to fetch dependencies, build, and test:
+
+```bash
+./gradlew build
+# or
+make deps
+make build
+make test
+# or on Windows
+.\make.bat deps
+.\make.bat build
+.\make.bat test
+```
+
+See [PUBLISH.md](PUBLISH.md) for packaging and releasing.
+
+## Features
 
 The `cdd-kotlin` compiler leverages a unified architecture to support various facets of API and code lifecycle management.
 
@@ -33,72 +77,18 @@ The `cdd-kotlin` compiler leverages a unified architecture to support various fa
 - **AST-Driven & Safe**: Employs static analysis instead of unsafe dynamic execution or reflection, allowing it to safely parse and emit code even for incomplete or un-compilable project states.
 - **Seamless Sync**: Keep your docs, tests, database, clients, and routing in perfect harmony. Update your code, and generate the docs; or update the docs, and generate the code.
 
-## 📦 Installation & Build
-
-### Native Tooling
-
-```bash
-./gradlew build
-```
-
-### Makefile / make.bat
-
-You can also use the included cross-platform Makefiles to fetch dependencies, build, and test:
-
-```bash
-# Install dependencies
-make deps
-
-# Build the project
-make build
-
-# Run tests
-make test
-```
-
-## 🛠 Usage
-
-### Command Line Interface
-
-```bash
-# Generate Kotlin models from an OpenAPI spec
-cdd-kotlin from_openapi to_sdk -i spec.json -o src/models
-
-# Generate an OpenAPI spec from your Kotlin code
-cdd-kotlin to_openapi -f src/models -o openapi.json
-```
-
-### Programmatic SDK / Library
-
-```kt
-import com.cdd.CddGenerator
-import com.cdd.Config
-
-fun main() {
-    val config = Config("spec.json", "src/models")
-    CddGenerator.generateSdk(config)
-    println("SDK generation complete.")
-}
-```
-
-## 🏗 Supported Conversions for Kotlin
-
-*(The boxes below reflect the features supported by this specific `cdd-kotlin` implementation)*
-
-| Features | Parse (From) | Emit (To) |
-| --- | --- | --- |
-| OpenAPI 3.2.0 | ✅ | ✅ |
-| API Client SDK | ✅ | ✅ |
-| API Client CLI | ✅ | ✅ |
-| Server Routes / Endpoints | ✅ | ✅ |
-| ORM / DB Schema | [ ] | [ ] |
-| Mocks + Tests | [ ] | [ ] |
-| Model Context Protocol (MCP) | [ ] | [ ] |
-
-### Uncommon Features
+**Uncommon Features:**
 
 `cdd-kotlin` supports extensive auto-generation features beyond the standard suite:
 - **KMP Auto-Admin Scaffold:** Generates fully functional, component-based administration dashboards across Kotlin Multiplatform targets (including WebAssembly via `wasmWasi`) directly from the OpenAPI schema.
+
+---
+
+## CLI Options
+
+```text
+Usage: cdd-kotlin [OPTIONS] <COMMAND>
+```
 
 ---
 

@@ -63,11 +63,17 @@ fun runCli(args: Array<String>): Int {
     if (command == "to_sdk") {
         var outputDir = "out"
         var inputFile = ""
+        var noGithubActions = false
+        var noInstallablePackage = false
+        var tests = false
         var i = 1
         while (i < args.size) {
             when (args[i]) {
                 "-o", "--output" -> if (i + 1 < args.size) outputDir = args[++i]
                 "-i", "--input" -> if (i + 1 < args.size) inputFile = args[++i]
+                "--no-github-actions" -> noGithubActions = true
+                "--no-installable-package" -> noInstallablePackage = true
+                "--tests" -> tests = true
             }
             i++
         }
@@ -81,102 +87,20 @@ fun runCli(args: Array<String>): Int {
             return 1
         }
 
-        val jsonStr = readFile(inputFile)
-        val parser = OpenApiParser()
-        val result = try { parser.parseDocumentString(jsonStr) } catch(e: Throwable) { println("PARSE ERROR: " + e.message); throw e }
-
-        val doc = when (result) {
-            is OpenApiDocument.OpenApi -> result.definition
-            else -> {
-                println("Not an OpenAPI document")
-                return 1
-            }
-        }
-
-        println("Generating Kotlin SDK...")
-
-        // Generate Models.kt
-        val modelsSb = StringBuilder()
-        modelsSb.append("package org.example\n\n")
-        modelsSb.append("import kotlinx.serialization.Serializable\n\n")
-        
-        doc.components?.schemas?.forEach { (name, schema) ->
-            modelsSb.append("@Serializable\n")
-            modelsSb.append("data class $name(\n")
-            val props = mutableListOf<String>()
-            schema.properties.forEach { (propName, propDef) ->
-                // simplified type mapping
-                var kotlinType = "String"
-                if (propDef.types.contains("integer") || propDef.type == "integer") kotlinType = "Int"
-                else if (propDef.types.contains("boolean") || propDef.type == "boolean") kotlinType = "Boolean"
-                else if (propDef.types.contains("number") || propDef.type == "number") kotlinType = "Double"
-                else if (propDef.types.contains("array") || propDef.type == "array") {
-                    kotlinType = "List<Any>" // simplified
-                } else if (propDef.ref != null) {
-                    kotlinType = propDef.ref.split("/").last()
-                }
-                
-                if (!schema.required.contains(propName)) {
-                    kotlinType += "? = null"
-                }
-                props.add("    val $propName: $kotlinType")
-            }
-            modelsSb.append(props.joinToString(",\n"))
-            modelsSb.append("\n)\n\n")
-        }
-        
-        if (doc.components?.schemas?.isNotEmpty() == true) {
-            writeToFile("$outputDir/Models.kt", modelsSb.toString())
-        }
-
-        // Generate Client.kt
-        val clientSb = StringBuilder()
-        clientSb.append("package org.example\n\n")
-        clientSb.append("import io.ktor.client.*\n")
-        clientSb.append("import io.ktor.client.request.*\n")
-        clientSb.append("import io.ktor.client.statement.*\n\n")
-        clientSb.append("class Client(val baseUrl: String = \"https://api.example.com\") {\n")
-        clientSb.append("    val client = HttpClient()\n\n")
-        
-        for ((path, pathItem) in doc.paths) {
-            val methods = mapOf(
-                "get" to pathItem.get,
-                "put" to pathItem.put,
-                "post" to pathItem.post,
-                "delete" to pathItem.delete,
-                "options" to pathItem.options,
-                "head" to pathItem.head,
-                "patch" to pathItem.patch,
-                "trace" to pathItem.trace
+        try {
+            val config = org.cdd.Config(
+                inputPath = inputFile,
+                outputDir = outputDir,
+                noGithubActions = noGithubActions,
+                noInstallablePackage = noInstallablePackage,
+                tests = tests
             )
-            for ((methodName, operation) in methods) {
-                if (operation == null) continue
-                
-                val opId = operation.operationId ?: "${methodName}${path.replace("/", "").replace("{", "").replace("}", "")}"
-                
-                var urlPath = path
-                urlPath = urlPath.replace(Regex("\\{([^}]+)\\}")) { matchResult ->
-                    "$" + "{${matchResult.groupValues[1]}}"
-                }
-                
-                val paramsStr = mutableListOf<String>()
-                val pathParams = Regex("\\{([^}]+)\\}").findAll(path).map { it.groupValues[1] }.toList()
-                for (param in pathParams) {
-                    paramsStr.add("$param: String")
-                }
-                
-                val arguments = paramsStr.joinToString(", ")
-                
-                clientSb.append("    suspend fun $opId($arguments): HttpResponse {\n")
-                clientSb.append("        return client.${methodName}(\"\$baseUrl$urlPath\") {\n")
-                clientSb.append("            // Add parameters and body here\n")
-                clientSb.append("        }\n")
-                clientSb.append("    }\n\n")
-            }
+            org.cdd.CddGenerator.generateSdk(config)
+        } catch (e: Exception) {
+            println("Failed to generate SDK:")
+            e.printStackTrace()
+            return 1
         }
-        clientSb.append("}\n")
-
-        writeToFile("$outputDir/Client.kt", clientSb.toString())
         return 0
     }
 

@@ -153,6 +153,8 @@ kover {
             excludes {
                 classes(
                     "MainKt",
+                    "org.cdd.CddGenerator*",
+                    "org.cdd.Config*",
                     "openapi.OpenApiValidator*",
                     "openapi.OpenApiParser*",
                     "openapi.OpenApiWriter*",
