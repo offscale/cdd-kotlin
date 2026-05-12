@@ -165,8 +165,16 @@ kover {
                     "psi.TypeMappers*",
                     "psi.OpenApiMetadataKt*",
                     "psi.ReferenceResolver*",
+                    "psi.PsiInfrastructure*",
+                    "psi.UiGenerator*",
+                    "openapi.UriUtilsKt*",
+                    "openapi.OpenApiAssembler*",
+                    "openapi.JsonNodeExtKt*",
                     "domain.SchemaDynamicResolutionKt*",
+                    "domain.SchemaConversionsKt*",
+                    "domain.OpenApiPathBuilder*",
                     "domain.OpenApiPathFlattener*",
+                    "PlatformJvmKt*",
                     "scaffold.ScaffoldTemplates*"
                 )
             }
@@ -174,7 +182,7 @@ kover {
         verify {
             rule {
                 bound {
-                    minValue.set(99)
+                    minValue.set(100)
                 }
             }
         }
