@@ -195,3 +195,15 @@ tasks.check {
     dependsOn("checkDocCoverage") 
     dependsOn("koverVerify") 
 }
+
+tasks.register<JavaExec>("run") {
+    group = "application"
+    mainClass.set("MainKt")
+    classpath = kotlin.targets.getByName("jvm").compilations.getByName("main").output.allOutputs + 
+                kotlin.targets.getByName("jvm").compilations.getByName("main").compileDependencyFiles +
+                kotlin.targets.getByName("jvm").compilations.getByName("main").runtimeDependencyFiles
+    
+    if (project.hasProperty("args")) {
+        args((project.property("args") as String).split(" "))
+    }
+}
