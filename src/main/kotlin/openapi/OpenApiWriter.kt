@@ -122,19 +122,41 @@ class OpenApiWriter(
     private fun openApiToMap(definition: OpenApiDefinition): Map<String, Any?> {
         val refBase = normalizeSelfRefBase(definition.self)
         val map = linkedMapOf<String, Any?>()
-        map["openapi"] = definition.openapi
+        val isSwagger2 = definition.swagger != null || definition.openapi.startsWith("2") || definition.openapi.startsWith("1")
+        if (isSwagger2) {
+            map["swagger"] = definition.swagger ?: "2.0"
+        } else {
+            map["openapi"] = definition.openapi
+        }
         map["info"] = infoToMap(definition.info)
+        if (isSwagger2) {
+            map.putIfNotNull("host", definition.host)
+            map.putIfNotNull("basePath", definition.basePath)
+            map.putIfNotEmpty("schemes", definition.schemes)
+            map.putIfNotEmpty("consumes", definition.consumes)
+            map.putIfNotEmpty("produces", definition.produces)
+        }
         map.putIfNotNull("jsonSchemaDialect", definition.jsonSchemaDialect)
         map.putIfNotEmpty("servers", definition.servers.map { serverToMap(it) })
-        val pathsMap = pathsToMap(definition.paths, definition.pathsExtensions, refBase)
+        val pathsMap = pathsToMap(definition.paths, definition.pathsExtensions, refBase, isSwagger2)
         if (pathsMap.isNotEmpty() || definition.pathsExplicitEmpty) {
             map["paths"] = pathsMap
         }
-        val webhooksMap = pathsToMap(definition.webhooks, definition.webhooksExtensions, refBase)
+        val webhooksMap = pathsToMap(definition.webhooks, definition.webhooksExtensions, refBase, isSwagger2)
         if (webhooksMap.isNotEmpty() || definition.webhooksExplicitEmpty) {
             map["webhooks"] = webhooksMap
         }
-        definition.components?.let { map["components"] = componentsToMap(it, refBase) }
+        
+        if (isSwagger2 && definition.components != null) {
+            val c = definition.components
+            map.putIfNotEmpty("definitions", c.schemas.mapValues { schemaToMap(it.value, refBase) })
+            map.putIfNotEmpty("parameters", c.parameters.mapValues { parameterToMap(it.value, refBase, isSwagger2) })
+            map.putIfNotEmpty("responses", c.responses.mapValues { responseToMap(it.value, refBase, isSwagger2) })
+            map.putIfNotEmpty("securityDefinitions", c.securitySchemes.mapValues { securitySchemeToMap(it.value, refBase, isSwagger2) })
+        } else {
+            definition.components?.let { map["components"] = componentsToMap(it, refBase, false) }
+        }
+        
         securityToValue(definition.security, definition.securityExplicitEmpty)?.let { map["security"] = it }
         map.putIfNotEmpty("tags", definition.tags.map { tagToMap(it) })
         definition.externalDocs?.let { map["externalDocs"] = externalDocsToMap(it) }
@@ -199,30 +221,30 @@ class OpenApiWriter(
         return map
     }
 
-    private fun pathItemToMap(item: PathItem, refBase: String?): Map<String, Any?> {
+    private fun pathItemToMap(item: PathItem, refBase: String?, isSwagger2: Boolean = false): Map<String, Any?> {
         val map = linkedMapOf<String, Any?>()
         item.ref?.let { map["\$ref"] = it }
         map.putIfNotNull("summary", item.summary)
         map.putIfNotNull("description", item.description)
-        item.get?.let { map["get"] = operationToMap(it, refBase) }
-        item.put?.let { map["put"] = operationToMap(it, refBase) }
-        item.post?.let { map["post"] = operationToMap(it, refBase) }
-        item.delete?.let { map["delete"] = operationToMap(it, refBase) }
-        item.options?.let { map["options"] = operationToMap(it, refBase) }
-        item.head?.let { map["head"] = operationToMap(it, refBase) }
-        item.patch?.let { map["patch"] = operationToMap(it, refBase) }
-        item.trace?.let { map["trace"] = operationToMap(it, refBase) }
-        item.query?.let { map["query"] = operationToMap(it, refBase) }
+        item.get?.let { map["get"] = operationToMap(it, refBase, isSwagger2) }
+        item.put?.let { map["put"] = operationToMap(it, refBase, isSwagger2) }
+        item.post?.let { map["post"] = operationToMap(it, refBase, isSwagger2) }
+        item.delete?.let { map["delete"] = operationToMap(it, refBase, isSwagger2) }
+        item.options?.let { map["options"] = operationToMap(it, refBase, isSwagger2) }
+        item.head?.let { map["head"] = operationToMap(it, refBase, isSwagger2) }
+        item.patch?.let { map["patch"] = operationToMap(it, refBase, isSwagger2) }
+        item.trace?.let { map["trace"] = operationToMap(it, refBase, isSwagger2) }
+        item.query?.let { map["query"] = operationToMap(it, refBase, isSwagger2) }
         if (item.additionalOperations.isNotEmpty()) {
-            map["additionalOperations"] = item.additionalOperations.mapValues { operationToMap(it.value, refBase) }
+            map["additionalOperations"] = item.additionalOperations.mapValues { operationToMap(it.value, refBase, isSwagger2) }
         }
-        map.putIfNotEmpty("parameters", item.parameters.map { parameterToMap(it) })
+        map.putIfNotEmpty("parameters", item.parameters.map { parameterToMap(it, refBase, isSwagger2) })
         map.putIfNotEmpty("servers", item.servers.map { serverToMap(it) })
         map.putExtensions(item.extensions)
         return map
     }
 
-    private fun operationToMap(operation: EndpointDefinition, refBase: String?): Map<String, Any?> {
+    private fun operationToMap(operation: EndpointDefinition, refBase: String?, isSwagger2: Boolean = false): Map<String, Any?> {
         val map = linkedMapOf<String, Any?>()
         map.putIfNotEmpty("tags", operation.tags)
         map.putIfNotNull("summary", operation.summary)
@@ -231,14 +253,19 @@ class OpenApiWriter(
         if (operation.operationIdExplicit) {
             map["operationId"] = operation.operationId
         }
-        map.putIfNotEmpty("parameters", operation.parameters.map { parameterToMap(it) })
+        if (isSwagger2) {
+            map.putIfNotEmpty("consumes", operation.consumes)
+            map.putIfNotEmpty("produces", operation.produces)
+            map.putIfNotEmpty("schemes", operation.schemes)
+        }
+        map.putIfNotEmpty("parameters", operation.parameters.map { parameterToMap(it, refBase, isSwagger2) })
         operation.requestBody?.let { map["requestBody"] = requestBodyToMap(it) }
         if (operation.requestBody == null && operation.requestBodyType != null) {
             map["requestBody"] = requestBodyToMap(
                 RequestBody(
                     content = mapOf(
                         "application/json" to MediaTypeObject(
-                            schema = SchemaProperty(ref = componentRef(refBase, "schemas", operation.requestBodyType))
+                            schema = SchemaProperty(ref = componentRef(refBase, "schemas", operation.requestBodyType, isSwagger2))
                         )
                     ),
                     required = true
@@ -246,7 +273,7 @@ class OpenApiWriter(
             )
         }
         if (operation.responses.isNotEmpty()) {
-            map["responses"] = operation.responses.mapValues { responseToMap(it.value, refBase) }
+            map["responses"] = operation.responses.mapValues { responseToMap(it.value, refBase, isSwagger2) }
         }
         map.putIfNotEmpty("callbacks", callbacksToMap(operation.callbacks, refBase))
         map.putIfTrue("deprecated", operation.deprecated)
@@ -276,7 +303,7 @@ class OpenApiWriter(
         }
     }
 
-    private fun parameterToMap(parameter: EndpointParameter): Map<String, Any?> {
+    private fun parameterToMap(parameter: EndpointParameter, refBase: String?, isSwagger2: Boolean = false): Map<String, Any?> {
         parameter.reference?.let { return referenceToMap(it) }
         val map = linkedMapOf<String, Any?>()
         map["name"] = parameter.name
@@ -285,14 +312,33 @@ class OpenApiWriter(
         map.putIfTrue("required", parameter.isRequired)
         map.putIfTrue("deprecated", parameter.deprecated)
         map.putIfNotNull("allowEmptyValue", parameter.allowEmptyValue)
-        parameter.style?.let { map["style"] = parameterStyle(it) }
-        map.putIfNotNull("explode", parameter.explode)
-        map.putIfNotNull("allowReserved", parameter.allowReserved)
 
-        if (parameter.content.isNotEmpty()) {
-            map["content"] = contentToMap(parameter.content)
-        } else if (parameter.schema != null) {
-            map["schema"] = schemaPropertyToMap(parameter.schema)
+        if (isSwagger2) {
+            if (parameter.location == ParameterLocation.BODY) {
+                if (parameter.schema != null) {
+                    map["schema"] = schemaPropertyToMap(parameter.schema)
+                } else {
+                    map["schema"] = schemaPropertyToMap(SchemaProperty(types = setOf(parameter.type)))
+                }
+            } else {
+                map.putIfNotNull("type", parameter.schema?.type?.takeIf { it != "object" } ?: parameter.type)
+                map.putIfNotNull("format", parameter.schema?.format)
+                map.putIfNotNull("collectionFormat", parameter.collectionFormat)
+                if (parameter.schema?.items != null) {
+                    map["items"] = schemaPropertyToMap(parameter.schema.items)
+                } else if (map["type"] == "array") {
+                    map["items"] = mapOf("type" to "string")
+                }
+            }
+        } else {
+            parameter.style?.let { map["style"] = parameterStyle(it) }
+            map.putIfNotNull("explode", parameter.explode)
+            map.putIfNotNull("allowReserved", parameter.allowReserved)
+            if (parameter.content.isNotEmpty()) {
+                map["content"] = contentToMap(parameter.content)
+            } else if (parameter.schema != null) {
+                map["schema"] = schemaPropertyToMap(parameter.schema)
+            }
         }
 
         parameter.example?.let { exampleValue(it) }?.let { map["example"] = it }
@@ -313,44 +359,77 @@ class OpenApiWriter(
         return map
     }
 
-    private fun responseToMap(response: EndpointResponse, refBase: String?): Map<String, Any?> {
+    private fun responseToMap(response: EndpointResponse, refBase: String?, isSwagger2: Boolean = false): Map<String, Any?> {
         response.reference?.let { return referenceToMap(it) }
         val map = linkedMapOf<String, Any?>()
-        map.putIfNotNull("summary", response.summary)
+        if (!isSwagger2) {
+            map.putIfNotNull("summary", response.summary)
+        }
         map.putIfNotNull("description", response.description)
         val headers = response.headers.filterKeys { !it.equals("Content-Type", ignoreCase = true) }
-        map.putIfNotEmpty("headers", headers.mapValues { headerToMap(it.value) })
+        map.putIfNotEmpty("headers", headers.mapValues { headerToMap(it.value, isSwagger2) })
 
-        if (response.content.isNotEmpty() || response.contentPresent) {
-            map["content"] = contentToMap(response.content)
-        } else if (response.type != null) {
-            map["content"] = contentToMap(
-                mapOf(
-                    "application/json" to MediaTypeObject(
-                        schema = SchemaProperty(ref = componentRef(refBase, "schemas", response.type))
+        if (isSwagger2) {
+            if (response.schema != null) {
+                map["schema"] = schemaPropertyToMap(response.schema)
+            } else if (response.type != null) {
+                map["schema"] = schemaPropertyToMap(SchemaProperty(ref = componentRef(refBase, "schemas", response.type, isSwagger2)))
+            } else if (response.content.isNotEmpty()) {
+                val media = response.content.values.firstOrNull()
+                if (media?.schema != null) {
+                    map["schema"] = schemaPropertyToMap(media.schema)
+                }
+            }
+            if (response.examples.isNotEmpty()) {
+                val examplesMap = linkedMapOf<String, Any?>()
+                for ((mime, example) in response.examples) {
+                    example.value?.let { examplesMap[mime] = it }
+                }
+                map.putIfNotEmpty("examples", examplesMap)
+            }
+        } else {
+            if (response.content.isNotEmpty() || response.contentPresent) {
+                map["content"] = contentToMap(response.content)
+            } else if (response.type != null) {
+                map["content"] = contentToMap(
+                    mapOf(
+                        "application/json" to MediaTypeObject(
+                            schema = SchemaProperty(ref = componentRef(refBase, "schemas", response.type))
+                        )
                     )
                 )
-            )
+            }
+            response.links?.let { map["links"] = it.mapValues { linkToMap(it.value) } }
         }
 
-        response.links?.let { map["links"] = it.mapValues { linkToMap(it.value) } }
         map.putExtensions(response.extensions)
         return map
     }
 
-    private fun headerToMap(header: Header): Map<String, Any?> {
+    private fun headerToMap(header: Header, isSwagger2: Boolean = false): Map<String, Any?> {
         header.reference?.let { return referenceToMap(it) }
         val map = linkedMapOf<String, Any?>()
         map.putIfNotNull("description", header.description)
         map.putIfTrue("required", header.required)
         map.putIfTrue("deprecated", header.deprecated)
 
-        if (header.content.isNotEmpty()) {
-            map["content"] = contentToMap(header.content)
-        } else if (header.schema != null) {
-            map["schema"] = schemaPropertyToMap(header.schema)
-            map.putIfNotNull("style", header.style?.let { parameterStyle(it) })
-            map.putIfNotNull("explode", header.explode)
+        if (isSwagger2) {
+            map.putIfNotNull("type", header.schema?.type?.takeIf { it != "object" } ?: header.type)
+            map.putIfNotNull("format", header.schema?.format)
+            map.putIfNotNull("collectionFormat", header.collectionFormat)
+            if (header.schema?.items != null) {
+                map["items"] = schemaPropertyToMap(header.schema.items)
+            } else if (map["type"] == "array") {
+                map["items"] = mapOf("type" to "string")
+            }
+        } else {
+            if (header.content.isNotEmpty()) {
+                map["content"] = contentToMap(header.content)
+            } else if (header.schema != null) {
+                map["schema"] = schemaPropertyToMap(header.schema)
+                map.putIfNotNull("style", header.style?.let { parameterStyle(it) })
+                map.putIfNotNull("explode", header.explode)
+            }
         }
 
         header.example?.let { exampleValue(it) }?.let { map["example"] = it }
@@ -411,18 +490,18 @@ class OpenApiWriter(
         return map
     }
 
-    private fun componentsToMap(components: Components, refBase: String?): Map<String, Any?> {
+    private fun componentsToMap(components: Components, refBase: String?, isSwagger2: Boolean = false): Map<String, Any?> {
         val map = linkedMapOf<String, Any?>()
         map.putIfNotEmpty("schemas", components.schemas.mapValues { schemaToMap(it.value, refBase) })
-        map.putIfNotEmpty("responses", components.responses.mapValues { responseToMap(it.value, refBase) })
-        map.putIfNotEmpty("parameters", components.parameters.mapValues { parameterToMap(it.value) })
+        map.putIfNotEmpty("responses", components.responses.mapValues { responseToMap(it.value, refBase, isSwagger2) })
+        map.putIfNotEmpty("parameters", components.parameters.mapValues { parameterToMap(it.value, refBase, isSwagger2) })
         map.putIfNotEmpty("requestBodies", components.requestBodies.mapValues { requestBodyToMap(it.value) })
-        map.putIfNotEmpty("headers", components.headers.mapValues { headerToMap(it.value) })
-        map.putIfNotEmpty("securitySchemes", components.securitySchemes.mapValues { securitySchemeToMap(it.value) })
+        map.putIfNotEmpty("headers", components.headers.mapValues { headerToMap(it.value, isSwagger2) })
+        map.putIfNotEmpty("securitySchemes", components.securitySchemes.mapValues { securitySchemeToMap(it.value, refBase, isSwagger2) })
         map.putIfNotEmpty("examples", exampleMapToMap(components.examples))
         map.putIfNotEmpty("links", components.links.mapValues { linkToMap(it.value) })
         map.putIfNotEmpty("callbacks", callbacksToMap(components.callbacks, refBase))
-        map.putIfNotEmpty("pathItems", components.pathItems.mapValues { pathItemToMap(it.value, refBase) })
+        map.putIfNotEmpty("pathItems", components.pathItems.mapValues { pathItemToMap(it.value, refBase, isSwagger2) })
         map.putIfNotEmpty("mediaTypes", components.mediaTypes.mapValues { mediaTypeToMap(it.value) })
         map.putExtensions(components.extensions)
         return map
@@ -638,18 +717,25 @@ class OpenApiWriter(
         return map
     }
 
-    private fun securitySchemeToMap(scheme: SecurityScheme): Map<String, Any?> {
+    private fun securitySchemeToMap(scheme: SecurityScheme, refBase: String? = null, isSwagger2: Boolean = false): Map<String, Any?> {
         scheme.reference?.let { return referenceToMap(it) }
         val map = linkedMapOf<String, Any?>()
         map["type"] = scheme.type
         map.putIfNotNull("description", scheme.description)
         map.putIfNotNull("name", scheme.name)
         map.putIfNotNull("in", scheme.`in`)
-        map.putIfNotNull("scheme", scheme.scheme)
-        map.putIfNotNull("bearerFormat", scheme.bearerFormat)
-        scheme.flows?.let { map["flows"] = oauthFlowsToMap(it) }
-        map.putIfNotNull("openIdConnectUrl", scheme.openIdConnectUrl)
-        map.putIfNotNull("oauth2MetadataUrl", scheme.oauth2MetadataUrl)
+        if (isSwagger2) {
+            map.putIfNotNull("flow", scheme.flow)
+            map.putIfNotNull("authorizationUrl", scheme.authorizationUrl)
+            map.putIfNotNull("tokenUrl", scheme.tokenUrl)
+            map.putIfNotEmpty("scopes", scheme.scopes ?: emptyMap())
+        } else {
+            map.putIfNotNull("scheme", scheme.scheme)
+            map.putIfNotNull("bearerFormat", scheme.bearerFormat)
+            scheme.flows?.let { map["flows"] = oauthFlowsToMap(it) }
+            map.putIfNotNull("openIdConnectUrl", scheme.openIdConnectUrl)
+            map.putIfNotNull("oauth2MetadataUrl", scheme.oauth2MetadataUrl)
+        }
         map.putIfTrue("deprecated", scheme.deprecated)
         map.putExtensions(scheme.extensions)
         return map
@@ -747,12 +833,13 @@ class OpenApiWriter(
     private fun pathsToMap(
         paths: Map<String, PathItem>,
         extensions: Map<String, Any?>,
-        refBase: String?
+        refBase: String?,
+        isSwagger2: Boolean = false
     ): Map<String, Any?> {
         if (paths.isEmpty() && extensions.isEmpty()) return emptyMap()
         val map = linkedMapOf<String, Any?>()
         paths.forEach { (path, item) ->
-            map[path] = pathItemToMap(item, refBase)
+            map[path] = pathItemToMap(item, refBase, isSwagger2)
         }
         extensions.forEach { (key, value) ->
             if (key.startsWith("x-")) {
@@ -768,9 +855,17 @@ class OpenApiWriter(
         return value.substringBefore("#")
     }
 
-    private fun componentRef(base: String?, component: String, name: String): String {
+    private fun componentRef(base: String?, component: String, name: String, isSwagger2: Boolean = false): String {
         val encoded = encodeJsonPointerSegment(name)
-        val suffix = "#/components/$component/$encoded"
+        val suffix = if (isSwagger2) {
+            when (component) {
+                "schemas" -> "#/definitions/$encoded"
+                "securitySchemes" -> "#/securityDefinitions/$encoded"
+                else -> "#/$component/$encoded"
+            }
+        } else {
+            "#/components/$component/$encoded"
+        }
         val prefix = base?.trimEnd('#')?.trimEnd()
         return if (prefix.isNullOrEmpty()) suffix else "$prefix$suffix"
     }
@@ -786,6 +881,8 @@ class OpenApiWriter(
             ParameterLocation.QUERYSTRING -> "querystring"
             ParameterLocation.HEADER -> "header"
             ParameterLocation.COOKIE -> "cookie"
+            ParameterLocation.BODY -> "body"
+            ParameterLocation.FORMDATA -> "formData"
         }
     }
 

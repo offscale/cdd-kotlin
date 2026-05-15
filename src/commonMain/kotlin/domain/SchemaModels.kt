@@ -175,6 +175,11 @@ data class SchemaDefinition(
     val maxItems: Int? = null,
 
     /**
+     * Swagger 2.0 (Items Object): Determines the format of the array if type array is used.
+     */
+    val collectionFormat: String? = null,
+
+    /**
      * Whether array items must be unique.
      * JSON Schema keyword: `uniqueItems`.
      */
@@ -651,6 +656,11 @@ data class SchemaProperty(
      * JSON Schema keyword: `maxItems`.
      */
     val maxItems: Int? = null,
+
+    /**
+     * Swagger 2.0 (Items Object): Determines the format of the array if type array is used.
+     */
+    val collectionFormat: String? = null,
 
     /**
      * Whether array items must be unique.

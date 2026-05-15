@@ -2576,7 +2576,7 @@ class NetworkGenerator {
                     val baseLines = buildCookieParamLines(param, paramType)
                     wrapOptional(optional, param.name, baseLines)
                 }
-                ParameterLocation.PATH, ParameterLocation.QUERYSTRING -> emptyList()
+                ParameterLocation.PATH, ParameterLocation.QUERYSTRING, ParameterLocation.BODY, ParameterLocation.FORMDATA -> emptyList<String>()
             }
         }
 
