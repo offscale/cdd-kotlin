@@ -275,12 +275,19 @@ class OpenApiParser() {
     ): OpenApiDefinition {
         val self = root.text("\$self")
         return withSelfBase(self, baseUri) {
-            val components = parseComponents(root.get("components"))
+            val isSwagger2 = root.has("swagger")
+            val components = if (isSwagger2) parseSwagger2Components(root) else parseComponents(root.get("components"))
             val pathsResult = parsePaths(root.get("paths"), components)
             val webhooksResult = parsePaths(root.get("webhooks"), components)
             val securityResult = parseSecurityRequirements(root.get("security"))
             OpenApiDefinition(
-                openapi = root.text("openapi") ?: "3.2.0",
+                openapi = root.text("openapi") ?: if (isSwagger2) "3.0.0" else "3.2.0",
+                swagger = root.text("swagger"),
+                host = root.text("host"),
+                basePath = root.text("basePath"),
+                schemes = root.get("schemes")?.asArray()?.mapNotNull { it.textValue() } ?: emptyList(),
+                consumes = root.get("consumes")?.asArray()?.mapNotNull { it.textValue() } ?: emptyList(),
+                produces = root.get("produces")?.asArray()?.mapNotNull { it.textValue() } ?: emptyList(),
                 info = parseInfo(root.get("info")) ?: Info(title = "Unknown", version = "0.0.0"),
                 jsonSchemaDialect = root.text("jsonSchemaDialect"),
                 servers = parseServers(root.get("servers")),
@@ -483,6 +490,9 @@ class OpenApiParser() {
             externalDocs = parseExternalDocs(node.get("externalDocs")),
             tags = node.get("tags")?.asArray()?.mapNotNull { it.textValue() } ?: emptyList(),
             callbacks = parseCallbacks(node.get("callbacks"), components),
+            consumes = node.get("consumes")?.asArray()?.mapNotNull { it.textValue() } ?: emptyList(),
+            produces = node.get("produces")?.asArray()?.mapNotNull { it.textValue() } ?: emptyList(),
+            schemes = node.get("schemes")?.asArray()?.mapNotNull { it.textValue() } ?: emptyList(),
             deprecated = node.boolean("deprecated") ?: false,
             security = securityResult.requirements,
             securityExplicitEmpty = securityResult.explicitEmpty,
@@ -557,7 +567,9 @@ class OpenApiParser() {
 
         val name = obj?.text("name") ?: "param"
         val location = parseParameterLocation(obj?.text("in"))
-        val schema = obj?.get("schema")?.let { parseSchemaProperty(it) }
+        val schemaFromNode = obj?.get("schema")?.let { parseSchemaProperty(it) }
+        val isSwagger2Direct = obj?.has("type") == true && !obj.has("schema")
+        val schema = if (isSwagger2Direct) parseSchemaProperty(node) else schemaFromNode
         val content = parseContentMap(obj?.get("content"), components)
         val typeFromSchema = schema ?: selectSchema(content, components)
         val type = typeFromSchema?.let { TypeMappers.mapType(it) } ?: "String"
@@ -575,6 +587,7 @@ class OpenApiParser() {
             description = obj?.text("description"),
             deprecated = obj?.boolean("deprecated") ?: false,
             allowEmptyValue = obj?.boolean("allowEmptyValue"),
+            collectionFormat = obj?.text("collectionFormat"),
             style = parseParameterStyle(obj?.text("style")),
             explode = obj?.boolean("explode"),
             allowReserved = obj?.boolean("allowReserved"),
@@ -644,7 +657,9 @@ class OpenApiParser() {
 
         val contentPresent = obj?.has("content") == true
         val content = parseContentMap(obj?.get("content"), components)
-        val type = selectSchema(content, components)?.let { TypeMappers.mapType(it) }
+        val schema = obj?.get("schema")?.let { parseSchemaProperty(it) }
+        val typeFromSchema = schema ?: selectSchema(content, components)
+        val type = typeFromSchema?.let { TypeMappers.mapType(it) }
 
         return EndpointResponse(
             statusCode = code,
@@ -653,6 +668,10 @@ class OpenApiParser() {
             headers = parseHeaders(obj?.get("headers"), components),
             content = content,
             contentPresent = contentPresent,
+            schema = schema,
+            examples = obj?.get("examples")?.asObject()?.fields()?.asSequence()?.associate { (k, v) ->
+                k to ExampleObject(value = nodeToValue(v))
+            } ?: emptyMap(),
             type = type,
             links = parseLinks(obj?.get("links"), components),
             extensions = parseExtensions(obj)
@@ -686,7 +705,9 @@ class OpenApiParser() {
             )
         }
 
-        val schema = obj?.get("schema")?.let { parseSchemaProperty(it) }
+        val schemaFromNode = obj?.get("schema")?.let { parseSchemaProperty(it) }
+        val isSwagger2Direct = obj?.has("type") == true && !obj.has("schema")
+        val schema = if (isSwagger2Direct) parseSchemaProperty(node) else schemaFromNode
         val content = parseContentMap(obj?.get("content"), components)
         val typeFromSchema = schema ?: selectSchema(content, components)
         val type = typeFromSchema?.let { TypeMappers.mapType(it) } ?: "String"
@@ -700,6 +721,7 @@ class OpenApiParser() {
             deprecated = obj?.boolean("deprecated") ?: false,
             example = obj?.get("example")?.let { ExampleObject(value = nodeToValue(it)) },
             examples = parseExampleMap(obj?.get("examples"), components),
+            collectionFormat = obj?.text("collectionFormat"),
             style = parseParameterStyle(obj?.text("style")) ?: ParameterStyle.SIMPLE,
             explode = obj?.boolean("explode") ?: false,
             extensions = parseExtensions(obj)
@@ -854,6 +876,25 @@ class OpenApiParser() {
             value = obj.get("value")?.let { nodeToValue(it) },
             extensions = parseExtensions(obj)
         )
+    }
+
+    private fun parseSwagger2Components(root: JsonNode): Components? {
+        val schemas = parseSchemas(root.get("definitions"))
+        val responses = parseComponentResponses(root.get("responses"))
+        val parameters = parseComponentParameters(root.get("parameters"))
+        val securitySchemes = parseSecuritySchemes(root.get("securityDefinitions"))
+        
+        if (schemas.isEmpty() && responses.isEmpty() && parameters.isEmpty() && securitySchemes.isEmpty()) {
+            return null
+        }
+        
+        val components = Components(
+            schemas = schemas,
+            responses = responses,
+            parameters = parameters,
+            securitySchemes = securitySchemes
+        )
+        return resolveComponentRefs(components)
     }
 
     private fun parseComponents(node: JsonNode?): Components? {
@@ -1188,6 +1229,7 @@ class OpenApiParser() {
             exclusiveMaximum = obj?.double("exclusiveMaximum"),
             minItems = obj?.int("minItems"),
             maxItems = obj?.int("maxItems"),
+            collectionFormat = obj?.text("collectionFormat"),
             uniqueItems = obj?.boolean("uniqueItems"),
             minProperties = obj?.int("minProperties"),
             maxProperties = obj?.int("maxProperties"),
@@ -1291,6 +1333,7 @@ class OpenApiParser() {
             exclusiveMaximum = obj?.double("exclusiveMaximum"),
             minItems = obj?.int("minItems"),
             maxItems = obj?.int("maxItems"),
+            collectionFormat = obj?.text("collectionFormat"),
             uniqueItems = obj?.boolean("uniqueItems"),
             minProperties = obj?.int("minProperties"),
             maxProperties = obj?.int("maxProperties"),
@@ -1441,6 +1484,12 @@ class OpenApiParser() {
             flows = parseOAuthFlows(obj.get("flows")),
             openIdConnectUrl = obj.text("openIdConnectUrl"),
             oauth2MetadataUrl = obj.text("oauth2MetadataUrl"),
+            flow = obj.text("flow"),
+            authorizationUrl = obj.text("authorizationUrl"),
+            tokenUrl = obj.text("tokenUrl"),
+            scopes = obj.get("scopes")?.asObject()?.fields()?.asSequence()?.associate { (k, v) ->
+                k to (v.textValue() ?: v.toString())
+            },
             deprecated = obj.boolean("deprecated") ?: false,
             extensions = parseExtensions(obj)
         )
@@ -1530,6 +1579,8 @@ class OpenApiParser() {
             "querystring" -> ParameterLocation.QUERYSTRING
             "header" -> ParameterLocation.HEADER
             "cookie" -> ParameterLocation.COOKIE
+            "body" -> ParameterLocation.BODY
+            "formdata" -> ParameterLocation.FORMDATA
             else -> ParameterLocation.QUERY
         }
     }

@@ -22,7 +22,7 @@ enum class HttpMethod {
  * See [Parameter Object](https://spec.openapis.org/oas/v3.2.0#parameter-object)
  */
 enum class ParameterLocation {
-    PATH, QUERY, QUERYSTRING, HEADER, COOKIE
+    PATH, QUERY, QUERYSTRING, HEADER, COOKIE, BODY, FORMDATA
 }
 
 /**
@@ -111,6 +111,11 @@ data class EndpointParameter(
      * that would otherwise be omitted entirely.
      */
     val allowEmptyValue: Boolean? = null,
+
+    /**
+     * Swagger 2.0: Determines the format of the array if type array is used.
+     */
+    val collectionFormat: String? = null,
 
     /**
      * Describes how the parameter value will be serialized depending on the type of the parameter value.
@@ -202,9 +207,14 @@ data class Header(
     val example: ExampleObject? = null,
 
     /**
-     * Examples of the header's potential value.
+     * Examples of the parameter's potential value.
      */
     val examples: Map<String, ExampleObject> = emptyMap(),
+
+    /**
+     * Swagger 2.0: Determines the format of the array if type array is used.
+     */
+    val collectionFormat: String? = null,
 
     /**
      * Describes how the header value will be serialized.
@@ -270,6 +280,16 @@ data class EndpointResponse(
      * and an explicit empty map (`content: {}`) for round-trip fidelity.
      */
     val contentPresent: Boolean = false,
+
+    /**
+     * Swagger 2.0: The response schema.
+     */
+    val schema: SchemaProperty? = null,
+
+    /**
+     * Swagger 2.0: Examples for the response.
+     */
+    val examples: Map<String, ExampleObject> = emptyMap(),
 
     /**
      * The Kotlin class name of the response payload, or null if no content is returned (Unit).
@@ -443,6 +463,21 @@ data class EndpointDefinition(
      * See [Callback Object](https://spec.openapis.org/oas/v3.2.0#callback-object)
      */
     val callbacks: Map<String, Callback> = emptyMap(),
+
+    /**
+     * Swagger 2.0: A list of MIME types the operation can consume.
+     */
+    val consumes: List<String> = emptyList(),
+
+    /**
+     * Swagger 2.0: A list of MIME types the operation can produce.
+     */
+    val produces: List<String> = emptyList(),
+
+    /**
+     * Swagger 2.0: The transfer protocol for the operation.
+     */
+    val schemes: List<String> = emptyList(),
 
     /**
      * Declares this operation to be deprecated. Consumers SHOULD refrain from usage of the declared operation.

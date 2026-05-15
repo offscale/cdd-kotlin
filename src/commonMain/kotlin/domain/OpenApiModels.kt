@@ -18,6 +18,36 @@ data class OpenApiDefinition(
     val openapi: String = "3.2.0",
 
     /**
+     * Swagger 2.0 identifier.
+     */
+    val swagger: String? = null,
+
+    /**
+     * Swagger 2.0: The host (name or ip) serving the API.
+     */
+    val host: String? = null,
+
+    /**
+     * Swagger 2.0: The base path on which the API is served.
+     */
+    val basePath: String? = null,
+
+    /**
+     * Swagger 2.0: The transfer protocol of the API.
+     */
+    val schemes: List<String> = emptyList(),
+
+    /**
+     * Swagger 2.0: A list of MIME types the APIs can consume.
+     */
+    val consumes: List<String> = emptyList(),
+
+    /**
+     * Swagger 2.0: A list of MIME types the APIs can produce.
+     */
+    val produces: List<String> = emptyList(),
+
+    /**
      * **REQUIRED**. Provides metadata about the API. The metadata MAY be used by tooling as required.
      */
     val info: Info,
@@ -390,6 +420,26 @@ data class SecurityScheme(
      * (`oauth2`). URL to the OAuth2 authorization server metadata (RFC8414). TLS is required.
      */
     val oauth2MetadataUrl: String? = null,
+
+    /**
+     * Swagger 2.0: The flow used by the OAuth2 security scheme.
+     */
+    val flow: String? = null,
+
+    /**
+     * Swagger 2.0: The authorization URL to be used for this flow.
+     */
+    val authorizationUrl: String? = null,
+
+    /**
+     * Swagger 2.0: The token URL to be used for this flow.
+     */
+    val tokenUrl: String? = null,
+
+    /**
+     * Swagger 2.0: The available scopes for the OAuth2 security scheme.
+     */
+    val scopes: Map<String, String>? = null,
 
     /**
      * Declares this security scheme to be deprecated. Consumers SHOULD refrain from usage of the declared scheme.

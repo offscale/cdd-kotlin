@@ -1500,6 +1500,7 @@ class OpenApiValidator {
                 ParameterLocation.HEADER -> setOf(ParameterStyle.SIMPLE)
                 ParameterLocation.COOKIE -> setOf(ParameterStyle.FORM, ParameterStyle.COOKIE)
                 ParameterLocation.QUERYSTRING -> emptySet()
+                ParameterLocation.BODY, ParameterLocation.FORMDATA -> emptySet()
             }
             if (allowed.isNotEmpty() && !allowed.contains(style)) {
                 issues += OpenApiIssue(
