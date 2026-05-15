@@ -58,9 +58,17 @@ object CddGenerator {
         clientSb.append("package org.example\n\n")
         clientSb.append("import io.ktor.client.*\n")
         clientSb.append("import io.ktor.client.request.*\n")
-        clientSb.append("import io.ktor.client.statement.*\n\n")
-        clientSb.append("class Client(val baseUrl: String = \"https://api.example.com\") {\n")
-        clientSb.append("    val client = HttpClient()\n\n")
+        clientSb.append("import io.ktor.client.statement.*\n")
+        clientSb.append("import io.ktor.client.plugins.contentnegotiation.*\n")
+        clientSb.append("import io.ktor.serialization.kotlinx.json.*\n")
+        clientSb.append("import io.ktor.http.ContentType\n")
+        clientSb.append("import io.ktor.http.contentType\n\n")
+        clientSb.append("class Client(val baseUrl: String = \"http://localhost:8080/v2\") {\n")
+        clientSb.append("    val client = HttpClient() {\n")
+        clientSb.append("        install(ContentNegotiation) {\n")
+        clientSb.append("            json(kotlinx.serialization.json.Json { ignoreUnknownKeys = true })\n")
+        clientSb.append("        }\n")
+        clientSb.append("    }\n\n")
         
         for ((path, pathItem) in doc.paths) {
             val methods = mapOf(
@@ -88,12 +96,26 @@ object CddGenerator {
                 for (param in pathParams) {
                     paramsStr.add("$param: String")
                 }
+                val queryParams = operation.parameters.filter { it.location == domain.ParameterLocation.QUERY }
+                for (param in queryParams) {
+                    paramsStr.add("${param.name}: String? = null")
+                }
+                
+                if (operation.requestBodyType != null) {
+                    paramsStr.add("body: ${operation.requestBodyType}")
+                }
                 
                 val arguments = paramsStr.joinToString(", ")
                 
                 clientSb.append("    suspend fun $opId($arguments): HttpResponse {\n")
                 clientSb.append("        return client.${methodName}(\"\$baseUrl$urlPath\") {\n")
-                clientSb.append("            // Add parameters and body here\n")
+                for (param in queryParams) {
+                    clientSb.append("            if (${param.name} != null) parameter(\"${param.name}\", ${param.name})\n")
+                }
+                if (operation.requestBodyType != null) {
+                    clientSb.append("            contentType(ContentType.Application.Json)\n")
+                    clientSb.append("            setBody(body)\n")
+                }
                 clientSb.append("        }\n")
                 clientSb.append("    }\n\n")
             }
@@ -154,27 +176,46 @@ object CddGenerator {
                     
                     val opId = operation.operationId ?: "${methodName}${path.replace("/", "").replace("{", "").replace("}", "")}"
                     
-                    val paramsStr = mutableListOf<String>()
                     val argsStr = mutableListOf<String>()
                     val pathParams = Regex("\\{([^}]+)\\}").findAll(path).map { it.groupValues[1] }.toList()
-                    for (param in pathParams) {
-                        paramsStr.add("$param: String")
-                        argsStr.add("\"test_string\"")
+                    for (paramName in pathParams) {
+                        val param = operation.parameters.find { it.name == paramName }
+                        if (param != null) {
+                            if (param.type.contains("integer") || param.type.contains("number")) argsStr.add("\"1\"")
+                            else if (param.type.contains("boolean")) argsStr.add("\"false\"")
+                            else argsStr.add("\"test_string\"")
+                        } else {
+                            argsStr.add("\"test_string\"")
+                        }
+                    }
+                    val queryParams = operation.parameters.filter { it.location == domain.ParameterLocation.QUERY }
+                    for (param in queryParams) {
+                        if (param.type.contains("integer") || param.type.contains("number")) argsStr.add("\"1\"")
+                        else if (param.type.contains("boolean")) argsStr.add("\"false\"")
+                        else argsStr.add("\"test_string\"")
+                    }
+
+                    if (operation.requestBodyType != null) {
+                        argsStr.add("Mocks.create${operation.requestBodyType}()")
                     }
                     
-                    val paramsDef = if (paramsStr.isNotEmpty()) paramsStr.joinToString(", ") + ", " else ""
                     val argsCall = if (argsStr.isNotEmpty()) argsStr.joinToString(", ") else ""
                     
                     testsSb.append("    @org.junit.jupiter.api.Test\n")
                     val methodNameSanitized = methodName.replace("-", "_")
                     val pathSanitized = path.replace("/", "_").replace("{", "").replace("}", "")
                     testsSb.append("    fun test_${methodNameSanitized}_${pathSanitized}() = kotlinx.coroutines.runBlocking {\n")
-                    testsSb.append("        try {\n")
-                    testsSb.append("            val client = Client(\"http://localhost:8080/api/v3\")\n")
-                    testsSb.append("            client.$opId($argsCall)\n")
-                    testsSb.append("        } catch (e: Exception) {\n")
-                    testsSb.append("            if (e is java.net.ConnectException) throw e\n")
-                    testsSb.append("        }\n")
+                    testsSb.append("        val client = Client(\"http://localhost:8080/v2\")\n")
+                    testsSb.append("        val response = client.$opId($argsCall)\n")
+                    testsSb.append("        org.junit.jupiter.api.Assertions.assertTrue(response.status.value in 200..299, \"Expected success status, got \" + response.status.value)\n")
+                    
+                    if (operation.responseType != null && operation.responseType != "Unit") {
+                        testsSb.append("        val bodyText = response.bodyAsText()\n")
+                        testsSb.append("        if (bodyText.isNotEmpty()) {\n")
+                        testsSb.append("            kotlinx.serialization.json.Json { ignoreUnknownKeys = true }.decodeFromString<${operation.responseType}>(bodyText)\n")
+                        testsSb.append("        }\n")
+                    }
+                    
                     testsSb.append("    }\n\n")
                 }
             }
@@ -195,6 +236,8 @@ object CddGenerator {
             buildGradleSb.append("dependencies {\n")
             buildGradleSb.append("    implementation(\"io.ktor:ktor-client-core:2.3.11\")\n")
             buildGradleSb.append("    implementation(\"io.ktor:ktor-client-cio:2.3.11\")\n")
+            buildGradleSb.append("    implementation(\"io.ktor:ktor-client-content-negotiation:2.3.11\")\n")
+            buildGradleSb.append("    implementation(\"io.ktor:ktor-serialization-kotlinx-json:2.3.11\")\n")
             buildGradleSb.append("    implementation(\"org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3\")\n")
             buildGradleSb.append("    testImplementation(\"org.junit.jupiter:junit-jupiter:5.10.0\")\n")
             buildGradleSb.append("    testImplementation(\"org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.0\")\n")
