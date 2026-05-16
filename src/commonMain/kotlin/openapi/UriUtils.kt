@@ -1,11 +1,13 @@
 package openapi
 
+/** Checks if the given URI string is absolute. */
 fun isAbsoluteUri(value: String): Boolean {
   return value.startsWith("http://") ||
       value.startsWith("https://") ||
       value.matches(Regex("^[a-zA-Z][a-zA-Z0-9+.-]*:.*"))
 }
 
+/** Resolves a relative URI against a base URI. */
 fun resolveUri(base: String, ref: String): String {
   if (isAbsoluteUri(ref)) return ref
   if (ref.startsWith("/")) {

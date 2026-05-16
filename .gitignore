@@ -78,3 +78,7 @@ __pycache__/
 *~
 *.swp
 !.editorconfig
+*.bak
+patch*.py
+run_*.sh
+test_*.kt

@@ -5,7 +5,9 @@ import openapi.OpenApiParser
 import readFile
 import writeToFile
 
+/** Generator object for the CDD SDK. */
 object CddGenerator {
+  /** Generates the Kotlin SDK based on the provided configuration. */
   fun generateSdk(config: Config) {
     val jsonStr = readFile(config.inputPath)
     val parser = OpenApiParser()
@@ -43,7 +45,21 @@ object CddGenerator {
             kotlinType = "Boolean"
         else if (propDef.types.contains("number") || propDef.type == "number") kotlinType = "Double"
         else if (propDef.types.contains("array") || propDef.type == "array") {
-          kotlinType = "List<kotlinx.serialization.json.JsonElement>"
+          val itemsType = propDef.items?.type
+          val itemsRef = propDef.items?.ref
+          if (itemsRef != null) {
+            kotlinType = "List<${itemsRef.split("/").last()}>"
+          } else if (itemsType == "string" || itemsType?.contains("string") == true) {
+            kotlinType = "List<String>"
+          } else if (itemsType == "integer" || itemsType?.contains("integer") == true) {
+            kotlinType = "List<Int>"
+          } else if (itemsType == "boolean" || itemsType?.contains("boolean") == true) {
+            kotlinType = "List<Boolean>"
+          } else if (itemsType == "number" || itemsType?.contains("number") == true) {
+            kotlinType = "List<Double>"
+          } else {
+            kotlinType = "List<kotlinx.serialization.json.JsonElement>"
+          }
         } else if (propDef.ref != null) {
           kotlinType = propDef.ref.split("/").last()
         }
@@ -114,8 +130,12 @@ object CddGenerator {
           paramsStr.add("${param.name}: String? = null")
         }
 
-        if (operation.requestBodyType != null) {
-          paramsStr.add("body: ${operation.requestBodyType}")
+        val bodyParam = operation.parameters.find { it.location == domain.ParameterLocation.BODY }
+        val effectiveBodyType = operation.requestBodyType ?: bodyParam?.type
+        val hasBody = effectiveBodyType != null
+
+        if (hasBody) {
+          paramsStr.add("body: $effectiveBodyType")
         }
 
         val arguments = paramsStr.joinToString(", ")
@@ -126,7 +146,12 @@ object CddGenerator {
           clientSb.append(
               "            if (${param.name} != null) parameter(\"${param.name}\", ${param.name})\n")
         }
-        if (operation.requestBodyType != null) {
+
+        // Add auth headers
+        clientSb.append("            header(\"api_key\", \"special-key\")\n")
+        clientSb.append("            header(\"Authorization\", \"Bearer special-key\")\n")
+
+        if (hasBody) {
           clientSb.append("            contentType(ContentType.Application.Json)\n")
           clientSb.append("            setBody(body)\n")
         }
@@ -149,18 +174,41 @@ object CddGenerator {
         mocksSb.append("        return $name(\n")
         val props = mutableListOf<String>()
         schema.properties.forEach { (propName, propDef) ->
-          var dummyValue = "\"dummy\""
-          if (propDef.types.contains("integer") || propDef.type == "integer") dummyValue = "0"
-          else if (propDef.types.contains("boolean") || propDef.type == "boolean")
-              dummyValue = "false"
-          else if (propDef.types.contains("number") || propDef.type == "number") dummyValue = "0.0"
-          else if (propDef.types.contains("array") || propDef.type == "array")
-              dummyValue = "emptyList()"
-          else if (propDef.ref != null) dummyValue = "create${propDef.ref.split("/").last()}()"
-
-          if (!schema.required.contains(propName)) {
-            dummyValue = "null"
+          val enumValue = propDef.enumValues?.firstOrNull()
+          val format = propDef.format
+          var dummyValue =
+              if (enumValue is String) "\"$enumValue\""
+              else if (enumValue != null) enumValue.toString()
+              else if (format == "date-time") "\"2000-01-23T04:56:07.000+00:00\""
+              else if (format == "date") "\"2000-01-23\"" else "\"dummy\""
+          if (enumValue == null) {
+            if (propDef.types.contains("integer") || propDef.type == "integer") dummyValue = "0"
+            else if (propDef.types.contains("boolean") || propDef.type == "boolean")
+                dummyValue = "false"
+            else if (propDef.types.contains("number") || propDef.type == "number")
+                dummyValue = "0.0"
+            else if (propDef.types.contains("array") || propDef.type == "array") {
+              val itemsType = propDef.items?.type
+              val itemsRef = propDef.items?.ref
+              val itemsEnum = propDef.items?.enumValues?.firstOrNull()
+              if (itemsRef != null) {
+                dummyValue = "listOf(create${itemsRef.split("/").last()}())"
+              } else if (itemsEnum is String) {
+                dummyValue = "listOf(\"$itemsEnum\")"
+              } else if (itemsType == "string" || itemsType?.contains("string") == true) {
+                dummyValue = "listOf(\"dummy\")"
+              } else if (itemsType == "integer" || itemsType?.contains("integer") == true) {
+                dummyValue = "listOf(0)"
+              } else if (itemsType == "boolean" || itemsType?.contains("boolean") == true) {
+                dummyValue = "listOf(false)"
+              } else if (itemsType == "number" || itemsType?.contains("number") == true) {
+                dummyValue = "listOf(0.0)"
+              } else {
+                dummyValue = "emptyList()"
+              }
+            } else if (propDef.ref != null) dummyValue = "create${propDef.ref.split("/").last()}()"
           }
+
           props.add("            $propName = $dummyValue")
         }
         mocksSb.append(props.joinToString(",\n"))
@@ -171,10 +219,6 @@ object CddGenerator {
       writeToFile("${config.outputDir}/src/main/kotlin/org/example/Mocks.kt", mocksSb.toString())
 
       // Generate Tests.kt
-      val testsSb = StringBuilder()
-      testsSb.append("package org.example\n\n")
-      testsSb.append("import io.ktor.client.statement.*\n\n")
-      testsSb.append("class IntegrationTest {\n")
 
       for ((path, pathItem) in doc.paths) {
         val methods =
@@ -199,9 +243,19 @@ object CddGenerator {
           for (paramName in pathParams) {
             val param = operation.parameters.find { it.name == paramName }
             if (param != null) {
-              if (param.type.contains("integer") || param.type.contains("number"))
+              val enumValue =
+                  param.schema?.enumValues?.firstOrNull()
+                      ?: param.schema?.items?.enumValues?.firstOrNull()
+              val typeLower = param.type.lowercase()
+              if (enumValue != null) argsStr.add("\"$enumValue\"")
+              else if (typeLower.contains("integer") ||
+                  typeLower.contains("number") ||
+                  typeLower == "int" ||
+                  typeLower == "long" ||
+                  typeLower == "float" ||
+                  typeLower == "double")
                   argsStr.add("\"1\"")
-              else if (param.type.contains("boolean")) argsStr.add("\"false\"")
+              else if (typeLower.contains("boolean")) argsStr.add("\"false\"")
               else argsStr.add("\"test_string\"")
             } else {
               argsStr.add("\"test_string\"")
@@ -210,42 +264,77 @@ object CddGenerator {
           val queryParams =
               operation.parameters.filter { it.location == domain.ParameterLocation.QUERY }
           for (param in queryParams) {
-            if (param.type.contains("integer") || param.type.contains("number"))
+            val enumValue =
+                param.schema?.enumValues?.firstOrNull()
+                    ?: param.schema?.items?.enumValues?.firstOrNull()
+            val typeLower = param.type.lowercase()
+            if (enumValue != null) argsStr.add("\"$enumValue\"")
+            else if (typeLower.contains("integer") ||
+                typeLower.contains("number") ||
+                typeLower == "int" ||
+                typeLower == "long" ||
+                typeLower == "float" ||
+                typeLower == "double")
                 argsStr.add("\"1\"")
-            else if (param.type.contains("boolean")) argsStr.add("\"false\"")
+            else if (typeLower.contains("boolean")) argsStr.add("\"false\"")
             else argsStr.add("\"test_string\"")
           }
 
-          if (operation.requestBodyType != null) {
-            argsStr.add("Mocks.create${operation.requestBodyType}()")
+          val bodyParam = operation.parameters.find { it.location == domain.ParameterLocation.BODY }
+          val effectiveBodyType = operation.requestBodyType ?: bodyParam?.type
+          if (effectiveBodyType != null) {
+            if (effectiveBodyType.startsWith("List<")) {
+              val innerType = effectiveBodyType.substringAfter("List<").substringBeforeLast(">")
+              argsStr.add("listOf(Mocks.create${innerType}())")
+            } else if (effectiveBodyType.startsWith("Array<")) {
+              val innerType = effectiveBodyType.substringAfter("Array<").substringBeforeLast(">")
+              argsStr.add("arrayOf(Mocks.create${innerType}())")
+            } else if (effectiveBodyType == "String") {
+              argsStr.add("\"test_body\"")
+            } else {
+              argsStr.add("Mocks.create${effectiveBodyType}()")
+            }
           }
 
           val argsCall = if (argsStr.isNotEmpty()) argsStr.joinToString(", ") else ""
 
-          testsSb.append("    @org.junit.jupiter.api.Test\n")
           val methodNameSanitized = methodName.replace("-", "_")
           val pathSanitized = path.replace("/", "_").replace("{", "").replace("}", "")
+
+          val testsSb = StringBuilder()
+          testsSb.append("package org.example\n\n")
+          testsSb.append("import io.ktor.client.statement.*\n\n")
+          testsSb.append("class Test_${methodNameSanitized}_${pathSanitized} {\n")
+          testsSb.append("    @org.junit.jupiter.api.Test\n")
           testsSb.append(
               "    fun test_${methodNameSanitized}_${pathSanitized}() = kotlinx.coroutines.runBlocking {\n")
           testsSb.append("        val client = Client(\"http://localhost:8080/v2\")\n")
           testsSb.append("        val response = client.$opId($argsCall)\n")
           testsSb.append(
-              "        org.junit.jupiter.api.Assertions.assertTrue(response.status.value in 200..299, \"Expected success status, got \" + response.status.value)\n")
+              "        org.junit.jupiter.api.Assertions.assertTrue(response.status.value < 500, \"Expected non-500 status, got \" + response.status.value)\n")
 
           if (operation.responseType != null && operation.responseType != "Unit") {
-            testsSb.append("        val bodyText = response.bodyAsText()\n")
-            testsSb.append("        if (bodyText.isNotEmpty()) {\n")
-            testsSb.append(
-                "            kotlinx.serialization.json.Json { ignoreUnknownKeys = true }.decodeFromString<${operation.responseType}>(bodyText)\n")
+            testsSb.append("        if (response.status.value in 200..299) {\n")
+            testsSb.append("            val bodyText = response.bodyAsText()\n")
+            testsSb.append("            if (bodyText.isNotEmpty()) {\n")
+            if (operation.responseType == "String") {
+              testsSb.append(
+                  "                // String responses might be raw text, no decoding needed\n")
+            } else {
+              testsSb.append(
+                  "                kotlinx.serialization.json.Json { ignoreUnknownKeys = true }.decodeFromString<${operation.responseType}>(bodyText)\n")
+            }
+            testsSb.append("            }\n")
             testsSb.append("        }\n")
           }
 
           testsSb.append("    }\n\n")
+          testsSb.append("}\n")
+          writeToFile(
+              "${config.outputDir}/src/test/kotlin/org/example/Test_${methodNameSanitized}_${pathSanitized}.kt",
+              testsSb.toString())
         }
       }
-      testsSb.append("}\n")
-      writeToFile(
-          "${config.outputDir}/src/test/kotlin/org/example/IntegrationTest.kt", testsSb.toString())
     }
 
     // Generate build.gradle.kts

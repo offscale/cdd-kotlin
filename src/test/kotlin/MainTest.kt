@@ -345,7 +345,7 @@ class MainTest {
               arrayOf("to_sdk", "-i", specFile.absolutePath, "-o", outDir.absolutePath, "--tests"))
       assertEquals(0, result)
       assertTrue(File(outDir, "src/main/kotlin/org/example/Mocks.kt").exists())
-      assertTrue(File(outDir, "src/test/kotlin/org/example/IntegrationTest.kt").exists())
+      assertTrue(File(outDir, "src/test/kotlin/org/example/Test_get__test.kt").exists())
     }
   }
 
