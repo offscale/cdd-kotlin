@@ -3,16 +3,17 @@ package scaffold
 import domain.Info
 
 /**
- * Object containing string templates for the KMP project structure.
- * These templates define the Gradle configuration and initial Kotlin definitions.
+ * Object containing string templates for the KMP project structure. These templates define the
+ * Gradle configuration and initial Kotlin definitions.
  */
 object ScaffoldTemplates {
 
-    /**
-     * Generates the content for gradle/libs.versions.toml.
-     * Defines versions for Kotlin, Compose, Ktor, and Serialization.
-     */
-    fun createVersionCatalog(): String = """
+  /**
+   * Generates the content for gradle/libs.versions.toml. Defines versions for Kotlin, Compose,
+   * Ktor, and Serialization.
+   */
+  fun createVersionCatalog(): String =
+      """
         [versions]
         agp = "8.2.2"
         android-compileSdk = "34"
@@ -49,26 +50,31 @@ object ScaffoldTemplates {
         composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
         kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
         kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
-    """.trimIndent()
+    """
+          .trimIndent()
 
-    /**
-     * Generates the root settings.gradle.kts file.
-     * @param projectName The name of the project to include.
-     */
-    fun createSettingsGradle(projectName: String): String = """
+  /**
+   * Generates the root settings.gradle.kts file.
+   *
+   * @param projectName The name of the project to include.
+   */
+  fun createSettingsGradle(projectName: String): String =
+      """
         rootProject.name = "$projectName"
         include(":composeApp")
-    """.trimIndent()
+    """
+          .trimIndent()
 
-    /**
-     * Generates the root build.gradle.kts file.
-     * Sets up the plugins for the overall project context.
-     * @param info Optional Info metadata to populate version.
-     */
-    fun createRootBuildGradle(info: Info? = null): String {
-        val versionLine = if (info != null) "version = \"${info.version}\"" else "version = \"1.0-SNAPSHOT\""
+  /**
+   * Generates the root build.gradle.kts file. Sets up the plugins for the overall project context.
+   *
+   * @param info Optional Info metadata to populate version.
+   */
+  fun createRootBuildGradle(info: Info? = null): String {
+    val versionLine =
+        if (info != null) "version = \"${info.version}\"" else "version = \"1.0-SNAPSHOT\""
 
-        return """
+    return """
         plugins {
             // this is necessary to avoid the plugins to be loaded multiple times
             // in each subproject's classloader
@@ -82,29 +88,30 @@ object ScaffoldTemplates {
 
         group = "com.example"
         $versionLine
-    """.trimIndent()
-    }
+    """
+        .trimIndent()
+  }
 
-    /**
-     * Generates the gradle.properties file used for JVM arguments.
-     */
-    fun createGradleProperties(): String = """
+  /** Generates the gradle.properties file used for JVM arguments. */
+  fun createGradleProperties(): String =
+      """
         org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
         kotlin.code.style=official
         android.useAndroidX=true
-    """.trimIndent()
+    """
+          .trimIndent()
 
-    /**
-     * Generates the module-level build.gradle.kts for the 'composeApp'.
-     * Configures SourceSets for Android, iOS, and Desktop.
-     * Configures Ktor and Serialization dependencies.
-     * @param namespace The Android namespace (package name).
-     * @param info Optional Info metadata to populate versionName.
-     */
-    fun createAppBuildGradle(namespace: String, info: Info? = null): String {
-        val versionNameStr = info?.version ?: "1.0"
+  /**
+   * Generates the module-level build.gradle.kts for the 'composeApp'. Configures SourceSets for
+   * Android, iOS, and Desktop. Configures Ktor and Serialization dependencies.
+   *
+   * @param namespace The Android namespace (package name).
+   * @param info Optional Info metadata to populate versionName.
+   */
+  fun createAppBuildGradle(namespace: String, info: Info? = null): String {
+    val versionNameStr = info?.version ?: "1.0"
 
-        return """
+    return """
         plugins {
             alias(libs.plugins.kotlinMultiplatform)
             alias(libs.plugins.androidApplication)
@@ -204,13 +211,13 @@ object ScaffoldTemplates {
                 targetCompatibility = JavaVersion.VERSION_1_8
             }
         }
-    """.trimIndent()
-    }
+    """
+        .trimIndent()
+  }
 
-    /**
-     * Generates a basic AndroidManifest.xml required for the Android target.
-     */
-    fun createAndroidManifest(): String = """
+  /** Generates a basic AndroidManifest.xml required for the Android target. */
+  fun createAndroidManifest(): String =
+      """
         <?xml version="1.0" encoding="utf-8"?>
         <manifest xmlns:android="http://schemas.android.com/apk/res/android">
             <application
@@ -230,13 +237,16 @@ object ScaffoldTemplates {
                 </activity>
             </application>
         </manifest>
-    """.trimIndent()
+    """
+          .trimIndent()
 
-    /**
-     * Generates a placeholder App.kt file in commonMain to ensure compilation.
-     * @param packageName The package definition.
-     */
-    fun createCommonAppKt(packageName: String): String = """
+  /**
+   * Generates a placeholder App.kt file in commonMain to ensure compilation.
+   *
+   * @param packageName The package definition.
+   */
+  fun createCommonAppKt(packageName: String): String =
+      """
         package $packageName
 
         import androidx.compose.material.MaterialTheme
@@ -253,5 +263,6 @@ object ScaffoldTemplates {
                 Text("Hello from KMP Auto-Admin Scaffold")
             }
         }
-    """.trimIndent()
+    """
+          .trimIndent()
 }

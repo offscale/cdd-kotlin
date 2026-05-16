@@ -77,3 +77,4 @@ __pycache__/
 # Tmp files
 *~
 *.swp
+!.editorconfig
