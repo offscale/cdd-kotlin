@@ -253,4 +253,34 @@ class DomainModelsCoverageTest {
     assertTrue(schema.effectiveTypes.contains("null"))
     assertEquals("array", schema.primaryType)
   }
+
+  @Test
+  fun methodName_handles_custom_and_standard_methods() {
+    val stdEndpoint =
+        EndpointDefinition(path = "/std", method = HttpMethod.POST, operationId = "std")
+    assertEquals("POST", stdEndpoint.methodName)
+
+    val customEndpoint =
+        EndpointDefinition(
+            path = "/custom",
+            method = HttpMethod.CUSTOM,
+            customMethod = "PURGE",
+            operationId = "custom")
+    assertEquals("PURGE", customEndpoint.methodName)
+
+    val customMissingEndpoint =
+        EndpointDefinition(path = "/custom2", method = HttpMethod.CUSTOM, operationId = "custom2")
+    assertEquals("CUSTOM", customMissingEndpoint.methodName)
+  }
+
+  @Test
+  fun responseType_returns_success_type() {
+    val endpoint =
+        EndpointDefinition(
+            path = "/success",
+            method = HttpMethod.GET,
+            operationId = "getSuccess",
+            responses = mapOf("201" to EndpointResponse(statusCode = "201", type = "MyModel")))
+    assertEquals("MyModel", endpoint.responseType)
+  }
 }

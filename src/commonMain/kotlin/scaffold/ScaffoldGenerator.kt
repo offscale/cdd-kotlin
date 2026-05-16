@@ -3,7 +3,9 @@ package scaffold
 import domain.Info
 import writeToFile
 
+/** Generator for scaffold project. */
 class ScaffoldGenerator {
+  /** Generates the scaffold project in the given directory. */
   fun generate(
       outputDirectory: String,
       projectName: String,

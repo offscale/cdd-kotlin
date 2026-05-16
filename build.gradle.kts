@@ -61,7 +61,8 @@ tasks.register("checkDocCoverage") {
 
   doLast {
     val sourceFiles =
-        fileTree("src/main/kotlin") { include("**/*.kt") } +
+        fileTree("src/commonMain/kotlin") { include("**/*.kt") } +
+            fileTree("src/main/kotlin") { include("**/*.kt") } +
             fileTree("src/wasmMain/kotlin") { include("**/*.kt") }
 
     val missing = mutableListOf<String>()
