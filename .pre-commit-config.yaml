@@ -1,10 +1,37 @@
 repos:
-
   - repo: local
     hooks:
+      - id: format-and-check
+        name: Format & Recheck
+        entry: bash -c './gradlew spotlessApply && ./gradlew spotlessCheck'
+        language: system
+        pass_filenames: false
+        types_or: [kotlin]
+
+      - id: build
+        name: Build
+        entry: ./gradlew assemble
+        language: system
+        pass_filenames: false
+        types_or: [kotlin]
+
+      - id: test
+        name: Test
+        entry: ./gradlew allTests
+        language: system
+        pass_filenames: false
+        types_or: [kotlin]
+
+      - id: lint
+        name: Lint (Verify)
+        entry: bash -c './gradlew check'
+        language: system
+        pass_filenames: false
+        types_or: [kotlin]
+
       - id: update-badges
         name: Update Badges
         entry: python3 scripts/update_badges.py
         language: system
-        files: ^README\.md$
         pass_filenames: false
+        always_run: true

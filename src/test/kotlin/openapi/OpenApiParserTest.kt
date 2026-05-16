@@ -12,16 +12,16 @@ import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import java.io.File
 
-class OpenApiParserTest { 
+class OpenApiParserTest {
 
-    private val parser = OpenApiParser() 
-    private val writer = OpenApiWriter() 
+  private val parser = OpenApiParser()
+  private val writer = OpenApiWriter()
 
-    @Test
-    fun `parse JSON OpenAPI into IR`() { 
-        val json = """ 
+  @Test
+  fun `parse JSON OpenAPI into IR`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "x-root": "root-ext", 
@@ -443,220 +443,228 @@ class OpenApiParserTest {
               ], 
               "externalDocs": { "description": "more", "url": "https://docs.example.com" } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val root = parser.parseString(json, OpenApiParser.Format.JSON) 
+    val root = parser.parseString(json, OpenApiParser.Format.JSON)
 
-        assertEquals("3.2.0", root.openapi) 
-        assertEquals("https://example.com/api/openapi", root.self) 
-        assertEquals("Pet API", root.info.title) 
-        assertEquals("root-ext", root.extensions["x-root"]) 
-        assertEquals("info-ext", root.info.extensions["x-info"]) 
-        assertEquals("https://spec.openapis.org/oas/3.1/dialect/base", root.jsonSchemaDialect) 
-        assertEquals("https://api.example.com/{version}", root.servers.first().url) 
-        assertEquals("v1", root.servers.first().variables?.get("version")?.default) 
+    assertEquals("3.2.0", root.openapi)
+    assertEquals("https://example.com/api/openapi", root.self)
+    assertEquals("Pet API", root.info.title)
+    assertEquals("root-ext", root.extensions["x-root"])
+    assertEquals("info-ext", root.info.extensions["x-info"])
+    assertEquals("https://spec.openapis.org/oas/3.1/dialect/base", root.jsonSchemaDialect)
+    assertEquals("https://api.example.com/{version}", root.servers.first().url)
+    assertEquals("v1", root.servers.first().variables?.get("version")?.default)
 
-        val pathItem = root.paths["/users/{id}"] 
-        assertNotNull(pathItem) 
-        assertEquals("User path", pathItem?.summary) 
-        assertEquals(true, pathItem?.extensions?.get("x-path")) 
+    val pathItem = root.paths["/users/{id}"]
+    assertNotNull(pathItem)
+    assertEquals("User path", pathItem?.summary)
+    assertEquals(true, pathItem?.extensions?.get("x-path"))
 
-        val getOp = pathItem?.get
-        assertEquals("getUser", getOp?.operationId) 
-        assertEquals(HttpMethod.GET, getOp?.method) 
-        assertTrue(getOp?.deprecated == true) 
-        val opExt = getOp?.extensions?.get("x-op") as? Map<*, *>
-        assertEquals(true, opExt?.get("flag")) 
-        assertTrue(getOp?.parameters?.any { it.name == "limit" && it.location == ParameterLocation.QUERY } == true) 
-        assertTrue(pathItem?.parameters?.any { it.name == "MissingParam" } == true) 
-        val pathLimitParam = pathItem?.parameters?.firstOrNull { it.reference?.ref == "#/components/parameters/limit" } 
-        assertEquals("Limit summary", pathLimitParam?.reference?.summary) 
-        assertEquals("Limit override", pathLimitParam?.description) 
-        assertEquals("#/components/requestBodies/CreateUser", getOp?.requestBody?.reference?.ref) 
-        assertEquals("Body override", getOp?.requestBody?.description) 
-        val traceHeader = getOp?.responses?.get("200")?.headers?.get("X-Trace") 
-        assertEquals("#/components/headers/X-Trace", traceHeader?.reference?.ref) 
-        assertEquals("Trace override", traceHeader?.description) 
-        val missingResponse = getOp?.responses?.get("404") 
-        assertEquals("#/components/responses/Unknown", missingResponse?.reference?.ref) 
-        assertEquals("Missing", missingResponse?.reference?.summary) 
-        assertEquals("Missing response", missingResponse?.description) 
+    val getOp = pathItem?.get
+    assertEquals("getUser", getOp?.operationId)
+    assertEquals(HttpMethod.GET, getOp?.method)
+    assertTrue(getOp?.deprecated == true)
+    val opExt = getOp?.extensions?.get("x-op") as? Map<*, *>
+    assertEquals(true, opExt?.get("flag"))
+    assertTrue(
+        getOp?.parameters?.any { it.name == "limit" && it.location == ParameterLocation.QUERY } ==
+            true)
+    assertTrue(pathItem?.parameters?.any { it.name == "MissingParam" } == true)
+    val pathLimitParam =
+        pathItem?.parameters?.firstOrNull { it.reference?.ref == "#/components/parameters/limit" }
+    assertEquals("Limit summary", pathLimitParam?.reference?.summary)
+    assertEquals("Limit override", pathLimitParam?.description)
+    assertEquals("#/components/requestBodies/CreateUser", getOp?.requestBody?.reference?.ref)
+    assertEquals("Body override", getOp?.requestBody?.description)
+    val traceHeader = getOp?.responses?.get("200")?.headers?.get("X-Trace")
+    assertEquals("#/components/headers/X-Trace", traceHeader?.reference?.ref)
+    assertEquals("Trace override", traceHeader?.description)
+    val missingResponse = getOp?.responses?.get("404")
+    assertEquals("#/components/responses/Unknown", missingResponse?.reference?.ref)
+    assertEquals("Missing", missingResponse?.reference?.summary)
+    assertEquals("Missing response", missingResponse?.description)
 
-        val copyOp = pathItem?.additionalOperations?.get("COPY") 
-        assertNotNull(copyOp) 
-        assertEquals(HttpMethod.CUSTOM, copyOp?.method) 
-        assertEquals("copyUser", copyOp?.operationId) 
+    val copyOp = pathItem?.additionalOperations?.get("COPY")
+    assertNotNull(copyOp)
+    assertEquals(HttpMethod.CUSTOM, copyOp?.method)
+    assertEquals("copyUser", copyOp?.operationId)
 
-        val lockOp = pathItem?.additionalOperations?.get("LOCK") 
-        assertNotNull(lockOp) 
-        assertEquals("lockUser", lockOp?.operationId) 
-        assertTrue(pathItem?.additionalOperations?.containsKey("x-note") == false) 
-        assertTrue(pathItem?.additionalOperations?.containsKey("customString") == false) 
+    val lockOp = pathItem?.additionalOperations?.get("LOCK")
+    assertNotNull(lockOp)
+    assertEquals("lockUser", lockOp?.operationId)
+    assertTrue(pathItem?.additionalOperations?.containsKey("x-note") == false)
+    assertTrue(pathItem?.additionalOperations?.containsKey("customString") == false)
 
-        val refPath = root.paths["/ref"] 
-        assertEquals("#/components/pathItems/UsersPath", refPath?.ref) 
-        assertEquals("Ref summary", refPath?.summary) 
-        assertTrue(refPath?.parameters?.any { it.name == "refParam" && it.location == ParameterLocation.QUERY } == true) 
-        assertEquals("paths-ext", root.pathsExtensions["x-paths"]) 
-        assertTrue(root.paths.containsKey("x-paths") == false) 
-        assertEquals("hook-ext", root.webhooksExtensions["x-webhooks"]) 
-        assertTrue(root.webhooks.containsKey("x-webhooks") == false) 
+    val refPath = root.paths["/ref"]
+    assertEquals("#/components/pathItems/UsersPath", refPath?.ref)
+    assertEquals("Ref summary", refPath?.summary)
+    assertTrue(
+        refPath?.parameters?.any {
+          it.name == "refParam" && it.location == ParameterLocation.QUERY
+        } == true)
+    assertEquals("paths-ext", root.pathsExtensions["x-paths"])
+    assertTrue(root.paths.containsKey("x-paths") == false)
+    assertEquals("hook-ext", root.webhooksExtensions["x-webhooks"])
+    assertTrue(root.webhooks.containsKey("x-webhooks") == false)
 
-        val userSchema = root.components?.schemas?.get("User") 
-        assertEquals("User schema", userSchema?.description) 
-        assertEquals("https://example.com/schemas/User", userSchema?.schemaId) 
-        assertEquals("https://json-schema.org/draft/2020-12/schema", userSchema?.schemaDialect) 
-        assertEquals("user", userSchema?.anchor) 
-        assertEquals("userDyn", userSchema?.dynamicAnchor) 
-        assertEquals(7, userSchema?.extensions?.get("x-schema")) 
-        assertEquals(1, userSchema?.minProperties) 
-        assertEquals(4, userSchema?.maxProperties) 
-        assertTrue(userSchema?.properties?.get("name")?.types?.contains("null") == true) 
-        assertEquals(20, userSchema?.properties?.get("name")?.maxLength) 
-        assertEquals("#/components/schemas/User", userSchema?.properties?.get("address")?.ref) 
-        assertEquals("prop-ext", userSchema?.properties?.get("id")?.extensions?.get("x-prop")) 
-        assertTrue(userSchema?.properties?.get("xmlAttr")?.xml?.attribute == true) 
-        assertEquals(listOf("active", "disabled"), userSchema?.properties?.get("status")?.enumValues) 
-        assertEquals(2, userSchema?.properties?.get("pet")?.oneOf?.size) 
-        val profile = userSchema?.properties?.get("profile") 
-        assertEquals("https://docs.example.com/profile", profile?.externalDocs?.url) 
-        assertEquals("Profile docs", profile?.externalDocs?.description) 
-        assertEquals("kind", profile?.discriminator?.propertyName) 
-        assertEquals("#/components/schemas/User", profile?.discriminator?.mapping?.get("user")) 
-        assertEquals("#/components/schemas/User", profile?.discriminator?.defaultMapping) 
-        val settingsSchema = userSchema?.properties?.get("settings") 
-        assertEquals(listOf("timezone"), settingsSchema?.required) 
-        assertEquals("string", settingsSchema?.properties?.get("timezone")?.types?.firstOrNull()) 
-        assertTrue(settingsSchema?.not?.types?.contains("null") == true) 
-        assertEquals(listOf("alpha", "beta"), userSchema?.properties?.get("tags")?.examples) 
+    val userSchema = root.components?.schemas?.get("User")
+    assertEquals("User schema", userSchema?.description)
+    assertEquals("https://example.com/schemas/User", userSchema?.schemaId)
+    assertEquals("https://json-schema.org/draft/2020-12/schema", userSchema?.schemaDialect)
+    assertEquals("user", userSchema?.anchor)
+    assertEquals("userDyn", userSchema?.dynamicAnchor)
+    assertEquals(7, userSchema?.extensions?.get("x-schema"))
+    assertEquals(1, userSchema?.minProperties)
+    assertEquals(4, userSchema?.maxProperties)
+    assertTrue(userSchema?.properties?.get("name")?.types?.contains("null") == true)
+    assertEquals(20, userSchema?.properties?.get("name")?.maxLength)
+    assertEquals("#/components/schemas/User", userSchema?.properties?.get("address")?.ref)
+    assertEquals("prop-ext", userSchema?.properties?.get("id")?.extensions?.get("x-prop"))
+    assertTrue(userSchema?.properties?.get("xmlAttr")?.xml?.attribute == true)
+    assertEquals(listOf("active", "disabled"), userSchema?.properties?.get("status")?.enumValues)
+    assertEquals(2, userSchema?.properties?.get("pet")?.oneOf?.size)
+    val profile = userSchema?.properties?.get("profile")
+    assertEquals("https://docs.example.com/profile", profile?.externalDocs?.url)
+    assertEquals("Profile docs", profile?.externalDocs?.description)
+    assertEquals("kind", profile?.discriminator?.propertyName)
+    assertEquals("#/components/schemas/User", profile?.discriminator?.mapping?.get("user"))
+    assertEquals("#/components/schemas/User", profile?.discriminator?.defaultMapping)
+    val settingsSchema = userSchema?.properties?.get("settings")
+    assertEquals(listOf("timezone"), settingsSchema?.required)
+    assertEquals("string", settingsSchema?.properties?.get("timezone")?.types?.firstOrNull())
+    assertTrue(settingsSchema?.not?.types?.contains("null") == true)
+    assertEquals(listOf("alpha", "beta"), userSchema?.properties?.get("tags")?.examples)
 
-        val petSchema = root.components?.schemas?.get("Pet") 
-        assertEquals(listOf("#/components/schemas/User"), petSchema?.oneOf) 
-        assertEquals(3, petSchema?.oneOfSchemas?.size) 
-        assertEquals("InlineTitle", petSchema?.oneOfSchemas?.get(0)?.title) 
-        assertEquals("string", petSchema?.oneOfSchemas?.get(1)?.type) 
-        assertEquals("string", petSchema?.oneOfSchemas?.get(2)?.type) 
-        assertTrue(petSchema?.anyOf?.isEmpty() == true) 
-        assertEquals(1, petSchema?.anyOfSchemas?.size) 
-        assertEquals("AnyTitle", petSchema?.anyOfSchemas?.get(0)?.title) 
-        assertTrue(petSchema?.allOf?.isEmpty() == true) 
-        assertEquals(1, petSchema?.allOfSchemas?.size) 
-        assertEquals("string", petSchema?.allOfSchemas?.get(0)?.type) 
+    val petSchema = root.components?.schemas?.get("Pet")
+    assertEquals(listOf("#/components/schemas/User"), petSchema?.oneOf)
+    assertEquals(3, petSchema?.oneOfSchemas?.size)
+    assertEquals("InlineTitle", petSchema?.oneOfSchemas?.get(0)?.title)
+    assertEquals("string", petSchema?.oneOfSchemas?.get(1)?.type)
+    assertEquals("string", petSchema?.oneOfSchemas?.get(2)?.type)
+    assertTrue(petSchema?.anyOf?.isEmpty() == true)
+    assertEquals(1, petSchema?.anyOfSchemas?.size)
+    assertEquals("AnyTitle", petSchema?.anyOfSchemas?.get(0)?.title)
+    assertTrue(petSchema?.allOf?.isEmpty() == true)
+    assertEquals(1, petSchema?.allOfSchemas?.size)
+    assertEquals("string", petSchema?.allOfSchemas?.get(0)?.type)
 
-        val tupleSchema = root.components?.schemas?.get("Tuple") 
-        assertEquals(2, tupleSchema?.prefixItems?.size) 
-        assertTrue(tupleSchema?.contains?.types?.contains("string") == true) 
-        assertEquals(1, tupleSchema?.minContains) 
-        assertEquals(2, tupleSchema?.maxContains) 
+    val tupleSchema = root.components?.schemas?.get("Tuple")
+    assertEquals(2, tupleSchema?.prefixItems?.size)
+    assertTrue(tupleSchema?.contains?.types?.contains("string") == true)
+    assertEquals(1, tupleSchema?.minContains)
+    assertEquals(2, tupleSchema?.maxContains)
 
-        val flags = root.components?.schemas?.get("Flags") 
-        assertEquals("a", flags?.examples?.get("example1")) 
-        assertEquals(listOf("a", "b"), flags?.examplesList) 
-        assertTrue(flags?.uniqueItems == true) 
+    val flags = root.components?.schemas?.get("Flags")
+    assertEquals("a", flags?.examples?.get("example1"))
+    assertEquals(listOf("a", "b"), flags?.examplesList)
+    assertTrue(flags?.uniqueItems == true)
 
-        val anyMap = root.components?.schemas?.get("AnyMap") 
-        assertNotNull(anyMap?.additionalProperties) 
+    val anyMap = root.components?.schemas?.get("AnyMap")
+    assertNotNull(anyMap?.additionalProperties)
 
-        val bag = root.components?.schemas?.get("Bag") 
-        assertTrue(bag?.additionalProperties?.types?.contains("integer") == true) 
+    val bag = root.components?.schemas?.get("Bag")
+    assertTrue(bag?.additionalProperties?.types?.contains("integer") == true)
 
-        val weird = root.components?.schemas?.get("WeirdProps") 
-        assertNull(weird?.additionalProperties) 
+    val weird = root.components?.schemas?.get("WeirdProps")
+    assertNull(weird?.additionalProperties)
 
-        val exampleMap = root.components?.schemas?.get("ExampleMap") 
-        assertEquals(1, exampleMap?.examples?.get("first")) 
+    val exampleMap = root.components?.schemas?.get("ExampleMap")
+    assertEquals(1, exampleMap?.examples?.get("first"))
 
-        val noTypeEnum = root.components?.schemas?.get("NoTypeEnum") 
-        assertEquals(7, noTypeEnum?.defaultValue) 
-        assertEquals(true, noTypeEnum?.constValue) 
+    val noTypeEnum = root.components?.schemas?.get("NoTypeEnum")
+    assertEquals(7, noTypeEnum?.defaultValue)
+    assertEquals(true, noTypeEnum?.constValue)
 
-        val noTypeDefault = root.components?.schemas?.get("NoTypeDefault") 
-        val noTypeExample = noTypeDefault?.example as? Map<*, *>
-        assertEquals(1, noTypeExample?.get("x")) 
+    val noTypeDefault = root.components?.schemas?.get("NoTypeDefault")
+    val noTypeExample = noTypeDefault?.example as? Map<*, *>
+    assertEquals(1, noTypeExample?.get("x"))
 
-        val apiKey = root.components?.securitySchemes?.get("api_key") 
-        assertTrue(apiKey?.deprecated == true) 
-        val refScheme = root.components?.securitySchemes?.get("RefScheme") 
-        assertEquals("#/components/securitySchemes/api_key", refScheme?.reference?.ref) 
-        assertEquals("ref scheme", refScheme?.reference?.description) 
+    val apiKey = root.components?.securitySchemes?.get("api_key")
+    assertTrue(apiKey?.deprecated == true)
+    val refScheme = root.components?.securitySchemes?.get("RefScheme")
+    assertEquals("#/components/securitySchemes/api_key", refScheme?.reference?.ref)
+    assertEquals("ref scheme", refScheme?.reference?.description)
 
-        val mediaType = root.components?.mediaTypes?.get("multipart/form-data") 
-        assertNotNull(mediaType?.encoding?.get("file")?.itemEncoding) 
-        assertEquals("file=abc", mediaType?.examples?.get("raw")?.serializedValue) 
-        assertEquals("String", mediaType?.encoding?.get("file")?.headers?.get("X-Ref")?.type) 
+    val mediaType = root.components?.mediaTypes?.get("multipart/form-data")
+    assertNotNull(mediaType?.encoding?.get("file")?.itemEncoding)
+    assertEquals("file=abc", mediaType?.examples?.get("raw")?.serializedValue)
+    assertEquals("String", mediaType?.encoding?.get("file")?.headers?.get("X-Ref")?.type)
 
-        val mediaRef = root.components?.mediaTypes?.get("text/plain") 
-        assertEquals("#/components/mediaTypes/multipart/form-data", mediaRef?.reference?.ref) 
-        assertEquals("MediaType ref", mediaRef?.reference?.summary) 
-        assertEquals("MediaType ref desc", mediaRef?.reference?.description) 
+    val mediaRef = root.components?.mediaTypes?.get("text/plain")
+    assertEquals("#/components/mediaTypes/multipart/form-data", mediaRef?.reference?.ref)
+    assertEquals("MediaType ref", mediaRef?.reference?.summary)
+    assertEquals("MediaType ref desc", mediaRef?.reference?.description)
 
-        val refExample = root.components?.examples?.get("RefExample") 
-        assertEquals("https://example.com/example.json", refExample?.ref) 
+    val refExample = root.components?.examples?.get("RefExample")
+    assertEquals("https://example.com/example.json", refExample?.ref)
 
-        val simpleExample = root.components?.examples?.get("SimpleExample") 
-        assertEquals("raw-string", simpleExample?.value) 
+    val simpleExample = root.components?.examples?.get("SimpleExample")
+    assertEquals("raw-string", simpleExample?.value)
 
-        val nullExample = root.components?.examples?.get("NullExample") 
-        assertTrue(nullExample?.dataValue == null) 
+    val nullExample = root.components?.examples?.get("NullExample")
+    assertTrue(nullExample?.dataValue == null)
 
-        val onEventCallback = root.components?.callbacks?.get("OnEvent") as? Callback.Inline
-        assertEquals("cb-ext", onEventCallback?.extensions?.get("x-cb")) 
-        assertTrue(onEventCallback?.expressions?.containsKey("\$request.body#/url") == true) 
-        val refCallback = root.components?.callbacks?.get("RefCallback") as? Callback.Inline
-        assertEquals("#/components/callbacks/OnEvent", refCallback?.reference?.ref) 
-        assertEquals("Ref cb", refCallback?.reference?.summary) 
-        assertEquals("Ref cb desc", refCallback?.reference?.description) 
-        assertTrue(refCallback?.expressions?.containsKey("\$request.body#/url") == true) 
+    val onEventCallback = root.components?.callbacks?.get("OnEvent") as? Callback.Inline
+    assertEquals("cb-ext", onEventCallback?.extensions?.get("x-cb"))
+    assertTrue(onEventCallback?.expressions?.containsKey("\$request.body#/url") == true)
+    val refCallback = root.components?.callbacks?.get("RefCallback") as? Callback.Inline
+    assertEquals("#/components/callbacks/OnEvent", refCallback?.reference?.ref)
+    assertEquals("Ref cb", refCallback?.reference?.summary)
+    assertEquals("Ref cb desc", refCallback?.reference?.description)
+    assertTrue(refCallback?.expressions?.containsKey("\$request.body#/url") == true)
 
-        val matrixParam = root.components?.parameters?.get("matrixParam") 
-        assertEquals(ParameterStyle.MATRIX, matrixParam?.style) 
+    val matrixParam = root.components?.parameters?.get("matrixParam")
+    assertEquals(ParameterStyle.MATRIX, matrixParam?.style)
 
-        val cookieParam = root.components?.parameters?.get("cookieParam") 
-        assertEquals(ParameterLocation.COOKIE, cookieParam?.location) 
-        assertEquals(ParameterStyle.FORM, cookieParam?.style) 
+    val cookieParam = root.components?.parameters?.get("cookieParam")
+    assertEquals(ParameterLocation.COOKIE, cookieParam?.location)
+    assertEquals(ParameterStyle.FORM, cookieParam?.style)
 
-        val cookieStyleParam = root.components?.parameters?.get("cookieStyleParam") 
-        assertEquals(ParameterLocation.COOKIE, cookieStyleParam?.location) 
-        assertEquals(ParameterStyle.COOKIE, cookieStyleParam?.style) 
+    val cookieStyleParam = root.components?.parameters?.get("cookieStyleParam")
+    assertEquals(ParameterLocation.COOKIE, cookieStyleParam?.location)
+    assertEquals(ParameterStyle.COOKIE, cookieStyleParam?.style)
 
-        val defaultParam = root.components?.parameters?.get("defaultParam") 
-        assertEquals(ParameterLocation.QUERY, defaultParam?.location) 
-        assertNull(defaultParam?.style) 
+    val defaultParam = root.components?.parameters?.get("defaultParam")
+    assertEquals(ParameterLocation.QUERY, defaultParam?.location)
+    assertNull(defaultParam?.style)
 
-        val response404 = getOp?.responses?.get("404") 
-        assertEquals("Missing response", response404?.description) 
+    val response404 = getOp?.responses?.get("404")
+    assertEquals("Missing response", response404?.description)
 
-        val response200 = getOp?.responses?.get("200") 
-        assertEquals("String", response200?.headers?.get("X-Missing")?.type) 
-        val userLink = response200?.links?.get("UserLink") 
-        assertEquals("getUser", userLink?.operationId) 
-        assertEquals("\$response.body#/id", userLink?.parameters?.get("userId")) 
-        assertEquals(3, userLink?.parameters?.get("priority")) 
-        assertEquals(listOf(true, false), userLink?.parameters?.get("flags")) 
-        assertEquals(mapOf("source" to "test"), userLink?.parameters?.get("meta")) 
-        assertEquals(mapOf("id" to 1), userLink?.requestBody) 
+    val response200 = getOp?.responses?.get("200")
+    assertEquals("String", response200?.headers?.get("X-Missing")?.type)
+    val userLink = response200?.links?.get("UserLink")
+    assertEquals("getUser", userLink?.operationId)
+    assertEquals("\$response.body#/id", userLink?.parameters?.get("userId"))
+    assertEquals(3, userLink?.parameters?.get("priority"))
+    assertEquals(listOf(true, false), userLink?.parameters?.get("flags"))
+    assertEquals(mapOf("source" to "test"), userLink?.parameters?.get("meta"))
+    assertEquals(mapOf("id" to 1), userLink?.requestBody)
 
-        val altLink = response200?.links?.get("AltLink") 
-        assertEquals("#/components/links/UserLink", altLink?.ref) 
-        assertEquals("Alt summary", altLink?.reference?.summary) 
-        assertEquals("Alt desc", altLink?.reference?.description) 
+    val altLink = response200?.links?.get("AltLink")
+    assertEquals("#/components/links/UserLink", altLink?.ref)
+    assertEquals("Alt summary", altLink?.reference?.summary)
+    assertEquals("Alt desc", altLink?.reference?.description)
 
-        val postOp = pathItem?.post
-        assertEquals("#/components/requestBodies/MissingBody", postOp?.requestBody?.reference?.ref) 
+    val postOp = pathItem?.post
+    assertEquals("#/components/requestBodies/MissingBody", postOp?.requestBody?.reference?.ref)
 
-        val putOp = pathItem?.put
-        assertEquals("String", putOp?.requestBodyType) 
+    val putOp = pathItem?.put
+    assertEquals("String", putOp?.requestBodyType)
 
-        val webhook = root.webhooks["newPet"] 
-        assertEquals("onNewPet", webhook?.post?.operationId) 
+    val webhook = root.webhooks["newPet"]
+    assertEquals("onNewPet", webhook?.post?.operationId)
 
-        val tag = root.tags.first() 
-        assertNull(tag.externalDocs) 
-    } 
+    val tag = root.tags.first()
+    assertNull(tag.externalDocs)
+  }
 
-    @Test
-    fun `parse preserves explicit empty response content`() { 
-        val json = """ 
+  @Test
+  fun `parse preserves explicit empty response content`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "Ping", "version": "1.0" }, 
@@ -670,26 +678,28 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val definition = parser.parseString(json, OpenApiParser.Format.JSON) 
-        val response = definition.paths["/ping"]?.get?.responses?.get("200") 
-        assertNotNull(response) 
-        assertTrue(response!!.content.isEmpty()) 
-        assertTrue(response.contentPresent) 
-    } 
+    val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+    val response = definition.paths["/ping"]?.get?.responses?.get("200")
+    assertNotNull(response)
+    assertTrue(response!!.content.isEmpty())
+    assertTrue(response.contentPresent)
+  }
 
-    @Test
-    fun `parse handles missing info object gracefully`() { 
-        val json = """{ "openapi": "3.2.0" }""" 
-        val root = parser.parseString(json) 
-        assertEquals("Unknown", root.info.title) 
-        assertEquals("0.0.0", root.info.version) 
-    } 
+  @Test
+  fun `parse handles missing info object gracefully`() {
+    val json = """{ "openapi": "3.2.0" }"""
+    val root = parser.parseString(json)
+    assertEquals("Unknown", root.info.title)
+    assertEquals("0.0.0", root.info.version)
+  }
 
-    @Test
-    fun `parse arbitrary JSON node types in custom keywords`() { 
-        val json = """ 
+  @Test
+  fun `parse arbitrary JSON node types in custom keywords`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "Any JSON", "version": "1.0" }, 
@@ -703,21 +713,23 @@ class OpenApiParserTest {
                  "objVal": { "k": "v" } 
               } 
             } 
-        """.trimIndent() 
-        val root = parser.parseString(json) 
-        val ext = root.extensions["x-ext"] as Map<*,*> 
-        assertEquals(null, ext["nullVal"]) 
-        assertEquals(42, (ext["intVal"] as Number).toInt()) 
-        assertEquals(3.14, (ext["floatVal"] as Number).toDouble()) 
-        assertEquals(true, ext["boolVal"]) 
-        assertEquals("hello", ext["stringVal"]) 
-        assertEquals(listOf(1, 2, 3), ext["arrVal"]) 
-        assertEquals(mapOf("k" to "v"), ext["objVal"]) 
-    } 
+        """
+            .trimIndent()
+    val root = parser.parseString(json)
+    val ext = root.extensions["x-ext"] as Map<*, *>
+    assertEquals(null, ext["nullVal"])
+    assertEquals(42, (ext["intVal"] as Number).toInt())
+    assertEquals(3.14, (ext["floatVal"] as Number).toDouble())
+    assertEquals(true, ext["boolVal"])
+    assertEquals("hello", ext["stringVal"])
+    assertEquals(listOf(1, 2, 3), ext["arrVal"])
+    assertEquals(mapOf("k" to "v"), ext["objVal"])
+  }
 
-    @Test
-    fun `parse resolves callback refs while preserving ref metadata`() { 
-        val json = """ 
+  @Test
+  fun `parse resolves callback refs while preserving ref metadata`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "Callbacks", "version": "1.0" }, 
@@ -741,24 +753,26 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val definition = parser.parseString(json, OpenApiParser.Format.JSON) 
-        val callback = definition.paths["/subscribe"]?.post?.callbacks?.get("onEvent") 
-        assertTrue(callback is Callback.Inline) 
-        val inline = callback as Callback.Inline
-        assertEquals("#/components/callbacks/OnEvent", inline.reference?.ref) 
-        assertTrue(inline.expressions.containsKey("{${'$'}request.body#/url}")) 
+    val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+    val callback = definition.paths["/subscribe"]?.post?.callbacks?.get("onEvent")
+    assertTrue(callback is Callback.Inline)
+    val inline = callback as Callback.Inline
+    assertEquals("#/components/callbacks/OnEvent", inline.reference?.ref)
+    assertTrue(inline.expressions.containsKey("{${'$'}request.body#/url}"))
 
-        val serialized = writer.writeJson(definition) 
-        val root = ObjectMapper(JsonFactory()).readTree(serialized) 
-        val callbackNode = root["paths"]["/subscribe"]["post"]["callbacks"]["onEvent"] 
-        assertEquals("#/components/callbacks/OnEvent", callbackNode["${'$'}ref"].asText()) 
-    } 
+    val serialized = writer.writeJson(definition)
+    val root = ObjectMapper(JsonFactory()).readTree(serialized)
+    val callbackNode = root["paths"]["/subscribe"]["post"]["callbacks"]["onEvent"]
+    assertEquals("#/components/callbacks/OnEvent", callbackNode["${'$'}ref"].asText())
+  }
 
-    @Test
-    fun `parse resolves component response refs with absolute uri`() { 
-        val json = """ 
+  @Test
+  fun `parse resolves component response refs with absolute uri`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "Pets", "version": "1.0" }, 
@@ -778,17 +792,19 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val definition = parser.parseString(json) 
-        val response = definition.paths["/pets"]?.get?.responses?.get("200") 
-        assertNotNull(response) 
-        assertEquals("ok", response?.description) 
-    } 
+    val definition = parser.parseString(json)
+    val response = definition.paths["/pets"]?.get?.responses?.get("200")
+    assertNotNull(response)
+    assertEquals("ok", response?.description)
+  }
 
-    @Test
-    fun `parse resolves component response refs with self base match`() { 
-        val json = """ 
+  @Test
+  fun `parse resolves component response refs with self base match`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "${"$"}self": "https://example.com/openapi.json", 
@@ -809,18 +825,20 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val definition = parser.parseString(json) 
-        val response = definition.paths["/pets"]?.get?.responses?.get("200") 
-        assertNotNull(response) 
-        assertEquals("ok", response?.description) 
-    } 
+    val definition = parser.parseString(json)
+    val response = definition.paths["/pets"]?.get?.responses?.get("200")
+    assertNotNull(response)
+    assertEquals("ok", response?.description)
+  }
 
-    @Test
-    fun `parse resolves component response refs using base uri when self missing`() { 
-        val ref = "https://example.com/openapi.json#/components/responses/Ok" 
-        val json = """ 
+  @Test
+  fun `parse resolves component response refs using base uri when self missing`() {
+    val ref = "https://example.com/openapi.json#/components/responses/Ok"
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "Pets", "version": "1.0" }, 
@@ -840,18 +858,20 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val definition = parser.parseString(json, baseUri = "https://example.com/openapi.json") 
-        val response = definition.paths["/pets"]?.get?.responses?.get("200") 
-        assertNotNull(response) 
-        assertEquals("ok", response?.description) 
-    } 
+    val definition = parser.parseString(json, baseUri = "https://example.com/openapi.json")
+    val response = definition.paths["/pets"]?.get?.responses?.get("200")
+    assertNotNull(response)
+    assertEquals("ok", response?.description)
+  }
 
-    @Test
-    fun `parse resolves component response refs when self is relative and base uri provided`() { 
-        val ref = "https://example.com/api/openapi.json#/components/responses/Ok" 
-        val json = """ 
+  @Test
+  fun `parse resolves component response refs when self is relative and base uri provided`() {
+    val ref = "https://example.com/api/openapi.json#/components/responses/Ok"
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "${"$"}self": "/api/openapi.json", 
@@ -872,18 +892,20 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val definition = parser.parseString(json, baseUri = "https://example.com/root/openapi.json") 
-        val response = definition.paths["/pets"]?.get?.responses?.get("200") 
-        assertNotNull(response) 
-        assertEquals("ok", response?.description) 
-    } 
+    val definition = parser.parseString(json, baseUri = "https://example.com/root/openapi.json")
+    val response = definition.paths["/pets"]?.get?.responses?.get("200")
+    assertNotNull(response)
+    assertEquals("ok", response?.description)
+  }
 
-    @Test
-    fun `parse does not resolve component response refs when base uri mismatches`() { 
-        val ref = "https://example.com/openapi.json#/components/responses/Ok" 
-        val json = """ 
+  @Test
+  fun `parse does not resolve component response refs when base uri mismatches`() {
+    val ref = "https://example.com/openapi.json#/components/responses/Ok"
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "Pets", "version": "1.0" }, 
@@ -903,18 +925,20 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val definition = parser.parseString(json, baseUri = "https://other.example.com/openapi.json") 
-        val response = definition.paths["/pets"]?.get?.responses?.get("200") 
-        assertNotNull(response) 
-        assertEquals("ref:$ref", response?.description) 
-    } 
+    val definition = parser.parseString(json, baseUri = "https://other.example.com/openapi.json")
+    val response = definition.paths["/pets"]?.get?.responses?.get("200")
+    assertNotNull(response)
+    assertEquals("ref:$ref", response?.description)
+  }
 
-    @Test
-    fun `parse does not resolve component response refs when self base mismatches`() { 
-        val ref = "https://other.example.com/openapi.json#/components/responses/Ok" 
-        val json = """ 
+  @Test
+  fun `parse does not resolve component response refs when self base mismatches`() {
+    val ref = "https://other.example.com/openapi.json#/components/responses/Ok"
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "${"$"}self": "https://example.com/openapi.json", 
@@ -935,17 +959,19 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val definition = parser.parseString(json) 
-        val response = definition.paths["/pets"]?.get?.responses?.get("200") 
-        assertNotNull(response) 
-        assertEquals("ref:$ref", response?.description) 
-    } 
+    val definition = parser.parseString(json)
+    val response = definition.paths["/pets"]?.get?.responses?.get("200")
+    assertNotNull(response)
+    assertEquals("ref:$ref", response?.description)
+  }
 
-    @Test
-    fun `parse resolves component response refs with percent encoded key`() { 
-        val json = """ 
+  @Test
+  fun `parse resolves component response refs with percent encoded key`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "Pets", "version": "1.0" }, 
@@ -965,17 +991,20 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val definition = parser.parseString(json) 
-        val response = definition.paths["/pets"]?.get?.responses?.get("200") 
-        assertNotNull(response) 
-        assertEquals("ok", response?.description) 
-    } 
+    val definition = parser.parseString(json)
+    val response = definition.paths["/pets"]?.get?.responses?.get("200")
+    assertNotNull(response)
+    assertEquals("ok", response?.description)
+  }
 
-    @Test
-    fun `percentDecode ignores invalid hex values gracefully`() { 
-        val definition = parser.parseString(""" 
+  @Test
+  fun `percentDecode ignores invalid hex values gracefully`() {
+    val definition =
+        parser.parseString(
+            """ 
             { 
                "openapi": "3.2.0", 
                "info": { "title": "Test", "version": "1.0" }, 
@@ -987,66 +1016,69 @@ class OpenApiParserTest {
                  } 
                } 
             } 
-        """.trimIndent()) 
-        val op = definition.components?.pathItems?.get("Bad%ZZ")?.get
-        assertEquals("badHex", op?.operationId) 
-    } 
+        """
+                .trimIndent())
+    val op = definition.components?.pathItems?.get("Bad%ZZ")?.get
+    assertEquals("badHex", op?.operationId)
+  }
 
-    @Test
-    fun `parseDocumentString returns Schema document when root is schema`() { 
-        val schemaJson = """{ "type": "string", "minLength": 1 }""" 
-        val doc = parser.parseDocumentString(schemaJson, OpenApiParser.Format.JSON) 
+  @Test
+  fun `parseDocumentString returns Schema document when root is schema`() {
+    val schemaJson = """{ "type": "string", "minLength": 1 }"""
+    val doc = parser.parseDocumentString(schemaJson, OpenApiParser.Format.JSON)
 
-        val schemaDoc = doc as? OpenApiDocument.Schema
-        assertNotNull(schemaDoc) 
-        assertEquals(setOf("string"), schemaDoc?.schema?.types) 
-        assertEquals(1, schemaDoc?.schema?.minLength) 
-    } 
+    val schemaDoc = doc as? OpenApiDocument.Schema
+    assertNotNull(schemaDoc)
+    assertEquals(setOf("string"), schemaDoc?.schema?.types)
+    assertEquals(1, schemaDoc?.schema?.minLength)
+  }
 
-    @Test
-    fun `parseDocumentString returns OpenAPI document when openapi field present`() { 
-        val openapiJson = """{ "openapi": "3.2.0", "info": { "title": "X", "version": "1" } }""" 
-        val doc = parser.parseDocumentString(openapiJson, OpenApiParser.Format.JSON) 
-        val openapiDoc = doc as? OpenApiDocument.OpenApi
-        assertNotNull(openapiDoc) 
-        assertEquals("3.2.0", openapiDoc?.definition?.openapi) 
-    } 
+  @Test
+  fun `parseDocumentString returns OpenAPI document when openapi field present`() {
+    val openapiJson = """{ "openapi": "3.2.0", "info": { "title": "X", "version": "1" } }"""
+    val doc = parser.parseDocumentString(openapiJson, OpenApiParser.Format.JSON)
+    val openapiDoc = doc as? OpenApiDocument.OpenApi
+    assertNotNull(openapiDoc)
+    assertEquals("3.2.0", openapiDoc?.definition?.openapi)
+  }
 
-    @Test
-    fun `parseSchemaString throws when document is OpenAPI`() { 
-        val openapiJson = """{ "openapi": "3.2.0", "info": { "title": "X", "version": "1" } }""" 
-        try { 
-            parser.parseSchemaString(openapiJson, OpenApiParser.Format.JSON) 
-        } catch (ex: IllegalArgumentException) { 
-            assertTrue(ex.message?.contains("OpenAPI Object") == true) 
-            return
-        } 
-        throw AssertionError("Expected IllegalArgumentException for OpenAPI document") 
-    } 
+  @Test
+  fun `parseSchemaString throws when document is OpenAPI`() {
+    val openapiJson = """{ "openapi": "3.2.0", "info": { "title": "X", "version": "1" } }"""
+    try {
+      parser.parseSchemaString(openapiJson, OpenApiParser.Format.JSON)
+    } catch (ex: IllegalArgumentException) {
+      assertTrue(ex.message?.contains("OpenAPI Object") == true)
+      return
+    }
+    throw AssertionError("Expected IllegalArgumentException for OpenAPI document")
+  }
 
-
-    @Test
-    fun `parse preserves explicit empty paths and webhooks`() { 
-        val json = """ 
+  @Test
+  fun `parse preserves explicit empty paths and webhooks`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "Empty API", "version": "1.0.0" }, 
               "paths": {}, 
               "webhooks": {} 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val definition = parser.parseString(json, OpenApiParser.Format.JSON) 
+    val definition = parser.parseString(json, OpenApiParser.Format.JSON)
 
-        assertTrue(definition.paths.isEmpty()) 
-        assertTrue(definition.webhooks.isEmpty()) 
-        assertTrue(definition.pathsExplicitEmpty) 
-        assertTrue(definition.webhooksExplicitEmpty) 
-    } 
+    assertTrue(definition.paths.isEmpty())
+    assertTrue(definition.webhooks.isEmpty())
+    assertTrue(definition.pathsExplicitEmpty)
+    assertTrue(definition.webhooksExplicitEmpty)
+  }
 
-    @Test
-    fun `parse tracks missing requestBody content`() { 
-        val json = """ 
+  @Test
+  fun `parse tracks missing requestBody content`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "Body", "version": "1.0" }, 
@@ -1064,18 +1096,20 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val root = parser.parseString(json, OpenApiParser.Format.JSON) 
-        val body = root.paths["/submit"]?.post?.requestBody
-        assertNotNull(body) 
-        assertFalse(body?.contentPresent ?: true) 
-        assertTrue(body?.content?.isEmpty() == true) 
-    } 
+    val root = parser.parseString(json, OpenApiParser.Format.JSON)
+    val body = root.paths["/submit"]?.post?.requestBody
+    assertNotNull(body)
+    assertFalse(body?.contentPresent ?: true)
+    assertTrue(body?.content?.isEmpty() == true)
+  }
 
-    @Test
-    fun `parse resolves media type ref for content schemas`() { 
-        val json = """ 
+  @Test
+  fun `parse resolves media type ref for content schemas`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "Media Types", "version": "1.0.0" }, 
@@ -1105,19 +1139,22 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val definition = parser.parseString(json, OpenApiParser.Format.JSON) 
-        val media = definition.paths["/pets"]?.get?.responses?.get("200")?.content?.get("application/json") 
+    val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+    val media =
+        definition.paths["/pets"]?.get?.responses?.get("200")?.content?.get("application/json")
 
-        assertNotNull(media) 
-        assertEquals("#/components/mediaTypes/PetJson", media?.ref) 
-        assertNotNull(media?.schema, "Expected resolved schema for media type ref") 
-    } 
+    assertNotNull(media)
+    assertEquals("#/components/mediaTypes/PetJson", media?.ref)
+    assertNotNull(media?.schema, "Expected resolved schema for media type ref")
+  }
 
-    @Test
-    fun `parse explicit empty security arrays`() { 
-        val json = """ 
+  @Test
+  fun `parse explicit empty security arrays`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "Security", "version": "1.0" }, 
@@ -1132,20 +1169,22 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val root = parser.parseString(json, OpenApiParser.Format.JSON) 
+    val root = parser.parseString(json, OpenApiParser.Format.JSON)
 
-        assertTrue(root.security.isEmpty()) 
-        assertTrue(root.securityExplicitEmpty) 
-        val op = root.paths["/pets"]?.get
-        assertTrue(op?.security?.isEmpty() == true) 
-        assertTrue(op?.securityExplicitEmpty == true) 
-    } 
+    assertTrue(root.security.isEmpty())
+    assertTrue(root.securityExplicitEmpty)
+    val op = root.paths["/pets"]?.get
+    assertTrue(op?.security?.isEmpty() == true)
+    assertTrue(op?.securityExplicitEmpty == true)
+  }
 
-    @Test
-    fun `parse schema property preserves ref siblings`() { 
-        val json = """ 
+  @Test
+  fun `parse schema property preserves ref siblings`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "Test", "version": "1.0" }, 
@@ -1165,19 +1204,21 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val parsed = parser.parseString(json, OpenApiParser.Format.JSON) 
-        val prop = parsed.components?.schemas?.get("Wrapper")?.properties?.get("id") 
-        assertNotNull(prop) 
-        assertEquals("#/components/schemas/Id", prop?.ref) 
-        assertEquals("Referenced id", prop?.description) 
-        assertTrue(prop?.deprecated == true) 
-    } 
+    val parsed = parser.parseString(json, OpenApiParser.Format.JSON)
+    val prop = parsed.components?.schemas?.get("Wrapper")?.properties?.get("id")
+    assertNotNull(prop)
+    assertEquals("#/components/schemas/Id", prop?.ref)
+    assertEquals("Referenced id", prop?.description)
+    assertTrue(prop?.deprecated == true)
+  }
 
-    @Test
-    fun `parse supports non-string enum values`() { 
-        val json = """ 
+  @Test
+  fun `parse supports non-string enum values`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "Enums", "version": "1.0" }, 
@@ -1199,27 +1240,28 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val parsed = parser.parseString(json, OpenApiParser.Format.JSON) 
-        val components = parsed.components?.schemas
+    val parsed = parser.parseString(json, OpenApiParser.Format.JSON)
+    val components = parsed.components?.schemas
 
-        assertEquals(listOf(1, 2, 3), components?.get("IntEnum")?.enumValues) 
-        assertEquals(listOf(true, false), components?.get("BoolEnum")?.enumValues) 
-        assertEquals( 
-            listOf(mapOf("k" to "v1"), mapOf("k" to "v2")), 
-            components?.get("ObjEnum")?.enumValues
-        ) 
+    assertEquals(listOf(1, 2, 3), components?.get("IntEnum")?.enumValues)
+    assertEquals(listOf(true, false), components?.get("BoolEnum")?.enumValues)
+    assertEquals(
+        listOf(mapOf("k" to "v1"), mapOf("k" to "v2")), components?.get("ObjEnum")?.enumValues)
 
-        val wrapper = components?.get("Wrapper") 
-        assertEquals(listOf("fast", "slow"), wrapper?.properties?.get("mode")?.enumValues) 
-        val levelEnums = wrapper?.properties?.get("level")?.enumValues?.map { (it as Number).toDouble() } 
-        assertEquals(listOf(0.1, 0.5), levelEnums) 
-    } 
+    val wrapper = components?.get("Wrapper")
+    assertEquals(listOf("fast", "slow"), wrapper?.properties?.get("mode")?.enumValues)
+    val levelEnums =
+        wrapper?.properties?.get("level")?.enumValues?.map { (it as Number).toDouble() }
+    assertEquals(listOf(0.1, 0.5), levelEnums)
+  }
 
-    @Test
-    fun `parse resolves media type refs for response typing and encoding header refs`() { 
-        val json = """ 
+  @Test
+  fun `parse resolves media type refs for response typing and encoding header refs`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "Refs", "version": "1.0" }, 
@@ -1275,30 +1317,33 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val definition = parser.parseString(json, OpenApiParser.Format.JSON) 
+    val definition = parser.parseString(json, OpenApiParser.Format.JSON)
 
-        val petResponse = definition.paths["/pets"]?.get?.responses?.get("200") 
-        assertEquals("Pet", petResponse?.type) 
+    val petResponse = definition.paths["/pets"]?.get?.responses?.get("200")
+    assertEquals("Pet", petResponse?.type)
 
-        val encodingHeader = definition.paths["/upload"] 
+    val encodingHeader =
+        definition.paths["/upload"]
             ?.post
             ?.requestBody
             ?.content
-            ?.get("multipart/form-data") 
+            ?.get("multipart/form-data")
             ?.encoding
-            ?.get("file") 
+            ?.get("file")
             ?.headers
-            ?.get("X-Trace") 
+            ?.get("X-Trace")
 
-        assertEquals("Int", encodingHeader?.type) 
-        assertEquals("#/components/headers/TraceHeader", encodingHeader?.reference?.ref) 
-    } 
+    assertEquals("Int", encodingHeader?.type)
+    assertEquals("#/components/headers/TraceHeader", encodingHeader?.reference?.ref)
+  }
 
-    @Test
-    fun `selects most specific media type when deriving response type`() { 
-        val json = """ 
+  @Test
+  fun `selects most specific media type when deriving response type`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "Media", "version": "1.0" }, 
@@ -1319,21 +1364,19 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val definition = parser.parseString(json, OpenApiParser.Format.JSON) 
-        val responseType = definition.paths["/items"] 
-            ?.get
-            ?.responses
-            ?.get("200") 
-            ?.type
+    val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+    val responseType = definition.paths["/items"]?.get?.responses?.get("200")?.type
 
-        assertEquals("Int", responseType) 
-    } 
+    assertEquals("Int", responseType)
+  }
 
-    @Test
-    fun `infers schema-less binary response type from media type`() { 
-        val json = """ 
+  @Test
+  fun `infers schema-less binary response type from media type`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "Binary", "version": "1.0" }, 
@@ -1353,21 +1396,19 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val definition = parser.parseString(json, OpenApiParser.Format.JSON) 
-        val responseType = definition.paths["/bin"] 
-            ?.get
-            ?.responses
-            ?.get("200") 
-            ?.type
+    val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+    val responseType = definition.paths["/bin"]?.get?.responses?.get("200")?.type
 
-        assertEquals("ByteArray", responseType) 
-    } 
+    assertEquals("ByteArray", responseType)
+  }
 
-    @Test
-    fun `infers schema-less form request body type from media type`() { 
-        val json = """ 
+  @Test
+  fun `infers schema-less form request body type from media type`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "Form", "version": "1.0" }, 
@@ -1386,19 +1427,19 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val definition = parser.parseString(json, OpenApiParser.Format.JSON) 
-        val requestBodyType = definition.paths["/form"] 
-            ?.post
-            ?.requestBodyType
+    val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+    val requestBodyType = definition.paths["/form"]?.post?.requestBodyType
 
-        assertEquals("String", requestBodyType) 
-    } 
+    assertEquals("String", requestBodyType)
+  }
 
-    @Test
-    fun `infers list type from itemSchema content`() { 
-        val json = """ 
+  @Test
+  fun `infers list type from itemSchema content`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "Stream", "version": "1.0" }, 
@@ -1418,21 +1459,19 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val definition = parser.parseString(json, OpenApiParser.Format.JSON) 
-        val responseType = definition.paths["/events"] 
-            ?.get
-            ?.responses
-            ?.get("200") 
-            ?.type
+    val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+    val responseType = definition.paths["/events"]?.get?.responses?.get("200")?.type
 
-        assertEquals("List<String>", responseType) 
-    } 
+    assertEquals("List<String>", responseType)
+  }
 
-    @Test
-    fun `parse resolves component link refs with overrides`() { 
-        val json = """ 
+  @Test
+  fun `parse resolves component link refs with overrides`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "Links", "version": "1.0" }, 
@@ -1462,20 +1501,22 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val definition = parser.parseString(json, OpenApiParser.Format.JSON) 
-        val link = definition.paths["/items"]?.get?.responses?.get("200")?.links?.get("UserLink") 
+    val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+    val link = definition.paths["/items"]?.get?.responses?.get("200")?.links?.get("UserLink")
 
-        assertNotNull(link) 
-        assertEquals("getUser", link?.operationId) 
-        assertEquals("override desc", link?.description) 
-        assertEquals("#/components/links/BaseLink", link?.ref) 
-    } 
+    assertNotNull(link)
+    assertEquals("getUser", link?.operationId)
+    assertEquals("override desc", link?.description)
+    assertEquals("#/components/links/BaseLink", link?.ref)
+  }
 
-    @Test
-    fun `parse resolves component example refs with overrides`() { 
-        val json = """ 
+  @Test
+  fun `parse resolves component example refs with overrides`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "Examples", "version": "1.0" }, 
@@ -1507,21 +1548,23 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val definition = parser.parseString(json, OpenApiParser.Format.JSON) 
-        val example = definition.paths["/items"]?.get?.parameters?.firstOrNull() 
-            ?.examples?.get("sample") 
+    val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+    val example =
+        definition.paths["/items"]?.get?.parameters?.firstOrNull()?.examples?.get("sample")
 
-        assertNotNull(example) 
-        assertEquals("override summary", example?.summary) 
-        assertEquals("abc-123", example?.dataValue) 
-        assertEquals("#/components/examples/IdExample", example?.ref) 
-    } 
+    assertNotNull(example)
+    assertEquals("override summary", example?.summary)
+    assertEquals("abc-123", example?.dataValue)
+    assertEquals("#/components/examples/IdExample", example?.ref)
+  }
 
-    @Test
-    fun `parse resolves component refs within components`() { 
-        val json = """ 
+  @Test
+  fun `parse resolves component refs within components`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "Ref Components", "version": "1.0" }, 
@@ -1564,45 +1607,47 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val root = parser.parseString(json, OpenApiParser.Format.JSON) 
-        val components = root.components
-        assertNotNull(components) 
+    val root = parser.parseString(json, OpenApiParser.Format.JSON)
+    val components = root.components
+    assertNotNull(components)
 
-        val limitRef = components?.parameters?.get("LimitRef") 
-        assertEquals("#/components/parameters/Limit", limitRef?.reference?.ref) 
-        assertEquals("limit", limitRef?.name) 
-        assertEquals("override", limitRef?.description) 
+    val limitRef = components?.parameters?.get("LimitRef")
+    assertEquals("#/components/parameters/Limit", limitRef?.reference?.ref)
+    assertEquals("limit", limitRef?.name)
+    assertEquals("override", limitRef?.description)
 
-        val okRef = components?.responses?.get("OkRef") 
-        assertEquals("#/components/responses/Ok", okRef?.reference?.ref) 
-        assertEquals("ok", okRef?.description) 
+    val okRef = components?.responses?.get("OkRef")
+    assertEquals("#/components/responses/Ok", okRef?.reference?.ref)
+    assertEquals("ok", okRef?.description)
 
-        val bodyRef = components?.requestBodies?.get("RefBody") 
-        assertEquals("#/components/requestBodies/BaseBody", bodyRef?.reference?.ref) 
-        assertTrue(bodyRef?.content?.isNotEmpty() == true) 
-        assertEquals("Body override", bodyRef?.description) 
+    val bodyRef = components?.requestBodies?.get("RefBody")
+    assertEquals("#/components/requestBodies/BaseBody", bodyRef?.reference?.ref)
+    assertTrue(bodyRef?.content?.isNotEmpty() == true)
+    assertEquals("Body override", bodyRef?.description)
 
-        val schemeRef = components?.securitySchemes?.get("ApiKeyRef") 
-        assertEquals("#/components/securitySchemes/ApiKey", schemeRef?.reference?.ref) 
-        assertEquals("apiKey", schemeRef?.type) 
-        assertEquals("header", schemeRef?.`in`) 
-        assertEquals("Ref desc", schemeRef?.description) 
+    val schemeRef = components?.securitySchemes?.get("ApiKeyRef")
+    assertEquals("#/components/securitySchemes/ApiKey", schemeRef?.reference?.ref)
+    assertEquals("apiKey", schemeRef?.type)
+    assertEquals("header", schemeRef?.`in`)
+    assertEquals("Ref desc", schemeRef?.description)
 
-        val exampleRef = components?.examples?.get("RefExample") 
-        assertEquals("#/components/examples/BaseExample", exampleRef?.ref) 
-        assertEquals("base", exampleRef?.dataValue) 
-        assertEquals("override", exampleRef?.summary) 
+    val exampleRef = components?.examples?.get("RefExample")
+    assertEquals("#/components/examples/BaseExample", exampleRef?.ref)
+    assertEquals("base", exampleRef?.dataValue)
+    assertEquals("override", exampleRef?.summary)
 
-        val mediaRef = components?.mediaTypes?.get("JsonRef") 
-        assertEquals("#/components/mediaTypes/JsonBase", mediaRef?.reference?.ref ?: mediaRef?.ref) 
-        assertNotNull(mediaRef?.schema) 
-    } 
+    val mediaRef = components?.mediaTypes?.get("JsonRef")
+    assertEquals("#/components/mediaTypes/JsonBase", mediaRef?.reference?.ref ?: mediaRef?.ref)
+    assertNotNull(mediaRef?.schema)
+  }
 
-    @Test
-    fun `parse missing operationId preserves omission`() { 
-        val json = """ 
+  @Test
+  fun `parse missing operationId preserves omission`() {
+    val json =
+        """ 
             { 
               "openapi": "3.2.0", 
               "info": { "title": "NoOpId", "version": "1.0" }, 
@@ -1616,12 +1661,13 @@ class OpenApiParserTest {
                 } 
               } 
             } 
-        """.trimIndent() 
+        """
+            .trimIndent()
 
-        val definition = parser.parseString(json, OpenApiParser.Format.JSON) 
-        val operation = definition.paths["/pets"]?.get
-        assertNotNull(operation) 
-        assertFalse(operation!!.operationIdExplicit) 
-        assertEquals("get_pets", operation.operationId) 
-    } 
+    val definition = parser.parseString(json, OpenApiParser.Format.JSON)
+    val operation = definition.paths["/pets"]?.get
+    assertNotNull(operation)
+    assertFalse(operation!!.operationIdExplicit)
+    assertEquals("get_pets", operation.operationId)
+  }
 }

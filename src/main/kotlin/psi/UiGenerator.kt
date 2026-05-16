@@ -5,22 +5,21 @@ import domain.SchemaProperty
 import org.jetbrains.kotlin.psi.KtFile
 
 /**
- * Generates Jetpack Compose / Compose Multiplatform UI code for a given Schema.
- * Creates Forms, Grids, and full Screen controllers connecting to APIs.
- * Updated to handle SchemaProperty.types set.
+ * Generates Jetpack Compose / Compose Multiplatform UI code for a given Schema. Creates Forms,
+ * Grids, and full Screen controllers connecting to APIs. Updated to handle SchemaProperty.types
+ * set.
  */
 class UiGenerator {
 
-    private val psiFactory = PsiInfrastructure.createPsiFactory()
+  private val psiFactory = PsiInfrastructure.createPsiFactory()
 
-    /**
-     * Generates a Kotlin file containing the Composable Form.
-     */
-    fun generateForm(packageName: String, schema: SchemaDefinition): KtFile {
-        val className = schema.name
-        val formName = "${className}Form"
+  /** Generates a Kotlin file containing the Composable Form. */
+  fun generateForm(packageName: String, schema: SchemaDefinition): KtFile {
+    val className = schema.name
+    val formName = "${className}Form"
 
-        val imports = """ 
+    val imports =
+        """ 
             package $packageName
             
             import androidx.compose.foundation.layout.* 
@@ -30,38 +29,45 @@ class UiGenerator {
             import androidx.compose.ui.Modifier
             import androidx.compose.ui.text.input.KeyboardType
             import androidx.compose.ui.unit.dp
-        """.trimIndent()
+        """
+            .trimIndent()
 
-        val stateDefinitions = schema.properties.entries.joinToString("\n    ") { (name, prop) ->
-            val stateInit = "initialState?.$name"
-            val isBool = isBoolean(prop)
-            val isString = prop.types.contains("string")
-            val fallback = if (isBool) "false" else "\"\""
-            val conversion = if (isBool || isString) "" else ".toString()"
+    val stateDefinitions =
+        schema.properties.entries.joinToString("\n    ") { (name, prop) ->
+          val stateInit = "initialState?.$name"
+          val isBool = isBoolean(prop)
+          val isString = prop.types.contains("string")
+          val fallback = if (isBool) "false" else "\"\""
+          val conversion = if (isBool || isString) "" else ".toString()"
 
-            "var $name by remember { mutableStateOf($stateInit$conversion ?: $fallback) }"
+          "var $name by remember { mutableStateOf($stateInit$conversion ?: $fallback) }"
         }
 
-        val inputFields = schema.properties.entries.joinToString("\n\n        ") { (name, prop) ->
-            generateInput(name, prop, schema.required.contains(name))
+    val inputFields =
+        schema.properties.entries.joinToString("\n\n        ") { (name, prop) ->
+          generateInput(name, prop, schema.required.contains(name))
         }
 
-        val constructorArgs = schema.properties.entries.joinToString(",\n                                    ") { (name, prop) ->
-            val isInt = prop.types.contains("integer")
-            val isNum = prop.types.contains("number")
-            val isBool = prop.types.contains("boolean")
+    val constructorArgs =
+        schema.properties.entries.joinToString(",\n                                    ") {
+            (name, prop) ->
+          val isInt = prop.types.contains("integer")
+          val isNum = prop.types.contains("number")
+          val isBool = prop.types.contains("boolean")
 
-            val value = when {
+          val value =
+              when {
                 isInt && prop.format == "int64" -> "$name.toLongOrNull() ?: 0L"
                 isInt -> "$name.toIntOrNull() ?: 0"
                 isNum -> "$name.toDoubleOrNull() ?: 0.0"
                 isBool -> name
                 else -> name
-            }
-            "$name = $value"
+              }
+          "$name = $value"
         }
 
-        val content = """ 
+    val content =
+        """ 
             $imports
             
             @Composable
@@ -92,19 +98,19 @@ class UiGenerator {
                     } 
                 } 
             } 
-        """.trimIndent()
+        """
+            .trimIndent()
 
-        return psiFactory.createFile("$formName.kt", content)
-    }
+    return psiFactory.createFile("$formName.kt", content)
+  }
 
-    /**
-     * Generates a Kotlin file containing the Composable Data Grid.
-     */
-    fun generateGrid(packageName: String, schema: SchemaDefinition): KtFile {
-        val className = schema.name
-        val gridName = "${className}Grid"
+  /** Generates a Kotlin file containing the Composable Data Grid. */
+  fun generateGrid(packageName: String, schema: SchemaDefinition): KtFile {
+    val className = schema.name
+    val gridName = "${className}Grid"
 
-        val imports = """ 
+    val imports =
+        """ 
             package $packageName
             
             import androidx.compose.foundation.clickable
@@ -117,16 +123,19 @@ class UiGenerator {
             import androidx.compose.ui.draw.alpha
             import androidx.compose.ui.text.font.FontWeight
             import androidx.compose.ui.unit.dp
-        """.trimIndent()
+        """
+            .trimIndent()
 
-        val validProps = schema.properties.filter {
-            // Exclude object refs for simplcity in grid
-            !it.value.types.contains("object") && it.value.ref == null
+    val validProps =
+        schema.properties.filter {
+          // Exclude object refs for simplcity in grid
+          !it.value.types.contains("object") && it.value.ref == null
         }
 
-        val headerCells = validProps.keys.joinToString("\n                        ") { name ->
-            val label = name.replaceFirstChar { it.uppercase() }
-            """ 
+    val headerCells =
+        validProps.keys.joinToString("\n                        ") { name ->
+          val label = name.replaceFirstChar { it.uppercase() }
+          """ 
             Text( 
                 text = "$label", 
                 modifier = Modifier.weight(1f).clickable { 
@@ -139,28 +148,38 @@ class UiGenerator {
                 }, 
                 fontWeight = FontWeight.Bold
             ) 
-            """.trimIndent()
+            """
+              .trimIndent()
         }
 
-        val rowCells = validProps.map { (name, prop) ->
-            val displayCode = when {
-                prop.types.contains("array") -> "item.$name.joinToString(\", \")"
-                else -> "item.$name.toString()"
-            }
-            """ 
+    val rowCells =
+        validProps
+            .map { (name, prop) ->
+              val displayCode =
+                  when {
+                    prop.types.contains("array") -> "item.$name.joinToString(\", \")"
+                    else -> "item.$name.toString()"
+                  }
+              """ 
             Text( 
                 text = $displayCode, 
                 modifier = Modifier.weight(1f) 
             ) 
-            """.trimIndent()
-        }.joinToString("\n                            ")
+            """
+                  .trimIndent()
+            }
+            .joinToString("\n                            ")
 
-        val sortCases = validProps.mapNotNull { (name, prop) ->
-            if (prop.types.contains("array")) return@mapNotNull null
-            "\"$name\" -> sorted.sortedBy { it.$name }"
-        }.joinToString("\n                        ")
+    val sortCases =
+        validProps
+            .mapNotNull { (name, prop) ->
+              if (prop.types.contains("array")) return@mapNotNull null
+              "\"$name\" -> sorted.sortedBy { it.$name }"
+            }
+            .joinToString("\n                        ")
 
-        val content = """ 
+    val content =
+        """ 
             $imports
             
             @Composable
@@ -206,25 +225,25 @@ class UiGenerator {
                     } 
                 } 
             } 
-        """.trimIndent()
+        """
+            .trimIndent()
 
-        return psiFactory.createFile("$gridName.kt", content)
-    }
+    return psiFactory.createFile("$gridName.kt", content)
+  }
 
-    /**
-     * Generates a Full Screen Composable that fetches data from an API and displays it in a Grid.
-     */
-    fun generateScreen(
-        packageName: String,
-        screenName: String,
-        schema: SchemaDefinition,
-        apiClassName: String,
-        listOperationId: String
-    ): KtFile {
-        val modelName = schema.name
-        val gridName = "${modelName}Grid"
+  /** Generates a Full Screen Composable that fetches data from an API and displays it in a Grid. */
+  fun generateScreen(
+      packageName: String,
+      screenName: String,
+      schema: SchemaDefinition,
+      apiClassName: String,
+      listOperationId: String
+  ): KtFile {
+    val modelName = schema.name
+    val gridName = "${modelName}Grid"
 
-        val content = """ 
+    val content =
+        """ 
             package $packageName
             
             import androidx.compose.foundation.layout.Box
@@ -280,17 +299,19 @@ class UiGenerator {
                     } 
                 } 
             } 
-        """.trimIndent()
+        """
+            .trimIndent()
 
-        return psiFactory.createFile("$screenName.kt", content)
-    }
+    return psiFactory.createFile("$screenName.kt", content)
+  }
 
-    private fun generateInput(name: String, prop: SchemaProperty, isRequired: Boolean): String {
-        val label = name.replaceFirstChar { it.uppercase() }
-        val modifier = "Modifier.fillMaxWidth()"
+  private fun generateInput(name: String, prop: SchemaProperty, isRequired: Boolean): String {
+    val label = name.replaceFirstChar { it.uppercase() }
+    val modifier = "Modifier.fillMaxWidth()"
 
-        return when {
-            prop.types.contains("boolean") -> """ 
+    return when {
+      prop.types.contains("boolean") ->
+          """ 
                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { 
                     Checkbox( 
                         checked = $name, 
@@ -298,8 +319,10 @@ class UiGenerator {
                     ) 
                     Text("$label") 
                 } 
-            """.trimIndent()
-            prop.types.any { it == "integer" || it == "number" } -> """ 
+            """
+              .trimIndent()
+      prop.types.any { it == "integer" || it == "number" } ->
+          """ 
                 OutlinedTextField( 
                     value = $name, 
                     onValueChange = { $name = it }, 
@@ -308,10 +331,11 @@ class UiGenerator {
                     modifier = $modifier, 
                     singleLine = true
                 ) 
-            """.trimIndent()
-            else -> {
-                val requiredMarker = if (isRequired) "*" else ""
-                """ 
+            """
+              .trimIndent()
+      else -> {
+        val requiredMarker = if (isRequired) "*" else ""
+        """ 
                 OutlinedTextField( 
                     value = $name, 
                     onValueChange = { $name = it }, 
@@ -319,10 +343,11 @@ class UiGenerator {
                     modifier = $modifier, 
                     singleLine = true
                 ) 
-                """.trimIndent()
-            }
-        }
+                """
+            .trimIndent()
+      }
     }
+  }
 
-    private fun isBoolean(prop: SchemaProperty): Boolean = prop.types.contains("boolean")
+  private fun isBoolean(prop: SchemaProperty): Boolean = prop.types.contains("boolean")
 }
