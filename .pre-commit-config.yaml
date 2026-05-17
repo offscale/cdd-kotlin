@@ -29,6 +29,27 @@ repos:
         pass_filenames: false
         types_or: [kotlin]
 
+      - id: test-swagger-2
+        name: Swagger 2.0 Petstore test
+        entry: bash -c './cdd.sh to_sdk -i /Users/samuel/repos/cdd-openapi-test-harness/petstore.json'
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: test-openapi-3
+        name: OpenAPI 3.2.0 Petstore test
+        entry: bash -c './cdd.sh to_sdk -i /Users/samuel/repos/cdd-openapi-test-harness/petstore_oas3.json'
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: build-wasm
+        name: Build WASM
+        entry: bash -c 'make build_wasm'
+        language: system
+        pass_filenames: false
+        always_run: true
+
       - id: update-badges
         name: Update Badges
         entry: python3 scripts/update_badges.py
