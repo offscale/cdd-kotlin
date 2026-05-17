@@ -17,7 +17,7 @@ jobs:
       - name: Checkout OpenAPI Test Harness
         uses: actions/checkout@v4
         with:
-          repository: offscale/cdd-openapi-test-harness
+          repository: SamuelMarks/cdd-openapi-test-harness
           path: cdd-openapi-test-harness
 
       - name: Set up JDK 21

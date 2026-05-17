@@ -2,12 +2,20 @@
 generated-project
 build/
 out/
+out.json
 bin/
+
+# Testing and Logging
+*.log
+prism.log
+patch*.py
+run_*.sh
+test_*.kt
+test-*.js
 
 # Gradle
 .gradle/
 .gradle_home/
-build/
 !gradle/wrapper/gradle-wrapper.jar
 
 # Kotlin
