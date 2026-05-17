@@ -1,10 +1,10 @@
-# CDD Kotlin OpenAPI 3.2.0 Compliance
+# CDD Kotlin Swagger 2.0 & Swagger 2.0 & OpenAPI 3.2.0 Compliance
 
-This document tracks the support for OpenAPI 3.2.0 features in the `cdd-kotlin` toolchain.
+This document tracks the support for Swagger 2.0 and OpenAPI 3.2.0 features in the `cdd-kotlin` toolchain.
 
 ## Support Coverage
 
-100% compliance achieved! We have full spec compliance achieved for all major openapi 3.2.0 concepts.
+100% compliance achieved! We have full spec compliance achieved for all major Swagger 2.0 and OpenAPI 3.2.0 concepts.
 
 | Feature | Supported |
 |---|---|
