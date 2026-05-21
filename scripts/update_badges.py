@@ -19,7 +19,9 @@ def main():
     
     test_cov = 0
     try:
-        subprocess.run(["./gradlew", "koverXmlReport"], capture_output=True, text=True)
+        import sys
+        gradlew = 'gradlew.bat' if sys.platform == 'win32' else './gradlew'
+        subprocess.run([gradlew, "koverXmlReport"], capture_output=True, text=True)
         report_xml = os.path.join("build", "reports", "kover", "report.xml")
         if os.path.exists(report_xml):
             tree = ET.parse(report_xml)
