@@ -1,9 +1,13 @@
 # Project specific
-generated-project
+generated-project/
 build/
 out/
-out.json
 bin/
+out.json
+test.json
+spec.json
+petstore.json
+petstore_oas3.json
 
 # Testing and Logging
 *.log
@@ -17,9 +21,60 @@ test-*.js
 .gradle/
 .gradle_home/
 !gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+build/
+local.properties
+gradle-app.setting
 
-# Kotlin
+# Kotlin & Java
 .kotlin/
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+replay_pid*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store
+.npm/
 
 # IDEs
 ## IntelliJ IDEA
@@ -27,6 +82,8 @@ test-*.js
 *.iml
 *.iws
 *.ipr
+out/
+!/.idea/icon.svg
 
 ## Eclipse
 .apt_generated
@@ -36,9 +93,14 @@ test-*.js
 .settings/
 .springBeans
 .sts4-cache
+bin/
 
 ## VS Code
-.vscode/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
 *.code-workspace
 .history/
 
@@ -58,35 +120,42 @@ test-*.js
 ehthumbs.db
 Thumbs.db
 Desktop.ini
+$RECYCLE.BIN/
 
 # Compiled/Generated
 *.wasm
 *.o
-*.so
-*.class
-*.log
+*.obj
 *.sqlite
 target/
-node_modules/
-__pycache__/
-*.pyc
 
 # Local Environment
 .env
-.env.local
+.env.*
+!.env.example
 *.local
 
 # Archives
-*.tar
+*.7z
+*.dmg
 *.gz
-*.zip
+*.iso
+*.jar
 *.rar
+*.tar
+*.zip
 
-# Tmp files
+# Tmp files & Caches
 *~
 *.swp
-!.editorconfig
+*.swo
+.DS_Store
 *.bak
-patch*.py
-run_*.sh
-test_*.kt
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+coverage.xml
