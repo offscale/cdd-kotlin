@@ -1,58 +1,65 @@
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+        exclude: \.(bat|cmd|ps1)$
+
   - repo: local
     hooks:
       - id: format-and-check
         name: Format & Recheck
-        entry: bash -c './gradlew spotlessApply && ./gradlew spotlessCheck'
-        language: system
+        entry: python scripts/xplat.py gradle spotlessApply spotlessCheck
+        language: python
         pass_filenames: false
         types_or: [kotlin]
 
       - id: build
         name: Build
-        entry: ./gradlew assemble
-        language: system
+        entry: python scripts/xplat.py gradle assemble
+        language: python
         pass_filenames: false
         types_or: [kotlin]
 
       - id: test
         name: Test
-        entry: ./gradlew allTests
-        language: system
+        entry: python scripts/xplat.py gradle allTests
+        language: python
         pass_filenames: false
         types_or: [kotlin]
 
       - id: lint
         name: Lint (Verify)
-        entry: bash -c './gradlew check'
-        language: system
+        entry: python scripts/xplat.py gradle check
+        language: python
         pass_filenames: false
         types_or: [kotlin]
 
       - id: test-swagger-2
         name: Swagger 2.0 Petstore test
-        entry: bash -c './cdd.sh to_sdk -i /Users/samuel/repos/cdd-openapi-test-harness/petstore.json'
-        language: system
+        entry: python scripts/xplat.py gradle run --args="to_sdk -i ../petstore.json"
+        language: python
         pass_filenames: false
         always_run: true
 
       - id: test-openapi-3
         name: OpenAPI 3.2.0 Petstore test
-        entry: bash -c './cdd.sh to_sdk -i /Users/samuel/repos/cdd-openapi-test-harness/petstore_oas3.json'
-        language: system
+        entry: python scripts/xplat.py gradle run --args="to_sdk -i ../petstore_oas3.json"
+        language: python
         pass_filenames: false
         always_run: true
 
       - id: build-wasm
         name: Build WASM
-        entry: bash -c 'make build_wasm'
-        language: system
+        entry: python scripts/xplat.py build_wasm
+        language: python
         pass_filenames: false
         always_run: true
 
       - id: update-badges
         name: Update Badges
-        entry: python3 scripts/update_badges.py
-        language: system
+        entry: python scripts/update_badges.py
+        language: python
         pass_filenames: false
         always_run: true
