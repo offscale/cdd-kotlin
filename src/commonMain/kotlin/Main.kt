@@ -30,6 +30,11 @@ fun runCli(args: Array<String>): Int {
       return 0
     }
 
+    if (args.contains("--version")) {
+      println("0.0.1")
+      return 0
+    }
+
     val command = if (args.size > 1 && args[0] == "from_openapi") args[1] else args[0]
     if (command == "demo") {
       val generator = ScaffoldGenerator()

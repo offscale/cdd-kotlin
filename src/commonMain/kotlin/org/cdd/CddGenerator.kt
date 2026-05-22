@@ -380,7 +380,7 @@ object CddGenerator {
       ciSb.append("  build:\n")
       ciSb.append("    runs-on: ubuntu-latest\n")
       ciSb.append("    steps:\n")
-      ciSb.append("    - uses: actions/checkout@v4\n")
+      ciSb.append("    - uses: actions/checkout@v6\n")
       ciSb.append("    - name: Set up JDK 21\n")
       ciSb.append("      uses: actions/setup-java@v4\n")
       ciSb.append("      with:\n")

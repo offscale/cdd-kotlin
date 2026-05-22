@@ -12,10 +12,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Checkout OpenAPI Test Harness
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: SamuelMarks/cdd-openapi-test-harness
           path: cdd-openapi-test-harness

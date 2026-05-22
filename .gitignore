@@ -14,8 +14,8 @@ petstore_oas3.json
 prism.log
 patch*.py
 run_*.sh
-test_*.kt
-test-*.js
+test*.kt
+test*.js
 
 # Gradle
 .gradle/
