@@ -77,8 +77,24 @@ jobs:
 
       - name: Release WASM Artifact
         if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}
-          files: "bin/*.wasm"
-          prerelease: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            TAG_NAME="${{ github.ref_name }}"
+            IS_PRERELEASE="false"
+          else
+            TAG_NAME="latest"
+            IS_PRERELEASE="true"
+          fi
+          
+          # Delete existing release for the floating tag to ensure clean slate
+          if [ "$TAG_NAME" = "latest" ]; then
+            gh release delete "$TAG_NAME" -y || true
+          fi
+          
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            gh release create "$TAG_NAME" bin/*.wasm --prerelease --title "$TAG_NAME" --notes "Latest build"
+          else
+            gh release create "$TAG_NAME" bin/*.wasm --title "$TAG_NAME" --generate-notes
+          fi
