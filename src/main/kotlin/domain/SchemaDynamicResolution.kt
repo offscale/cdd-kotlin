@@ -15,11 +15,12 @@ class DynamicAnchorScope(
    */
   fun resolveDynamicRef(schema: SchemaProperty, ref: String): SchemaProperty? {
     val anchorName = extractDynamicAnchorName(ref) ?: return null
-    val resources = scopeBySchema[schema].orEmpty()
-    for (index in resources.indices.reversed()) {
-      resources[index].anchors[anchorName]?.let {
-        return it
-      }
+    val resources = scopeBySchema[schema] ?: return null
+    var index = resources.size - 1
+    while (index >= 0) {
+      val anchor = resources[index].anchors[anchorName]
+      if (anchor != null) return anchor
+      index--
     }
     return null
   }

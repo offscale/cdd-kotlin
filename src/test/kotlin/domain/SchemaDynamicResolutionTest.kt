@@ -31,4 +31,40 @@ class SchemaDynamicResolutionTest {
   fun extractDynamicAnchorName_percent_decode_invalid() {
     assertEquals("foo%2Z", extractDynamicAnchorName("#foo%2Z"))
   }
+
+  @Test
+  fun resolveDynamicRef_valid_ref_not_found() {
+    val root = SchemaProperty(schemaId = "root", dynamicAnchor = "rootAnchor")
+    val scope = buildDynamicAnchorScope(root)
+    val result = scope.resolveDynamicRef(root, "#otherAnchor")
+    assertNull(result)
+  }
+
+  @Test
+  fun resolveDynamicRef_valid_ref_found() {
+    val root = SchemaProperty(schemaId = "root", dynamicAnchor = "rootAnchor")
+    val scope = buildDynamicAnchorScope(root)
+    val result = scope.resolveDynamicRef(root, "#rootAnchor")
+    assertEquals(root, result)
+  }
+
+  @Test
+  fun resolveDynamicRef_valid_ref_found_in_parent() {
+    val child = SchemaProperty(schemaId = "child", dynamicAnchor = "childAnchor")
+    val root =
+        SchemaProperty(
+            schemaId = "root", dynamicAnchor = "rootAnchor", defs = mapOf("child" to child))
+    val scope = buildDynamicAnchorScope(root)
+    val result = scope.resolveDynamicRef(child, "#rootAnchor")
+    assertEquals(root, result)
+  }
+
+  @Test
+  fun resolveDynamicRef_unknown_schema() {
+    val root = SchemaProperty(schemaId = "root", dynamicAnchor = "rootAnchor")
+    val scope = buildDynamicAnchorScope(root)
+    val unknown = SchemaProperty()
+    val result = scope.resolveDynamicRef(unknown, "#rootAnchor")
+    assertNull(result)
+  }
 }

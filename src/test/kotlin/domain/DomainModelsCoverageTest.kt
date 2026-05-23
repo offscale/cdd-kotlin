@@ -209,6 +209,17 @@ class DomainModelsCoverageTest {
   }
 
   @Test
+  fun `responseType returns null when empty responses`() {
+    val endpoint =
+        EndpointDefinition(
+            path = "/empty",
+            method = HttpMethod.GET,
+            operationId = "getEmpty",
+            responses = emptyMap())
+    assertEquals(null, endpoint.responseType)
+  }
+
+  @Test
   fun `responseType returns null when no success responses`() {
     val endpoint =
         EndpointDefinition(
@@ -252,6 +263,12 @@ class DomainModelsCoverageTest {
     assertTrue(schema.effectiveTypes.contains("array"))
     assertTrue(schema.effectiveTypes.contains("null"))
     assertEquals("array", schema.primaryType)
+  }
+
+  @Test
+  fun `primaryType handles only null type`() {
+    val schema = SchemaDefinition(name = "NullOnly", types = setOf("null"))
+    assertEquals("null", schema.primaryType)
   }
 
   @Test

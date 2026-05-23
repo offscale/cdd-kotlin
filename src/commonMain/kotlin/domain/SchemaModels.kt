@@ -371,7 +371,7 @@ data class SchemaDefinition(
 
   /** Primary type for codegen (ignores "null" when present). */
   val primaryType: String
-    get() = effectiveTypes.firstOrNull { it != "null" } ?: effectiveTypes.firstOrNull() ?: type
+    get() = effectiveTypes.firstOrNull { it != "null" } ?: effectiveTypes.first()
 }
 
 /**

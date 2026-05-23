@@ -14,7 +14,7 @@ object ApiGenerator {
       throw IllegalArgumentException("Input must be a directory: $inputDir")
     }
 
-    val ktFiles = dir.walk().filter { it.isFile && it.extension == "kt" }.toList()
+    val ktFiles = dir.walk().toList().filter { it.isFile && it.extension == "kt" }
     val allCode = ktFiles.joinToString("\n") { it.readText() }
 
     val dtoParser = DtoParser()

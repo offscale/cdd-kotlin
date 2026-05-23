@@ -479,7 +479,7 @@ data class EndpointDefinition(
     get() {
       // Find lowest 2xx code
       val success = responses.keys.filter { it.startsWith("2") }.minOrNull() ?: return null
-      return responses[success]?.type
+      return responses.getValue(success).type
     }
 }
 
