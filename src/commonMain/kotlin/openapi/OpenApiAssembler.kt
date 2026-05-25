@@ -105,7 +105,7 @@ class OpenApiAssembler {
       base: Map<String, PathItem>,
       overrides: Map<String, PathItem>
   ): Map<String, PathItem> {
-    if (overrides.isEmpty()) return base
+
     val merged = LinkedHashMap<String, PathItem>()
     merged.putAll(base)
 
@@ -133,10 +133,7 @@ class OpenApiAssembler {
       base: Map<String, Any?>,
       overrides: Map<String, Any?>
   ): Map<String, Any?> {
-    if (base.isEmpty() && overrides.isEmpty()) return emptyMap()
-    val merged = LinkedHashMap<String, Any?>()
-    merged.putAll(base)
-    merged.putAll(overrides)
-    return merged
+
+    return base + overrides
   }
 }

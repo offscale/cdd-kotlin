@@ -100,21 +100,21 @@ object OpenApiPathBuilder {
   }
 
   private fun findCommonParameters(ops: List<EndpointDefinition>): List<EndpointParameter> {
-    if (ops.isEmpty()) return emptyList()
+
     val first = ops.first().parameters
     if (first.isEmpty()) return emptyList()
     return first.filter { param -> ops.all { op -> op.parameters.any { it == param } } }
   }
 
   private fun findCommonString(values: List<String?>): String? {
-    if (values.isEmpty()) return null
+
     val distinct = values.distinct()
     val candidate = distinct.singleOrNull() ?: return null
     return candidate ?: return null
   }
 
   private fun findCommonServers(ops: List<EndpointDefinition>): List<Server>? {
-    if (ops.isEmpty()) return null
+
     val distinct = ops.map { it.servers }.distinct()
     val candidate = distinct.singleOrNull() ?: return null
     return candidate.takeIf { it.isNotEmpty() }

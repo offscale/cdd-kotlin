@@ -72,7 +72,9 @@ object TypeMappers {
         "number" -> if (prop.format == "float") "Float" else "Double"
         "boolean" -> "Boolean"
         "array" -> {
-          val itemType = prop.items?.let { mapTypeInternal(it, dynamicRefResolver, stack) } ?: "Any"
+          val itemType =
+              if (prop.items != null) mapTypeInternal(prop.items, dynamicRefResolver, stack)
+              else "Any"
           "List<$itemType>"
         }
         "object" -> {
@@ -210,7 +212,7 @@ object TypeMappers {
 
     when {
       cleanType == "Any" -> {
-        return SchemaProperty(booleanSchema = true)
+        types.add("any") // temporary placeholder to allow drop-through
       }
       cleanType == "String" -> types.add("string")
       cleanType == "Int" -> {
@@ -255,11 +257,16 @@ object TypeMappers {
         val valueType = if (args.size >= 2) args[1] else "Any"
         additionalProperties = kotlinToSchemaProperty(valueType)
       }
-      cleanType.first().isUpperCase() -> {
+      cleanType.isNotEmpty() && cleanType.first().isUpperCase() -> {
         types.add("object")
         ref = cleanType
       }
       else -> types.add("string") // Default fallback
+    }
+
+    if (cleanType == "Any") {
+      return SchemaProperty(
+          booleanSchema = true, types = if (isNullable) setOf("null") else emptySet())
     }
 
     // Add "null" type if Kotlin type is nullable (OAS 3.2 / JSON Schema compliance)

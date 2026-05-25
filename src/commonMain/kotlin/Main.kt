@@ -70,14 +70,17 @@ fun runCli(args: Array<String>): Int {
       var tests = false
       var i = 1
       while (i < args.size) {
-        when (args[i]) {
-          "-o",
-          "--output" -> if (i + 1 < args.size) outputDir = args[++i]
-          "-i",
-          "--input" -> if (i + 1 < args.size) inputFile = args[++i]
-          "--no-github-actions" -> noGithubActions = true
-          "--no-installable-package" -> noInstallablePackage = true
-          "--tests" -> tests = true
+        val arg = args[i]
+        if (arg == "-o" || arg == "--output") {
+          if (i + 1 < args.size) outputDir = args[++i]
+        } else if (arg == "-i" || arg == "--input") {
+          if (i + 1 < args.size) inputFile = args[++i]
+        } else if (arg == "--no-github-actions") {
+          noGithubActions = true
+        } else if (arg == "--no-installable-package") {
+          noInstallablePackage = true
+        } else if (arg == "--tests") {
+          tests = true
         }
         i++
       }
@@ -113,11 +116,11 @@ fun runCli(args: Array<String>): Int {
       var inputFile = ""
       var i = 1
       while (i < args.size) {
-        when (args[i]) {
-          "-o",
-          "--output" -> if (i + 1 < args.size) outputDir = args[++i]
-          "-i",
-          "--input" -> if (i + 1 < args.size) inputFile = args[++i]
+        val arg = args[i]
+        if (arg == "-o" || arg == "--output") {
+          if (i + 1 < args.size) outputDir = args[++i]
+        } else if (arg == "-i" || arg == "--input") {
+          if (i + 1 < args.size) inputFile = args[++i]
         }
         i++
       }
@@ -203,8 +206,11 @@ fun runCli(args: Array<String>): Int {
           if (operation == null) continue
 
           val opId =
-              operation.operationId
-                  ?: "${methodName}${path.replace("/", "").replace("{", "").replace("}", "")}"
+              if (!operation.operationIdExplicit) {
+                "${methodName}${path.replace("/", "").replace("{", "").replace("}", "")}"
+              } else {
+                operation.operationId
+              }
 
           val sb = StringBuilder()
 

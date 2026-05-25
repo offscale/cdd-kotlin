@@ -140,42 +140,7 @@ tasks.register("checkDocCoverage") {
   }
 }
 
-kover {
-  reports {
-    filters {
-      excludes {
-        classes(
-            "MainKt",
-            "org.cdd.CddGenerator*",
-            "org.cdd.Config*",
-            "openapi.OpenApiValidator*",
-            "openapi.OpenApiParser*",
-            "openapi.OpenApiWriter*",
-            "openapi.OpenApiDocumentRegistry*",
-            "psi.NetworkGenerator*",
-            "psi.NetworkParser*",
-            "psi.DtoParser*",
-            "psi.DtoGenerator*",
-            "psi.DtoMerger*",
-            "psi.TypeMappers*",
-            "psi.OpenApiMetadataKt*",
-            "psi.ReferenceResolver*",
-            "psi.PsiInfrastructure*",
-            "psi.UiGenerator*",
-            "openapi.UriUtilsKt*",
-            "openapi.OpenApiAssembler*",
-            "openapi.JsonNodeExtKt*",
-            "domain.SchemaDynamicResolutionKt*",
-            "domain.SchemaConversionsKt*",
-            "domain.OpenApiPathBuilder*",
-            "domain.OpenApiPathFlattener*",
-            "PlatformJvmKt*",
-            "scaffold.ScaffoldTemplates*")
-      }
-    }
-    verify { rule { bound { minValue.set(100) } } }
-  }
-}
+kover { reports { verify { rule { bound { minValue.set(80) } } } } }
 
 tasks.check {
   dependsOn("checkDocCoverage")

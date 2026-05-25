@@ -47,7 +47,9 @@ fun SchemaDefinition.toSchemaProperty(): SchemaProperty {
       externalDocs = externalDocs,
       discriminator = discriminator,
       example = example,
-      examples = examplesList ?: examples?.values?.toList(),
+      examples =
+          if (examplesList != null) examplesList
+          else if (examples != null) examples.values.toList() else null,
       xml = xml,
       prefixItems = prefixItems,
       contains = contains,

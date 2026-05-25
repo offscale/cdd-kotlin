@@ -70,7 +70,7 @@ object ScaffoldTemplates {
    *
    * @param info Optional Info metadata to populate version.
    */
-  fun createRootBuildGradle(info: Info? = null): String {
+  fun createRootBuildGradle(info: Info?): String {
     val versionLine =
         if (info != null) "version = \"${info.version}\"" else "version = \"1.0-SNAPSHOT\""
 
@@ -108,8 +108,8 @@ object ScaffoldTemplates {
    * @param namespace The Android namespace (package name).
    * @param info Optional Info metadata to populate versionName.
    */
-  fun createAppBuildGradle(namespace: String, info: Info? = null): String {
-    val versionNameStr = info?.version ?: "1.0"
+  fun createAppBuildGradle(namespace: String, info: Info?): String {
+    val versionNameStr = if (info != null && info.version.isNotEmpty()) info.version else "1.0"
 
     return """
         plugins {

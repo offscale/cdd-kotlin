@@ -13,12 +13,7 @@ val JsonNode.isTextual: Boolean
 val JsonNode.isBoolean: Boolean
   get() = this is JsonPrimitive && this.booleanOrNull != null
 val JsonNode.isNumber: Boolean
-  get() =
-      this is JsonPrimitive &&
-          (this.intOrNull != null ||
-              this.doubleOrNull != null ||
-              this.longOrNull != null ||
-              this.floatOrNull != null)
+  get() = this is JsonPrimitive && (!this.isString && this.doubleOrNull != null)
 val JsonNode.isNullNode: Boolean
   get() = this is JsonNull
 
