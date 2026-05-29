@@ -6,5 +6,6 @@ data class Config(
     val outputDir: String,
     val noGithubActions: Boolean = false,
     val noInstallablePackage: Boolean = false,
-    val tests: Boolean = false
+    val tests: Boolean = false,
+    val inputDir: String = ""
 )

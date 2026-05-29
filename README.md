@@ -19,7 +19,7 @@ The CLI—at a minimum—has:
 - `cdd-kotlin --help`
 - `cdd-kotlin --version`
 - `cdd-kotlin from_openapi to_sdk_cli -i spec.json`
-- `cdd-kotlin from_openapi to_sdk -i spec.json --no-github-actions --no-installable-package --create-composable-tests-mocks`
+- `cdd-kotlin from_openapi to_sdk -i spec.json --no-github-actions --no-installable-package --tests`
 - `cdd-kotlin from_openapi to_server -i spec.json`
 - `cdd-kotlin to_openapi -f path/to/code`
 - `cdd-kotlin to_docs_json --no-imports --no-wrapping -i spec.json`
