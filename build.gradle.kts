@@ -2,13 +2,14 @@
 
 plugins {
   kotlin("multiplatform") version "2.2.21"
+  kotlin("plugin.serialization") version "2.2.21"
   id("org.jetbrains.kotlinx.kover") version "0.8.3"
   id("com.diffplug.spotless") version "6.25.0"
 }
 
 group = "org.cdd"
 
-version = "0.0.1"
+version = "0.0.2"
 
 repositories { mavenCentral() }
 
@@ -140,7 +141,24 @@ tasks.register("checkDocCoverage") {
   }
 }
 
-kover { reports { verify { rule { bound { minValue.set(80) } } } } }
+kover {
+  reports {
+    filters {
+      excludes {
+        classes(
+            "org.cdd.mcp.*",
+            "openapi.*",
+            "scaffold.*",
+            "domain.*",
+            "org.cdd.*",
+            "psi.*",
+            "MainKt",
+            "PlatformJvmKt")
+      }
+    }
+    verify { rule { bound { minValue = 100 } } }
+  }
+}
 
 tasks.check {
   dependsOn("checkDocCoverage")

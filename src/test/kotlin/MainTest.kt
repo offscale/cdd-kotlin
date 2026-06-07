@@ -43,6 +43,18 @@ class MainTest {
   }
 
   @Test
+  fun `main runs mcp server when mcp command is passed`() {
+    val originalIn = System.`in`
+    try {
+      System.setIn(java.io.ByteArrayInputStream(ByteArray(0)))
+      val result = runCli(arrayOf("mcp"))
+      assertEquals(0, result)
+    } finally {
+      System.setIn(originalIn)
+    }
+  }
+
+  @Test
   fun `main handles generation failures gracefully`(@TempDir tempDir: Path) {
     withUserDir(tempDir) {
       val blocker = File(tempDir.toFile(), "generated-project")

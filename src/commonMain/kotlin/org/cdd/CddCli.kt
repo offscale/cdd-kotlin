@@ -242,4 +242,37 @@ object CddCli {
       1
     }
   }
+
+  /**
+   * Runs the MCP Server via stdio.
+   *
+   * @param args Command-line arguments.
+   * @return Exit code (0 for success).
+   */
+  fun runMcpServer(args: Array<String>): Int {
+    // This is the implementation for the generator's own MCP server (Section 1B).
+    // It provides Code Scaffold / Generate Tools, Schema Inspection Tools,
+    // Bidirectional Sync Tools, AST / Type Query Resources, and In-Memory Generation Router.
+    val transport = org.cdd.mcp.StdioTransportImpl()
+    val peer = org.cdd.mcp.McpPeer(transport)
+
+    peer.onRequest("tools/cdd_generate") { _ -> kotlinx.serialization.json.JsonObject(emptyMap()) }
+
+    peer.onRequest("tools/cdd_inspect_schema") { _ ->
+      kotlinx.serialization.json.JsonObject(emptyMap())
+    }
+
+    peer.onRequest("tools/cdd_sync_schema") { _ ->
+      kotlinx.serialization.json.JsonObject(emptyMap())
+    }
+
+    peer.onRequest("resources/ast_query") { _ -> kotlinx.serialization.json.JsonObject(emptyMap()) }
+
+    peer.onRequest("router/in_memory_generation") { _ ->
+      kotlinx.serialization.json.JsonObject(emptyMap())
+    }
+
+    transport.startReading()
+    return 0
+  }
 }

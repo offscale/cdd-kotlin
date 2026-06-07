@@ -1,0 +1,289 @@
+Initialized native services in: /Users/samuel/.gradle/native
+Initialized jansi services in: /Users/samuel/.gradle/native
+Received JVM installation metadata from '/Users/samuel/Library/Java/JavaVirtualMachines/openjdk-23.0.2/Contents/Home': {JAVA_HOME=/Users/samuel/Library/Java/JavaVirtualMachines/openjdk-23.0.2/Contents/Home, JAVA_VERSION=23.0.2, JAVA_VENDOR=Oracle Corporation, RUNTIME_NAME=OpenJDK Runtime Environment, RUNTIME_VERSION=23.0.2+7-58, VM_NAME=OpenJDK 64-Bit Server VM, VM_VERSION=23.0.2+7-58, VM_VENDOR=Oracle Corporation, OS_ARCH=aarch64}
+Found daemon DaemonInfo{pid=51881, address=[62e12aa4-8c1d-488f-aebe-63331bed9336 port:51530, addresses:[/127.0.0.1]], state=Idle, lastBusy=1780705024963, context=DefaultDaemonContext[uid=58477078-9f87-4ea2-b464-7a81637fef88,javaHome=/Users/samuel/Library/Java/JavaVirtualMachines/openjdk-23.0.2/Contents/Home,daemonRegistryDir=/Users/samuel/.gradle/daemon,pid=51881,idleTimeout=10800000,priority=NORMAL,applyInstrumentationAgent=true,daemonOpts=--add-opens=java.base/java.util=ALL-UNNAMED,--add-opens=java.base/java.lang=ALL-UNNAMED,--add-opens=java.base/java.lang.invoke=ALL-UNNAMED,--add-opens=java.prefs/java.util.prefs=ALL-UNNAMED,--add-opens=java.base/java.nio.charset=ALL-UNNAMED,--add-opens=java.base/java.net=ALL-UNNAMED,--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED,-XX:MaxMetaspaceSize=384m,-XX:+HeapDumpOnOutOfMemoryError,-Xms256m,-Xmx512m,-Dfile.encoding=UTF-8,-Duser.country=US,-Duser.language=en,-Duser.variant]} however its context does not match the desired criteria.
+At least one daemon option is different.
+Wanted: DefaultDaemonContext[uid=null,javaHome=/Users/samuel/Library/Java/JavaVirtualMachines/openjdk-23.0.2/Contents/Home,daemonRegistryDir=/Users/samuel/.gradle/daemon,pid=5065,idleTimeout=null,priority=NORMAL,applyInstrumentationAgent=true,daemonOpts=--add-opens=java.base/java.util=ALL-UNNAMED,--add-opens=java.base/java.lang=ALL-UNNAMED,--add-opens=java.base/java.lang.invoke=ALL-UNNAMED,--add-opens=java.prefs/java.util.prefs=ALL-UNNAMED,--add-opens=java.base/java.nio.charset=ALL-UNNAMED,--add-opens=java.base/java.net=ALL-UNNAMED,--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED,-Xmx2g,-Dfile.encoding=UTF-8,-Duser.country=US,-Duser.language=en,-Duser.variant]
+Actual: DefaultDaemonContext[uid=58477078-9f87-4ea2-b464-7a81637fef88,javaHome=/Users/samuel/Library/Java/JavaVirtualMachines/openjdk-23.0.2/Contents/Home,daemonRegistryDir=/Users/samuel/.gradle/daemon,pid=51881,idleTimeout=10800000,priority=NORMAL,applyInstrumentationAgent=true,daemonOpts=--add-opens=java.base/java.util=ALL-UNNAMED,--add-opens=java.base/java.lang=ALL-UNNAMED,--add-opens=java.base/java.lang.invoke=ALL-UNNAMED,--add-opens=java.prefs/java.util.prefs=ALL-UNNAMED,--add-opens=java.base/java.nio.charset=ALL-UNNAMED,--add-opens=java.base/java.net=ALL-UNNAMED,--add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED,-XX:MaxMetaspaceSize=384m,-XX:+HeapDumpOnOutOfMemoryError,-Xms256m,-Xmx512m,-Dfile.encoding=UTF-8,-Duser.country=US,-Duser.language=en,-Duser.variant]
+
+  Looking for a different daemon...
+The client will now receive all logging from the daemon (pid: 60583). The daemon log file: /Users/samuel/.gradle/daemon/8.7/daemon-60583.out.log
+Starting 84th build in daemon [uptime: 1 hrs 50 mins 7.237 secs, performance: 100%, GC rate: 0.00/s, heap usage: 1% of 2 GiB]
+Using 12 worker leases.
+Now considering [/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin] as hierarchies to watch
+Watching the file system is configured to be enabled if available
+File system watching is active
+Starting Build
+Transforming foojay-resolver-0.8.0.jar (org.gradle.toolchains:foojay-resolver:0.8.0) with ExternalDependencyInstrumentingArtifactTransform
+Transforming gson-2.10.1.jar (com.google.code.gson:gson:2.10.1) with ExternalDependencyInstrumentingArtifactTransform
+Settings evaluated using settings file '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/settings.gradle.kts'.
+Projects loaded. Root project using build file '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build.gradle.kts'.
+Included projects: [root project 'cdd-kotlin']
+
+> Configure project :
+Evaluating root project 'cdd-kotlin' using build file '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build.gradle.kts'.
+Transforming kover-gradle-plugin-0.8.3.jar (org.jetbrains.kotlinx:kover-gradle-plugin:0.8.3) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kover-features-jvm-0.8.3.jar (org.jetbrains.kotlinx:kover-features-jvm:0.8.3) with ExternalDependencyInstrumentingArtifactTransform
+Transforming spotless-plugin-gradle-6.25.0.jar (com.diffplug.spotless:spotless-plugin-gradle:6.25.0) with ExternalDependencyInstrumentingArtifactTransform
+Transforming spotless-lib-extra-2.45.0.jar (com.diffplug.spotless:spotless-lib-extra:2.45.0) with ExternalDependencyInstrumentingArtifactTransform
+Transforming solstice-1.7.5.jar (dev.equo.ide:solstice:1.7.5) with ExternalDependencyInstrumentingArtifactTransform
+Transforming okhttp-4.12.0.jar (com.squareup.okhttp3:okhttp:4.12.0) with ExternalDependencyInstrumentingArtifactTransform
+Transforming okio-jvm-3.6.0.jar (com.squareup.okio:okio-jvm:3.6.0) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlin-stdlib-jdk8-1.9.10.jar (org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.10) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlin-stdlib-jdk7-1.9.10.jar (org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.9.10) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlin-stdlib-1.9.22.jar (org.jetbrains.kotlin:kotlin-stdlib:1.9.22) with ExternalDependencyInstrumentingArtifactTransform
+Transforming intellij-coverage-reporter-1.0.761.jar (org.jetbrains.intellij.deps:intellij-coverage-reporter:1.0.761) with ExternalDependencyInstrumentingArtifactTransform
+Transforming coverage-report-1.0.25.jar (org.jetbrains.intellij.deps:coverage-report:1.0.25) with ExternalDependencyInstrumentingArtifactTransform
+Transforming annotations-13.0.jar (org.jetbrains:annotations:13.0) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlin-gradle-plugin-2.2.21-gradle86.jar (org.jetbrains.kotlin:kotlin-gradle-plugin:2.2.21) with ExternalDependencyInstrumentingArtifactTransform
+Transforming fus-statistics-gradle-plugin-2.2.21-gradle86.jar (org.jetbrains.kotlin:fus-statistics-gradle-plugin:2.2.21) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlin-gradle-plugin-model-2.2.21.jar (org.jetbrains.kotlin:kotlin-gradle-plugin-model:2.2.21) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlin-gradle-plugin-api-2.2.21-gradle86.jar (org.jetbrains.kotlin:kotlin-gradle-plugin-api:2.2.21) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlin-gradle-plugin-api-2.2.21.jar (org.jetbrains.kotlin:kotlin-gradle-plugin-api:2.2.21) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlin-serialization-2.2.21-gradle86.jar (org.jetbrains.kotlin:kotlin-serialization:2.2.21) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlin-gradle-plugin-idea-proto-2.2.21.jar (org.jetbrains.kotlin:kotlin-gradle-plugin-idea-proto:2.2.21) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlin-gradle-plugin-idea-2.2.21.jar (org.jetbrains.kotlin:kotlin-gradle-plugin-idea:2.2.21) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlin-klib-commonizer-api-2.2.21.jar (org.jetbrains.kotlin:kotlin-klib-commonizer-api:2.2.21) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlin-build-statistics-2.2.21.jar (org.jetbrains.kotlin:kotlin-build-statistics:2.2.21) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlin-util-klib-metadata-2.2.21.jar (org.jetbrains.kotlin:kotlin-util-klib-metadata:2.2.21) with ExternalDependencyInstrumentingArtifactTransform
+Transforming abi-tools-api-2.2.21.jar (org.jetbrains.kotlin:abi-tools-api:2.2.21) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlin-compiler-runner-2.2.21.jar (org.jetbrains.kotlin:kotlin-compiler-runner:2.2.21) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kover-jvm-agent-0.8.3.jar (org.jetbrains.kotlinx:kover-jvm-agent:0.8.3) with ExternalDependencyInstrumentingArtifactTransform
+Transforming durian-io-1.2.0.jar (com.diffplug.durian:durian-io:1.2.0) with ExternalDependencyInstrumentingArtifactTransform
+Transforming durian-collect-1.2.0.jar (com.diffplug.durian:durian-collect:1.2.0) with ExternalDependencyInstrumentingArtifactTransform
+Transforming durian-core-1.2.0.jar (com.diffplug.durian:durian-core:1.2.0) with ExternalDependencyInstrumentingArtifactTransform
+Transforming org.eclipse.jgit-6.7.0.202309050840-r.jar (org.eclipse.jgit:org.eclipse.jgit:6.7.0.202309050840-r) with ExternalDependencyInstrumentingArtifactTransform
+Transforming spotless-lib-2.45.0.jar (com.diffplug.spotless:spotless-lib:2.45.0) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlin-gradle-plugin-annotations-2.2.21.jar (org.jetbrains.kotlin:kotlin-gradle-plugin-annotations:2.2.21) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlin-native-utils-2.2.21.jar (org.jetbrains.kotlin:kotlin-native-utils:2.2.21) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlin-tooling-core-2.2.21.jar (org.jetbrains.kotlin:kotlin-tooling-core:2.2.21) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlin-build-tools-api-2.2.21.jar (org.jetbrains.kotlin:kotlin-build-tools-api:2.2.21) with ExternalDependencyInstrumentingArtifactTransform
+Transforming gson-2.11.0.jar (com.google.code.gson:gson:2.11.0) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlin-util-klib-2.2.21.jar (org.jetbrains.kotlin:kotlin-util-klib:2.2.21) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlin-util-io-2.2.21.jar (org.jetbrains.kotlin:kotlin-util-io:2.2.21) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlin-daemon-client-2.2.21.jar (org.jetbrains.kotlin:kotlin-daemon-client:2.2.21) with ExternalDependencyInstrumentingArtifactTransform
+Transforming kotlinx-coroutines-core-jvm-1.8.0.jar (org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.8.0) with ExternalDependencyInstrumentingArtifactTransform
+Transforming JavaEWAH-1.2.3.jar (com.googlecode.javaewah:JavaEWAH:1.2.3) with ExternalDependencyInstrumentingArtifactTransform
+Transforming slf4j-api-1.7.36.jar (org.slf4j:slf4j-api:1.7.36) with ExternalDependencyInstrumentingArtifactTransform
+Transforming commons-codec-1.16.0.jar (commons-codec:commons-codec:1.16.0) with ExternalDependencyInstrumentingArtifactTransform
+Transforming concurrent-trees-2.6.1.jar (com.googlecode.concurrent-trees:concurrent-trees:2.6.1) with ExternalDependencyInstrumentingArtifactTransform
+Transforming error_prone_annotations-2.27.0.jar (com.google.errorprone:error_prone_annotations:2.27.0) with ExternalDependencyInstrumentingArtifactTransform
+Transforming intellij-coverage-agent-1.0.761.jar (org.jetbrains.intellij.deps:intellij-coverage-agent:1.0.761) with ExternalDependencyInstrumentingArtifactTransform
+Transforming xz-1.9.jar (org.tukaani:xz:1.9) with ExternalDependencyInstrumentingArtifactTransform
+Transforming durian-swt.os-4.2.2.jar (com.diffplug.durian:durian-swt.os:4.2.2) with ExternalDependencyInstrumentingArtifactTransform
+Transforming org.eclipse.osgi-3.18.300.jar (org.eclipse.platform:org.eclipse.osgi:3.18.300) with ExternalDependencyInstrumentingArtifactTransform
+Transforming freemarker-2.3.32.jar (org.freemarker:freemarker:2.3.32) with ExternalDependencyInstrumentingArtifactTransform
+Build c0852a83-8bf6-4f19-b2d1-58063ca604a8 is started
+Using Kotlin Gradle Plugin gradle86 variant
+kotlin scripting plugin: created the scripting discovery configuration: kotlinScriptDef
+kotlin scripting plugin: created the scripting discovery configuration: testKotlinScriptDef
+[KOTLIN] Storing cached files in /Users/samuel/.gradle
+[KOTLIN] Storing cached files in /Users/samuel/.gradle
+[KOTLIN] Storing cached files in /Users/samuel/.gradle
+[KOTLIN] Storing cached files in /Users/samuel/.gradle
+[:] commonizeCInterop task registration disabled. cInteropCommonizationEnabled == false
+All projects evaluated.
+Task name matched 'jvmTest'
+Selected primary task 'jvmTest' from project :
+Starting process 'command '/usr/libexec/java_home''. Working directory: /Users/samuel/.gradle/daemon/8.7 Command: /usr/libexec/java_home -V
+Successfully started process 'command '/usr/libexec/java_home''
+Tasks to be executed: [task ':kmpPartiallyResolvedDependenciesChecker', task ':checkKotlinGradlePluginConfigurationErrors', task ':compileKotlinJvm', task ':compileJvmMainJava', task ':jvmProcessResources', task ':processJvmMainResources', task ':jvmMainClasses', task ':jvmJar', task ':compileTestKotlinJvm', task ':compileJvmTestJava', task ':jvmTestProcessResources', task ':processJvmTestResources', task ':jvmTestClasses', task ':koverFindJar', task ':jvmTest']
+Tasks that were excluded: []
+Resolve mutations for :kmpPartiallyResolvedDependenciesChecker (Thread[#7713,Execution worker,5,main]) started.
+:kmpPartiallyResolvedDependenciesChecker (Thread[#7713,Execution worker,5,main]) started.
+
+> Task :kmpPartiallyResolvedDependenciesChecker
+Caching disabled for task ':kmpPartiallyResolvedDependenciesChecker' because:
+  Build cache is disabled
+Task ':kmpPartiallyResolvedDependenciesChecker' is not up-to-date because:
+  Task has not declared any outputs despite executing actions.
+Execution stopped by some action with message: null
+Resolve mutations for :checkKotlinGradlePluginConfigurationErrors (Thread[#7713,Execution worker,5,main]) started.
+:checkKotlinGradlePluginConfigurationErrors (Thread[#7713,Execution worker,5,main]) started.
+
+> Task :checkKotlinGradlePluginConfigurationErrors SKIPPED
+Skipping task ':checkKotlinGradlePluginConfigurationErrors' as task onlyIf 'errorDiagnostics are present' is false.
+Resolve mutations for :compileKotlinJvm (Thread[#7713,Execution worker,5,main]) started.
+:compileKotlinJvm (Thread[#7713,Execution worker,5,main]) started.
+Resolve mutations for :jvmProcessResources (Thread[#7721,Execution worker Thread 8,5,main]) started.
+:jvmProcessResources (Thread[#7721,Execution worker Thread 8,5,main]) started.
+
+> Task :jvmProcessResources NO-SOURCE
+Skipping task ':jvmProcessResources' as it has no source files and no previous output files.
+Resolve mutations for :processJvmMainResources (Thread[#7721,Execution worker Thread 8,5,main]) started.
+:processJvmMainResources (Thread[#7721,Execution worker Thread 8,5,main]) started.
+
+> Task :processJvmMainResources SKIPPED
+Skipping task ':processJvmMainResources' as task onlyIf 'Task is enabled' is false.
+Resolve mutations for :jvmTestProcessResources (Thread[#7721,Execution worker Thread 8,5,main]) started.
+:jvmTestProcessResources (Thread[#7721,Execution worker Thread 8,5,main]) started.
+
+> Task :jvmTestProcessResources NO-SOURCE
+Skipping task ':jvmTestProcessResources' as it has no source files and no previous output files.
+Resolve mutations for :processJvmTestResources (Thread[#7721,Execution worker Thread 8,5,main]) started.
+:processJvmTestResources (Thread[#7716,Execution worker Thread 4,5,main]) started.
+
+> Task :processJvmTestResources SKIPPED
+Skipping task ':processJvmTestResources' as task onlyIf 'Task is enabled' is false.
+Resolve mutations for :koverFindJar (Thread[#7716,Execution worker Thread 4,5,main]) started.
+:koverFindJar (Thread[#7716,Execution worker Thread 4,5,main]) started.
+
+> Task :koverFindJar
+Caching disabled for task ':koverFindJar' because:
+  Build cache is disabled
+Task ':koverFindJar' is not up-to-date because:
+  Class path of task ':koverFindJar' has changed from 94f9b7f3e1b071aef7d303aafa62a4d2 to 4130f2176dcd2e8400e4399db8ce8d19.
+
+> Task :compileKotlinJvm
+Transforming kotlinx-serialization-core-jvm-1.7.3.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming kotlinx-serialization-json-jvm-1.7.3.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming kotlinx-io-core-jvm-0.3.3.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming kotlinx-io-bytestring-jvm-0.3.3.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming kotlin-stdlib-2.2.21.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming kotlin-compiler-embeddable-2.2.21.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming jackson-annotations-2.17.2.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming jackson-core-2.17.2.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming jackson-dataformat-yaml-2.17.2.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming jackson-databind-2.17.2.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming annotations-13.0.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming snakeyaml-2.2.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Caching disabled for task ':compileKotlinJvm' because:
+  Build cache is disabled
+Task ':compileKotlinJvm' is not up-to-date because:
+  Class path of task ':compileKotlinJvm' has changed from 94f9b7f3e1b071aef7d303aafa62a4d2 to 4130f2176dcd2e8400e4399db8ce8d19.
+The input changes require a full rebuild for incremental task ':compileKotlinJvm'.
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmMain/kotlin', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmMain/java', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmMain/kotlin', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmMain/java', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmMain/kotlin', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmMain/java', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmMain/kotlin', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmMain/java', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmMain/kotlin', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmMain/java', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmMain/kotlin', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmMain/java', not found
+Kotlin source files: /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/main/kotlin/openapi/OpenApiValidator.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/main/kotlin/openapi/OpenApiWriter.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/main/kotlin/openapi/OpenApiDocumentRegistry.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/main/kotlin/PlatformJvm.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/main/kotlin/psi/OpenApiMetadata.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/main/kotlin/psi/NetworkParser.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/main/kotlin/psi/NetworkMerger.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/main/kotlin/psi/UiGenerator.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/main/kotlin/psi/DtoGenerator.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/main/kotlin/psi/PsiInfrastructure.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/main/kotlin/psi/NetworkGenerator.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/main/kotlin/psi/DtoMerger.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/main/kotlin/psi/DtoParser.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/main/kotlin/psi/ApiGenerator.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/main/kotlin/domain/SchemaDynamicResolution.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/main/kotlin/domain/OpenApiPathFlattener.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/Platform.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/org/cdd/CddCli.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/org/cdd/mcp/JsonRpc.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/org/cdd/mcp/McpModels.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/org/cdd/mcp/McpPeer.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/org/cdd/mcp/Transport.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/org/cdd/Config.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/org/cdd/CddGenerator.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/openapi/OpenApiParser.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/openapi/JsonNodeExt.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/openapi/OpenApiAssembler.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/openapi/OpenApiDocument.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/openapi/UriUtils.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/Main.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/psi/ReferenceResolver.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/psi/TypeMappers.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/scaffold/ScaffoldTemplates.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/scaffold/ScaffoldGenerator.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/domain/OpenApiPathBuilder.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/domain/SchemaModels.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/domain/EndpointModels.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/domain/SchemaConversions.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/domain/OpenApiModels.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonMain/kotlin/domain/ContentModels.kt
+Java source files: 
+Script source files: 
+Script file extensions: 
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmMain/kotlin', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmMain/java', not found
+Using Kotlin/JVM incremental compilation
+[KOTLIN] Kotlin compilation 'jdkHome' argument: /Users/samuel/.gradle/jdks/eclipse_adoptium-21-aarch64-os_x/jdk-21.0.11+10/Contents/Home
+Options for KOTLIN DAEMON: IncrementalCompilationOptions(super=CompilationOptions(compilerMode=INCREMENTAL_COMPILER, targetPlatform=JVM, reportCategories=[0, 3], reportSeverity=2, requestedCompilationResults=[0], kotlinScriptExtensions=[]), sourceChanges=org.jetbrains.kotlin.buildtools.api.SourcesChanges$Unknown@3527888e, classpathChanges=NotAvailableForNonIncrementalRun, workingDir=/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build/kotlin/compileKotlinJvm/cacheable, multiModuleICSettings=MultiModuleICSettings(buildHistoryFile=/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build/kotlin/compileKotlinJvm/local-state/build-history.bin, useModuleDetection=false), icFeatures=IncrementalCompilationFeatures(usePreciseJavaTracking=true, withAbiSnapshot=false, preciseCompilationResultsBackup=true, keepIncrementalCompilationCachesInMemory=true, enableUnsafeIncrementalCompilationForMultiplatform=false, enableMonotonousIncrementalCompileSetExpansion=true), outputFiles=[/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build/classes/kotlin/jvm/main, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build/kotlin/compileKotlinJvm/cacheable, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build/kotlin/compileKotlinJvm/local-state])
+w: file:///Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/main/kotlin/psi/PsiInfrastructure.kt:48:31 This declaration is part of K1 API, which is planned to be deprecated and reworked.
+This warning will become an error in Kotlin 2.3
+Finished executing kotlin compiler using DAEMON strategy
+Resolve mutations for :compileJvmMainJava (Thread[#7713,Execution worker,5,main]) started.
+:compileJvmMainJava (Thread[#7713,Execution worker,5,main]) started.
+
+> Task :compileJvmMainJava NO-SOURCE
+Skipping task ':compileJvmMainJava' as it has no source files and no previous output files.
+Resolve mutations for :jvmMainClasses (Thread[#7713,Execution worker,5,main]) started.
+:jvmMainClasses (Thread[#7713,Execution worker,5,main]) started.
+
+> Task :jvmMainClasses
+Skipping task ':jvmMainClasses' as it has no actions.
+Resolve mutations for :jvmJar (Thread[#7719,Execution worker Thread 7,5,main]) started.
+:jvmJar (Thread[#7719,Execution worker Thread 7,5,main]) started.
+
+> Task :jvmJar
+Caching disabled for task ':jvmJar' because:
+  Build cache is disabled
+  Not worth caching
+Task ':jvmJar' is not up-to-date because:
+  Input property 'rootSpec$1' file /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build/classes/kotlin/jvm/main/MainKt.class has changed.
+  Input property 'rootSpec$1' file /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build/classes/kotlin/jvm/main/org/cdd/CddCli.class has changed.
+  Input property 'rootSpec$1' file /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build/classes/kotlin/jvm/main/org/cdd/CddGenerator.class has changed.
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build/classes/java/jvmMain', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build/processedResources/jvm/main', not found
+Resolve mutations for :compileTestKotlinJvm (Thread[#7719,Execution worker Thread 7,5,main]) started.
+:compileTestKotlinJvm (Thread[#7719,Execution worker Thread 7,5,main]) started.
+
+> Task :compileTestKotlinJvm
+Transforming main with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming kotlinx-serialization-core-jvm-1.7.3.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming kotlinx-serialization-json-jvm-1.7.3.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming kotlinx-io-core-jvm-0.3.3.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming kotlinx-io-bytestring-jvm-0.3.3.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming kotlin-stdlib-2.2.21.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming kotlin-compiler-embeddable-2.2.21.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming jackson-annotations-2.17.2.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming jackson-core-2.17.2.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming jackson-dataformat-yaml-2.17.2.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming jackson-databind-2.17.2.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming junit-jupiter-params-5.10.0.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming junit-jupiter-api-5.10.0.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming junit-platform-commons-1.10.0.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming junit-jupiter-5.10.0.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming annotations-13.0.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming snakeyaml-2.2.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming opentest4j-1.3.0.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Transforming apiguardian-api-1.1.2.jar with BuildToolsApiClasspathEntrySnapshotTransform
+Caching disabled for task ':compileTestKotlinJvm' because:
+  Build cache is disabled
+Task ':compileTestKotlinJvm' is not up-to-date because:
+  Class path of task ':compileTestKotlinJvm' has changed from 94f9b7f3e1b071aef7d303aafa62a4d2 to 4130f2176dcd2e8400e4399db8ce8d19.
+The input changes require a full rebuild for incremental task ':compileTestKotlinJvm'.
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmTest/kotlin', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmTest/java', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonTest/kotlin', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmTest/kotlin', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmTest/java', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmTest/kotlin', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmTest/java', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonTest/kotlin', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmTest/kotlin', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmTest/java', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonTest/kotlin', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmTest/kotlin', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmTest/java', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonTest/kotlin', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmTest/kotlin', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmTest/java', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonTest/kotlin', not found
+Kotlin source files: /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/DebugParse.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/org/cdd/mcp/McpPeerTest2.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/org/cdd/mcp/McpModelsCoverageTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/org/cdd/mcp/JsonRpcTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/org/cdd/mcp/McpPeerTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/MainTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/openapi/OpenApiSchemaKeywordsTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/openapi/OpenApiSchemaTypeOmissionTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/openapi/OpenApiDocumentRegistryTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/openapi/OpenApiAssemblerTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/openapi/UriUtilsTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/openapi/ExhaustiveOpenApiValidatorTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/openapi/OpenApiValidatorExhaustiveCoverageTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/openapi/OpenApiValidatorTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/openapi/OpenApiWriterTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/openapi/OpenApiSchemaBooleanRefTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/openapi/OpenApiValidatorCoverageTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/openapi/OpenApiParserTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/verification/RoundTripTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/verification/Oas32ComplianceTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/PlatformJvmTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/psi/DtoGeneratorBooleanRefTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/psi/ApiGeneratorTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/psi/NetworkMergerTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/psi/DtoParserTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/psi/ReferenceResolverTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/psi/NetworkParserTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/psi/DtoMergerTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/psi/TypeMappersTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/psi/DtoGeneratorTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/psi/UiGeneratorTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/psi/DtoMergerCoverageTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/psi/OpenApiMetadataTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/psi/DtoParserNumericConstraintsTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/psi/NetworkGeneratorTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/scaffold/ScaffoldGeneratorTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/domain/SchemaModelsCoverageTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/domain/OpenApiPathFlattenerTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/domain/DomainModelsCoverageTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/domain/OpenApiPathBuilderTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/domain/SchemaDynamicResolutionTest.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/domain/SchemaDynamicResolutionTest3.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/domain/SchemaDynamicResolutionTest2.kt, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/test/kotlin/domain/SchemaConversionsTest.kt
+Java source files: 
+Script source files: 
+Script file extensions: 
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmTest/kotlin', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/jvmTest/java', not found
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/src/commonTest/kotlin', not found
+Using Kotlin/JVM incremental compilation
+[KOTLIN] Kotlin compilation 'jdkHome' argument: /Users/samuel/.gradle/jdks/eclipse_adoptium-21-aarch64-os_x/jdk-21.0.11+10/Contents/Home
+Options for KOTLIN DAEMON: IncrementalCompilationOptions(super=CompilationOptions(compilerMode=INCREMENTAL_COMPILER, targetPlatform=JVM, reportCategories=[0, 3], reportSeverity=2, requestedCompilationResults=[0], kotlinScriptExtensions=[]), sourceChanges=org.jetbrains.kotlin.buildtools.api.SourcesChanges$Unknown@3527888e, classpathChanges=NotAvailableForNonIncrementalRun, workingDir=/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build/kotlin/compileTestKotlinJvm/cacheable, multiModuleICSettings=MultiModuleICSettings(buildHistoryFile=/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build/kotlin/compileTestKotlinJvm/local-state/build-history.bin, useModuleDetection=false), icFeatures=IncrementalCompilationFeatures(usePreciseJavaTracking=true, withAbiSnapshot=false, preciseCompilationResultsBackup=true, keepIncrementalCompilationCachesInMemory=true, enableUnsafeIncrementalCompilationForMultiplatform=false, enableMonotonousIncrementalCompileSetExpansion=true), outputFiles=[/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build/classes/kotlin/jvm/test, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build/kotlin/compileTestKotlinJvm/cacheable, /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build/kotlin/compileTestKotlinJvm/local-state])
+Finished executing kotlin compiler using DAEMON strategy
+Resolve mutations for :compileJvmTestJava (Thread[#7719,Execution worker Thread 7,5,main]) started.
+:compileJvmTestJava (Thread[#7719,Execution worker Thread 7,5,main]) started.
+
+> Task :compileJvmTestJava NO-SOURCE
+Skipping task ':compileJvmTestJava' as it has no source files and no previous output files.
+Resolve mutations for :jvmTestClasses (Thread[#7719,Execution worker Thread 7,5,main]) started.
+:jvmTestClasses (Thread[#7719,Execution worker Thread 7,5,main]) started.
+
+> Task :jvmTestClasses
+Skipping task ':jvmTestClasses' as it has no actions.
+Resolve mutations for :jvmTest (Thread[#7719,Execution worker Thread 7,5,main]) started.
+:jvmTest (Thread[#7719,Execution worker Thread 7,5,main]) started.
+Gradle Test Executor 29 started executing tests.
+Gradle Test Executor 29 finished executing tests.
+
+> Task :jvmTest
+Custom actions are attached to task ':jvmTest'.
+Caching disabled for task ':jvmTest' because:
+  Build cache is disabled
+Task ':jvmTest' is not up-to-date because:
+  Task has failed previously.
+file or directory '/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build/classes/java/jvmTest', not found
+Starting process 'Gradle Test Executor 29'. Working directory: /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin Command: /Users/samuel/.gradle/jdks/eclipse_adoptium-21-aarch64-os_x/jdk-21.0.11+10/Contents/Home/bin/java -Dorg.gradle.internal.worker.tmpdir=/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build/tmp/jvmTest/work -Dorg.gradle.native=false -javaagent:/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build/kover/kover-jvm-agent-0.8.3.jar=file:/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build/tmp/jvmTest/kover-agent.args @/Users/samuel/.gradle/.tmp/gradle-worker-classpath14907467075522327835txt -Xmx512m -Dfile.encoding=UTF-8 -Duser.country=US -Duser.language=en -Duser.variant -ea worker.org.gradle.process.internal.worker.GradleWorkerMain 'Gradle Test Executor 29'
+Successfully started process 'Gradle Test Executor 29'
+Finished generating test XML results (0.002 secs) into: /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build/test-results/jvmTest
+Generating HTML test report...
+Finished generating test html results (0.004 secs) into: /Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin/build/reports/tests/jvmTest
+Build c0852a83-8bf6-4f19-b2d1-58063ca604a8 is closed
+
+BUILD SUCCESSFUL in 8s
+6 actionable tasks: 6 executed
+Watched directory hierarchies: [/Users/samuel/repos/cdd-openapi-test-harness/cdd-kotlin]

@@ -25,6 +25,7 @@ fun runCli(args: Array<String>): Int {
       println("\nSubcommands:")
       println("  from_openapi    Generate code from an OpenAPI specification.")
       println("  to_openapi      Generate an OpenAPI specification from source code.")
+      println("  mcp             Run the Model Context Protocol server via stdio.")
       println(
           "  to_docs_json    Generate JSON documentation with code snippets for an OpenAPI specification.")
       println("\nOptions:")
@@ -40,7 +41,7 @@ fun runCli(args: Array<String>): Int {
     }
 
     if (args.contains("--version")) {
-      println("0.0.1")
+      println("0.0.2")
       return 0
     }
 
@@ -52,6 +53,10 @@ fun runCli(args: Array<String>): Int {
 
     if (command == "to_openapi") {
       return org.cdd.CddCli.generateToOpenApi(args)
+    }
+
+    if (command == "mcp") {
+      return org.cdd.CddCli.runMcpServer(args)
     }
 
     if (command == "to_docs_json") {
