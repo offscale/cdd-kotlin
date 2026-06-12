@@ -10,56 +10,56 @@ repos:
     hooks:
       - id: format-and-check
         name: Format & Recheck
-        entry: python scripts/xplat.py gradle spotlessApply spotlessCheck
-        language: python
+        entry: python3 scripts/xplat.py gradle spotlessApply spotlessCheck
+        language: system
         pass_filenames: false
         types_or: [kotlin]
 
       - id: build
         name: Build
-        entry: python scripts/xplat.py gradle assemble
-        language: python
+        entry: python3 scripts/xplat.py gradle assemble
+        language: system
         pass_filenames: false
         types_or: [kotlin]
 
       - id: test
         name: Test
-        entry: python scripts/xplat.py gradle allTests
-        language: python
+        entry: python3 scripts/xplat.py gradle allTests
+        language: system
         pass_filenames: false
         types_or: [kotlin]
 
       - id: lint
         name: Lint (Verify)
-        entry: python scripts/xplat.py gradle check
-        language: python
+        entry: python3 scripts/xplat.py gradle check
+        language: system
         pass_filenames: false
         types_or: [kotlin]
 
       - id: test-swagger-2
         name: Swagger 2.0 Petstore test
-        entry: python scripts/xplat.py gradle run --args="to_sdk -i ../petstore.json"
-        language: python
+        entry: bash scripts/test_sdk.sh ../petstore.json /v2
+        language: system
         pass_filenames: false
         always_run: true
 
       - id: test-openapi-3
         name: OpenAPI 3.2.0 Petstore test
-        entry: python scripts/xplat.py gradle run --args="to_sdk -i ../petstore_oas3.json"
-        language: python
+        entry: bash scripts/test_sdk.sh ../petstore_oas3.json /api/v3
+        language: system
         pass_filenames: false
         always_run: true
 
       - id: build-wasm
         name: Build WASM
-        entry: python scripts/xplat.py build_wasm
-        language: python
+        entry: python3 scripts/xplat.py build_wasm
+        language: system
         pass_filenames: false
         always_run: true
 
       - id: update-badges
         name: Update Badges
-        entry: python scripts/update_badges.py
-        language: python
+        entry: python3 scripts/update_badges.py
+        language: system
         pass_filenames: false
         always_run: true
