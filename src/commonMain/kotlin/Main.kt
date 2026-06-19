@@ -4,6 +4,7 @@
  * @param args Command-line arguments.
  */
 fun main(args: Array<String>) {
+  println("HELLO WORLD")
   val exitCode = runCli(args)
   if (exitCode != 0) {
     throw RuntimeException("CLI exited with code $exitCode")

@@ -6,6 +6,15 @@ import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class McpModelsCoverageTest {
+  companion object {
+    val testJsonBoth =
+        kotlinx.serialization.json.Json {
+          ignoreUnknownKeys = true
+          encodeDefaults = true
+        }
+    val testJsonIgnore = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+    val testJsonEncode = kotlinx.serialization.json.Json { encodeDefaults = true }
+  }
 
   @Test
   fun testAnnotated() {
@@ -16,36 +25,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<Annotated>(json)
+    val decoded = testJsonBoth.decodeFromString<Annotated>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<Annotated>(unknownJson)
+      testJsonIgnore.decodeFromString<Annotated>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<Annotated>(emptyJson)
+      testJsonIgnore.decodeFromString<Annotated>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -74,36 +67,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<BlobResourceContents>(json)
+    val decoded = testJsonBoth.decodeFromString<BlobResourceContents>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<BlobResourceContents>(unknownJson)
+      testJsonIgnore.decodeFromString<BlobResourceContents>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<BlobResourceContents>(emptyJson)
+      testJsonIgnore.decodeFromString<BlobResourceContents>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -138,36 +115,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<CallToolRequest>(json)
+    val decoded = testJsonBoth.decodeFromString<CallToolRequest>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CallToolRequest>(unknownJson)
+      testJsonIgnore.decodeFromString<CallToolRequest>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CallToolRequest>(emptyJson)
+      testJsonIgnore.decodeFromString<CallToolRequest>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -198,36 +159,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<CallToolRequestParams>(json)
+    val decoded = testJsonBoth.decodeFromString<CallToolRequestParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CallToolRequestParams>(unknownJson)
+      testJsonIgnore.decodeFromString<CallToolRequestParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CallToolRequestParams>(emptyJson)
+      testJsonIgnore.decodeFromString<CallToolRequestParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -260,36 +205,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<CallToolResult>(json)
+    val decoded = testJsonBoth.decodeFromString<CallToolResult>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CallToolResult>(unknownJson)
+      testJsonIgnore.decodeFromString<CallToolResult>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CallToolResult>(emptyJson)
+      testJsonIgnore.decodeFromString<CallToolResult>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -320,36 +249,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<CancelledNotification>(json)
+    val decoded = testJsonBoth.decodeFromString<CancelledNotification>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CancelledNotification>(unknownJson)
+      testJsonIgnore.decodeFromString<CancelledNotification>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CancelledNotification>(emptyJson)
+      testJsonIgnore.decodeFromString<CancelledNotification>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -378,36 +291,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<CancelledNotificationParams>(json)
+    val decoded = testJsonBoth.decodeFromString<CancelledNotificationParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CancelledNotificationParams>(unknownJson)
+      testJsonIgnore.decodeFromString<CancelledNotificationParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CancelledNotificationParams>(emptyJson)
+      testJsonIgnore.decodeFromString<CancelledNotificationParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -439,36 +336,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ClientCapabilities>(json)
+    val decoded = testJsonBoth.decodeFromString<ClientCapabilities>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ClientCapabilities>(unknownJson)
+      testJsonIgnore.decodeFromString<ClientCapabilities>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ClientCapabilities>(emptyJson)
+      testJsonIgnore.decodeFromString<ClientCapabilities>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -497,36 +378,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ClientCapabilitiesRoots>(json)
+    val decoded = testJsonBoth.decodeFromString<ClientCapabilitiesRoots>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ClientCapabilitiesRoots>(unknownJson)
+      testJsonIgnore.decodeFromString<ClientCapabilitiesRoots>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ClientCapabilitiesRoots>(emptyJson)
+      testJsonIgnore.decodeFromString<ClientCapabilitiesRoots>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -571,36 +436,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<CompleteRequest>(json)
+    val decoded = testJsonBoth.decodeFromString<CompleteRequest>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CompleteRequest>(unknownJson)
+      testJsonIgnore.decodeFromString<CompleteRequest>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CompleteRequest>(emptyJson)
+      testJsonIgnore.decodeFromString<CompleteRequest>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -638,36 +487,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<CompleteRequestParams>(json)
+    val decoded = testJsonBoth.decodeFromString<CompleteRequestParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CompleteRequestParams>(unknownJson)
+      testJsonIgnore.decodeFromString<CompleteRequestParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CompleteRequestParams>(emptyJson)
+      testJsonIgnore.decodeFromString<CompleteRequestParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -696,36 +529,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<CompleteRequestArgument>(json)
+    val decoded = testJsonBoth.decodeFromString<CompleteRequestArgument>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CompleteRequestArgument>(unknownJson)
+      testJsonIgnore.decodeFromString<CompleteRequestArgument>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CompleteRequestArgument>(emptyJson)
+      testJsonIgnore.decodeFromString<CompleteRequestArgument>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -754,36 +571,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<CompleteRequestRef>(json)
+    val decoded = testJsonBoth.decodeFromString<CompleteRequestRef>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CompleteRequestRef>(unknownJson)
+      testJsonIgnore.decodeFromString<CompleteRequestRef>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CompleteRequestRef>(emptyJson)
+      testJsonIgnore.decodeFromString<CompleteRequestRef>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -816,36 +617,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<CompleteResult>(json)
+    val decoded = testJsonBoth.decodeFromString<CompleteResult>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CompleteResult>(unknownJson)
+      testJsonIgnore.decodeFromString<CompleteResult>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CompleteResult>(emptyJson)
+      testJsonIgnore.decodeFromString<CompleteResult>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -874,36 +659,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<CompleteResultCompletion>(json)
+    val decoded = testJsonBoth.decodeFromString<CompleteResultCompletion>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CompleteResultCompletion>(unknownJson)
+      testJsonIgnore.decodeFromString<CompleteResultCompletion>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CompleteResultCompletion>(emptyJson)
+      testJsonIgnore.decodeFromString<CompleteResultCompletion>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -949,36 +718,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<CreateMessageRequest>(json)
+    val decoded = testJsonBoth.decodeFromString<CreateMessageRequest>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CreateMessageRequest>(unknownJson)
+      testJsonIgnore.decodeFromString<CreateMessageRequest>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CreateMessageRequest>(emptyJson)
+      testJsonIgnore.decodeFromString<CreateMessageRequest>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -1015,36 +768,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<CreateMessageRequestParams>(json)
+    val decoded = testJsonBoth.decodeFromString<CreateMessageRequestParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CreateMessageRequestParams>(unknownJson)
+      testJsonIgnore.decodeFromString<CreateMessageRequestParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CreateMessageRequestParams>(emptyJson)
+      testJsonIgnore.decodeFromString<CreateMessageRequestParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -1092,36 +829,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<CreateMessageResult>(json)
+    val decoded = testJsonBoth.decodeFromString<CreateMessageResult>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CreateMessageResult>(unknownJson)
+      testJsonIgnore.decodeFromString<CreateMessageResult>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<CreateMessageResult>(emptyJson)
+      testJsonIgnore.decodeFromString<CreateMessageResult>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -1155,36 +876,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<SamplingMessageContent>(json)
+    val decoded = testJsonBoth.decodeFromString<SamplingMessageContent>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<SamplingMessageContent>(unknownJson)
+      testJsonIgnore.decodeFromString<SamplingMessageContent>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<SamplingMessageContent>(emptyJson)
+      testJsonIgnore.decodeFromString<SamplingMessageContent>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -1217,36 +922,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<EmbeddedResource>(json)
+    val decoded = testJsonBoth.decodeFromString<EmbeddedResource>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<EmbeddedResource>(unknownJson)
+      testJsonIgnore.decodeFromString<EmbeddedResource>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<EmbeddedResource>(emptyJson)
+      testJsonIgnore.decodeFromString<EmbeddedResource>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -1278,36 +967,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<GetPromptRequest>(json)
+    val decoded = testJsonBoth.decodeFromString<GetPromptRequest>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<GetPromptRequest>(unknownJson)
+      testJsonIgnore.decodeFromString<GetPromptRequest>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<GetPromptRequest>(emptyJson)
+      testJsonIgnore.decodeFromString<GetPromptRequest>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -1336,36 +1009,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<GetPromptRequestParams>(json)
+    val decoded = testJsonBoth.decodeFromString<GetPromptRequestParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<GetPromptRequestParams>(unknownJson)
+      testJsonIgnore.decodeFromString<GetPromptRequestParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<GetPromptRequestParams>(emptyJson)
+      testJsonIgnore.decodeFromString<GetPromptRequestParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -1398,36 +1055,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<GetPromptResult>(json)
+    val decoded = testJsonBoth.decodeFromString<GetPromptResult>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<GetPromptResult>(unknownJson)
+      testJsonIgnore.decodeFromString<GetPromptResult>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<GetPromptResult>(emptyJson)
+      testJsonIgnore.decodeFromString<GetPromptResult>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -1458,36 +1099,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ImageContent>(json)
+    val decoded = testJsonBoth.decodeFromString<ImageContent>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ImageContent>(unknownJson)
+      testJsonIgnore.decodeFromString<ImageContent>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ImageContent>(emptyJson)
+      testJsonIgnore.decodeFromString<ImageContent>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -1520,36 +1145,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<Implementation>(json)
+    val decoded = testJsonBoth.decodeFromString<Implementation>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<Implementation>(unknownJson)
+      testJsonIgnore.decodeFromString<Implementation>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<Implementation>(emptyJson)
+      testJsonIgnore.decodeFromString<Implementation>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -1601,36 +1210,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<InitializeRequest>(json)
+    val decoded = testJsonBoth.decodeFromString<InitializeRequest>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<InitializeRequest>(unknownJson)
+      testJsonIgnore.decodeFromString<InitializeRequest>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<InitializeRequest>(emptyJson)
+      testJsonIgnore.decodeFromString<InitializeRequest>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -1674,36 +1267,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<InitializeRequestParams>(json)
+    val decoded = testJsonBoth.decodeFromString<InitializeRequestParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<InitializeRequestParams>(unknownJson)
+      testJsonIgnore.decodeFromString<InitializeRequestParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<InitializeRequestParams>(emptyJson)
+      testJsonIgnore.decodeFromString<InitializeRequestParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -1752,36 +1329,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<InitializeResult>(json)
+    val decoded = testJsonBoth.decodeFromString<InitializeResult>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<InitializeResult>(unknownJson)
+      testJsonIgnore.decodeFromString<InitializeResult>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<InitializeResult>(emptyJson)
+      testJsonIgnore.decodeFromString<InitializeResult>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -1820,36 +1381,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<InitializedNotification>(json)
+    val decoded = testJsonBoth.decodeFromString<InitializedNotification>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<InitializedNotification>(unknownJson)
+      testJsonIgnore.decodeFromString<InitializedNotification>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<InitializedNotification>(emptyJson)
+      testJsonIgnore.decodeFromString<InitializedNotification>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -1880,36 +1425,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<InitializedNotificationParams>(json)
+    val decoded = testJsonBoth.decodeFromString<InitializedNotificationParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<InitializedNotificationParams>(unknownJson)
+      testJsonIgnore.decodeFromString<InitializedNotificationParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<InitializedNotificationParams>(emptyJson)
+      testJsonIgnore.decodeFromString<InitializedNotificationParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -1946,36 +1475,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<JSONRPCError>(json)
+    val decoded = testJsonBoth.decodeFromString<JSONRPCError>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<JSONRPCError>(unknownJson)
+      testJsonIgnore.decodeFromString<JSONRPCError>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<JSONRPCError>(emptyJson)
+      testJsonIgnore.decodeFromString<JSONRPCError>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -2006,36 +1519,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<JSONRPCErrorError>(json)
+    val decoded = testJsonBoth.decodeFromString<JSONRPCErrorError>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<JSONRPCErrorError>(unknownJson)
+      testJsonIgnore.decodeFromString<JSONRPCErrorError>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<JSONRPCErrorError>(emptyJson)
+      testJsonIgnore.decodeFromString<JSONRPCErrorError>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -2068,36 +1565,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<JSONRPCNotification>(json)
+    val decoded = testJsonBoth.decodeFromString<JSONRPCNotification>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<JSONRPCNotification>(unknownJson)
+      testJsonIgnore.decodeFromString<JSONRPCNotification>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<JSONRPCNotification>(emptyJson)
+      testJsonIgnore.decodeFromString<JSONRPCNotification>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -2131,36 +1612,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<JSONRPCRequest>(json)
+    val decoded = testJsonBoth.decodeFromString<JSONRPCRequest>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<JSONRPCRequest>(unknownJson)
+      testJsonIgnore.decodeFromString<JSONRPCRequest>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<JSONRPCRequest>(emptyJson)
+      testJsonIgnore.decodeFromString<JSONRPCRequest>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -2193,36 +1658,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<JSONRPCResponse>(json)
+    val decoded = testJsonBoth.decodeFromString<JSONRPCResponse>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<JSONRPCResponse>(unknownJson)
+      testJsonIgnore.decodeFromString<JSONRPCResponse>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<JSONRPCResponse>(emptyJson)
+      testJsonIgnore.decodeFromString<JSONRPCResponse>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -2251,36 +1700,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ListPromptsRequest>(json)
+    val decoded = testJsonBoth.decodeFromString<ListPromptsRequest>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListPromptsRequest>(unknownJson)
+      testJsonIgnore.decodeFromString<ListPromptsRequest>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListPromptsRequest>(emptyJson)
+      testJsonIgnore.decodeFromString<ListPromptsRequest>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -2309,36 +1742,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ListPromptsRequestParams>(json)
+    val decoded = testJsonBoth.decodeFromString<ListPromptsRequestParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListPromptsRequestParams>(unknownJson)
+      testJsonIgnore.decodeFromString<ListPromptsRequestParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListPromptsRequestParams>(emptyJson)
+      testJsonIgnore.decodeFromString<ListPromptsRequestParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -2371,36 +1788,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ListPromptsResult>(json)
+    val decoded = testJsonBoth.decodeFromString<ListPromptsResult>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListPromptsResult>(unknownJson)
+      testJsonIgnore.decodeFromString<ListPromptsResult>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListPromptsResult>(emptyJson)
+      testJsonIgnore.decodeFromString<ListPromptsResult>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -2431,36 +1832,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ListResourceTemplatesRequest>(json)
+    val decoded = testJsonBoth.decodeFromString<ListResourceTemplatesRequest>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListResourceTemplatesRequest>(unknownJson)
+      testJsonIgnore.decodeFromString<ListResourceTemplatesRequest>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListResourceTemplatesRequest>(emptyJson)
+      testJsonIgnore.decodeFromString<ListResourceTemplatesRequest>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -2489,36 +1874,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ListResourceTemplatesRequestParams>(json)
+    val decoded = testJsonBoth.decodeFromString<ListResourceTemplatesRequestParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListResourceTemplatesRequestParams>(unknownJson)
+      testJsonIgnore.decodeFromString<ListResourceTemplatesRequestParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListResourceTemplatesRequestParams>(emptyJson)
+      testJsonIgnore.decodeFromString<ListResourceTemplatesRequestParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -2551,36 +1920,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ListResourceTemplatesResult>(json)
+    val decoded = testJsonBoth.decodeFromString<ListResourceTemplatesResult>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListResourceTemplatesResult>(unknownJson)
+      testJsonIgnore.decodeFromString<ListResourceTemplatesResult>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListResourceTemplatesResult>(emptyJson)
+      testJsonIgnore.decodeFromString<ListResourceTemplatesResult>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -2613,36 +1966,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ListResourcesRequest>(json)
+    val decoded = testJsonBoth.decodeFromString<ListResourcesRequest>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListResourcesRequest>(unknownJson)
+      testJsonIgnore.decodeFromString<ListResourcesRequest>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListResourcesRequest>(emptyJson)
+      testJsonIgnore.decodeFromString<ListResourcesRequest>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -2671,36 +2008,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ListResourcesRequestParams>(json)
+    val decoded = testJsonBoth.decodeFromString<ListResourcesRequestParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListResourcesRequestParams>(unknownJson)
+      testJsonIgnore.decodeFromString<ListResourcesRequestParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListResourcesRequestParams>(emptyJson)
+      testJsonIgnore.decodeFromString<ListResourcesRequestParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -2733,36 +2054,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ListResourcesResult>(json)
+    val decoded = testJsonBoth.decodeFromString<ListResourcesResult>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListResourcesResult>(unknownJson)
+      testJsonIgnore.decodeFromString<ListResourcesResult>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListResourcesResult>(emptyJson)
+      testJsonIgnore.decodeFromString<ListResourcesResult>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -2796,36 +2101,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ListRootsRequest>(json)
+    val decoded = testJsonBoth.decodeFromString<ListRootsRequest>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListRootsRequest>(unknownJson)
+      testJsonIgnore.decodeFromString<ListRootsRequest>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListRootsRequest>(emptyJson)
+      testJsonIgnore.decodeFromString<ListRootsRequest>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -2855,36 +2144,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ListRootsRequestParams>(json)
+    val decoded = testJsonBoth.decodeFromString<ListRootsRequestParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListRootsRequestParams>(unknownJson)
+      testJsonIgnore.decodeFromString<ListRootsRequestParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListRootsRequestParams>(emptyJson)
+      testJsonIgnore.decodeFromString<ListRootsRequestParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -2916,36 +2189,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ListRootsResult>(json)
+    val decoded = testJsonBoth.decodeFromString<ListRootsResult>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListRootsResult>(unknownJson)
+      testJsonIgnore.decodeFromString<ListRootsResult>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListRootsResult>(emptyJson)
+      testJsonIgnore.decodeFromString<ListRootsResult>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -2974,36 +2231,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ListToolsRequest>(json)
+    val decoded = testJsonBoth.decodeFromString<ListToolsRequest>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListToolsRequest>(unknownJson)
+      testJsonIgnore.decodeFromString<ListToolsRequest>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListToolsRequest>(emptyJson)
+      testJsonIgnore.decodeFromString<ListToolsRequest>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -3032,36 +2273,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ListToolsRequestParams>(json)
+    val decoded = testJsonBoth.decodeFromString<ListToolsRequestParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListToolsRequestParams>(unknownJson)
+      testJsonIgnore.decodeFromString<ListToolsRequestParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListToolsRequestParams>(emptyJson)
+      testJsonIgnore.decodeFromString<ListToolsRequestParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -3094,36 +2319,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ListToolsResult>(json)
+    val decoded = testJsonBoth.decodeFromString<ListToolsResult>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListToolsResult>(unknownJson)
+      testJsonIgnore.decodeFromString<ListToolsResult>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ListToolsResult>(emptyJson)
+      testJsonIgnore.decodeFromString<ListToolsResult>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -3169,36 +2378,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<LoggingMessageNotification>(json)
+    val decoded = testJsonBoth.decodeFromString<LoggingMessageNotification>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<LoggingMessageNotification>(unknownJson)
+      testJsonIgnore.decodeFromString<LoggingMessageNotification>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<LoggingMessageNotification>(emptyJson)
+      testJsonIgnore.decodeFromString<LoggingMessageNotification>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -3235,36 +2428,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<LoggingMessageNotificationParams>(json)
+    val decoded = testJsonBoth.decodeFromString<LoggingMessageNotificationParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<LoggingMessageNotificationParams>(unknownJson)
+      testJsonIgnore.decodeFromString<LoggingMessageNotificationParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<LoggingMessageNotificationParams>(emptyJson)
+      testJsonIgnore.decodeFromString<LoggingMessageNotificationParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -3293,36 +2470,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ModelHint>(json)
+    val decoded = testJsonBoth.decodeFromString<ModelHint>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ModelHint>(unknownJson)
+      testJsonIgnore.decodeFromString<ModelHint>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ModelHint>(emptyJson)
+      testJsonIgnore.decodeFromString<ModelHint>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -3356,36 +2517,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ModelPreferences>(json)
+    val decoded = testJsonBoth.decodeFromString<ModelPreferences>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ModelPreferences>(unknownJson)
+      testJsonIgnore.decodeFromString<ModelPreferences>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ModelPreferences>(emptyJson)
+      testJsonIgnore.decodeFromString<ModelPreferences>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -3420,36 +2565,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<Notification>(json)
+    val decoded = testJsonBoth.decodeFromString<Notification>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<Notification>(unknownJson)
+      testJsonIgnore.decodeFromString<Notification>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<Notification>(emptyJson)
+      testJsonIgnore.decodeFromString<Notification>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -3478,36 +2607,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<PaginatedRequest>(json)
+    val decoded = testJsonBoth.decodeFromString<PaginatedRequest>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PaginatedRequest>(unknownJson)
+      testJsonIgnore.decodeFromString<PaginatedRequest>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PaginatedRequest>(emptyJson)
+      testJsonIgnore.decodeFromString<PaginatedRequest>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -3536,36 +2649,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<PaginatedRequestParams>(json)
+    val decoded = testJsonBoth.decodeFromString<PaginatedRequestParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PaginatedRequestParams>(unknownJson)
+      testJsonIgnore.decodeFromString<PaginatedRequestParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PaginatedRequestParams>(emptyJson)
+      testJsonIgnore.decodeFromString<PaginatedRequestParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -3596,36 +2693,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<PaginatedResult>(json)
+    val decoded = testJsonBoth.decodeFromString<PaginatedResult>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PaginatedResult>(unknownJson)
+      testJsonIgnore.decodeFromString<PaginatedResult>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PaginatedResult>(emptyJson)
+      testJsonIgnore.decodeFromString<PaginatedResult>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -3659,36 +2740,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<PingRequest>(json)
+    val decoded = testJsonBoth.decodeFromString<PingRequest>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PingRequest>(unknownJson)
+      testJsonIgnore.decodeFromString<PingRequest>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PingRequest>(emptyJson)
+      testJsonIgnore.decodeFromString<PingRequest>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -3717,36 +2782,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<PingRequestParams>(json)
+    val decoded = testJsonBoth.decodeFromString<PingRequestParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PingRequestParams>(unknownJson)
+      testJsonIgnore.decodeFromString<PingRequestParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PingRequestParams>(emptyJson)
+      testJsonIgnore.decodeFromString<PingRequestParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -3782,36 +2831,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ProgressNotification>(json)
+    val decoded = testJsonBoth.decodeFromString<ProgressNotification>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ProgressNotification>(unknownJson)
+      testJsonIgnore.decodeFromString<ProgressNotification>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ProgressNotification>(emptyJson)
+      testJsonIgnore.decodeFromString<ProgressNotification>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -3840,36 +2873,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ProgressNotificationParams>(json)
+    val decoded = testJsonBoth.decodeFromString<ProgressNotificationParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ProgressNotificationParams>(unknownJson)
+      testJsonIgnore.decodeFromString<ProgressNotificationParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ProgressNotificationParams>(emptyJson)
+      testJsonIgnore.decodeFromString<ProgressNotificationParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -3898,36 +2915,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<Prompt>(json)
+    val decoded = testJsonBoth.decodeFromString<Prompt>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<Prompt>(unknownJson)
+      testJsonIgnore.decodeFromString<Prompt>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<Prompt>(emptyJson)
+      testJsonIgnore.decodeFromString<Prompt>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -3956,36 +2957,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<PromptArgument>(json)
+    val decoded = testJsonBoth.decodeFromString<PromptArgument>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PromptArgument>(unknownJson)
+      testJsonIgnore.decodeFromString<PromptArgument>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PromptArgument>(emptyJson)
+      testJsonIgnore.decodeFromString<PromptArgument>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -4019,36 +3004,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<PromptListChangedNotification>(json)
+    val decoded = testJsonBoth.decodeFromString<PromptListChangedNotification>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PromptListChangedNotification>(unknownJson)
+      testJsonIgnore.decodeFromString<PromptListChangedNotification>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PromptListChangedNotification>(emptyJson)
+      testJsonIgnore.decodeFromString<PromptListChangedNotification>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -4079,36 +3048,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<PromptListChangedNotificationParams>(json)
+    val decoded = testJsonBoth.decodeFromString<PromptListChangedNotificationParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PromptListChangedNotificationParams>(unknownJson)
+      testJsonIgnore.decodeFromString<PromptListChangedNotificationParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PromptListChangedNotificationParams>(emptyJson)
+      testJsonIgnore.decodeFromString<PromptListChangedNotificationParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -4141,36 +3094,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<PromptMessage>(json)
+    val decoded = testJsonBoth.decodeFromString<PromptMessage>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PromptMessage>(unknownJson)
+      testJsonIgnore.decodeFromString<PromptMessage>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PromptMessage>(emptyJson)
+      testJsonIgnore.decodeFromString<PromptMessage>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -4199,36 +3136,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<PromptMessageContent>(json)
+    val decoded = testJsonBoth.decodeFromString<PromptMessageContent>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PromptMessageContent>(unknownJson)
+      testJsonIgnore.decodeFromString<PromptMessageContent>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PromptMessageContent>(emptyJson)
+      testJsonIgnore.decodeFromString<PromptMessageContent>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -4257,36 +3178,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<PromptReference>(json)
+    val decoded = testJsonBoth.decodeFromString<PromptReference>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PromptReference>(unknownJson)
+      testJsonIgnore.decodeFromString<PromptReference>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<PromptReference>(emptyJson)
+      testJsonIgnore.decodeFromString<PromptReference>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -4315,36 +3220,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ReadResourceRequest>(json)
+    val decoded = testJsonBoth.decodeFromString<ReadResourceRequest>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ReadResourceRequest>(unknownJson)
+      testJsonIgnore.decodeFromString<ReadResourceRequest>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ReadResourceRequest>(emptyJson)
+      testJsonIgnore.decodeFromString<ReadResourceRequest>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -4373,36 +3262,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ReadResourceRequestParams>(json)
+    val decoded = testJsonBoth.decodeFromString<ReadResourceRequestParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ReadResourceRequestParams>(unknownJson)
+      testJsonIgnore.decodeFromString<ReadResourceRequestParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ReadResourceRequestParams>(emptyJson)
+      testJsonIgnore.decodeFromString<ReadResourceRequestParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -4434,36 +3307,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ReadResourceResult>(json)
+    val decoded = testJsonBoth.decodeFromString<ReadResourceResult>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ReadResourceResult>(unknownJson)
+      testJsonIgnore.decodeFromString<ReadResourceResult>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ReadResourceResult>(emptyJson)
+      testJsonIgnore.decodeFromString<ReadResourceResult>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -4493,36 +3350,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<Request>(json)
+    val decoded = testJsonBoth.decodeFromString<Request>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<Request>(unknownJson)
+      testJsonIgnore.decodeFromString<Request>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<Request>(emptyJson)
+      testJsonIgnore.decodeFromString<Request>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -4558,36 +3399,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<Resource>(json)
+    val decoded = testJsonBoth.decodeFromString<Resource>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<Resource>(unknownJson)
+      testJsonIgnore.decodeFromString<Resource>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<Resource>(emptyJson)
+      testJsonIgnore.decodeFromString<Resource>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -4622,36 +3447,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ResourceContents>(json)
+    val decoded = testJsonBoth.decodeFromString<ResourceContents>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ResourceContents>(unknownJson)
+      testJsonIgnore.decodeFromString<ResourceContents>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ResourceContents>(emptyJson)
+      testJsonIgnore.decodeFromString<ResourceContents>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -4685,36 +3494,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ResourceListChangedNotification>(json)
+    val decoded = testJsonBoth.decodeFromString<ResourceListChangedNotification>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ResourceListChangedNotification>(unknownJson)
+      testJsonIgnore.decodeFromString<ResourceListChangedNotification>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ResourceListChangedNotification>(emptyJson)
+      testJsonIgnore.decodeFromString<ResourceListChangedNotification>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -4745,36 +3538,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ResourceListChangedNotificationParams>(json)
+    val decoded = testJsonBoth.decodeFromString<ResourceListChangedNotificationParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ResourceListChangedNotificationParams>(unknownJson)
+      testJsonIgnore.decodeFromString<ResourceListChangedNotificationParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ResourceListChangedNotificationParams>(emptyJson)
+      testJsonIgnore.decodeFromString<ResourceListChangedNotificationParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -4803,36 +3580,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ResourceReference>(json)
+    val decoded = testJsonBoth.decodeFromString<ResourceReference>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ResourceReference>(unknownJson)
+      testJsonIgnore.decodeFromString<ResourceReference>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ResourceReference>(emptyJson)
+      testJsonIgnore.decodeFromString<ResourceReference>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -4867,36 +3628,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ResourceTemplate>(json)
+    val decoded = testJsonBoth.decodeFromString<ResourceTemplate>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ResourceTemplate>(unknownJson)
+      testJsonIgnore.decodeFromString<ResourceTemplate>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ResourceTemplate>(emptyJson)
+      testJsonIgnore.decodeFromString<ResourceTemplate>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -4932,36 +3677,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ResourceUpdatedNotification>(json)
+    val decoded = testJsonBoth.decodeFromString<ResourceUpdatedNotification>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ResourceUpdatedNotification>(unknownJson)
+      testJsonIgnore.decodeFromString<ResourceUpdatedNotification>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ResourceUpdatedNotification>(emptyJson)
+      testJsonIgnore.decodeFromString<ResourceUpdatedNotification>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -4990,36 +3719,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ResourceUpdatedNotificationParams>(json)
+    val decoded = testJsonBoth.decodeFromString<ResourceUpdatedNotificationParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ResourceUpdatedNotificationParams>(unknownJson)
+      testJsonIgnore.decodeFromString<ResourceUpdatedNotificationParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ResourceUpdatedNotificationParams>(emptyJson)
+      testJsonIgnore.decodeFromString<ResourceUpdatedNotificationParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -5048,36 +3761,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<Result>(json)
+    val decoded = testJsonBoth.decodeFromString<Result>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<Result>(unknownJson)
+      testJsonIgnore.decodeFromString<Result>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<Result>(emptyJson)
+      testJsonIgnore.decodeFromString<Result>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -5106,34 +3803,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<Root>(json)
+    val decoded = testJsonBoth.decodeFromString<Root>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<Root>(unknownJson)
+      testJsonIgnore.decodeFromString<Root>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json.Json { ignoreUnknownKeys = true }.decodeFromString<Root>(emptyJson)
+      testJsonIgnore.decodeFromString<Root>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -5167,36 +3850,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<RootsListChangedNotification>(json)
+    val decoded = testJsonBoth.decodeFromString<RootsListChangedNotification>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<RootsListChangedNotification>(unknownJson)
+      testJsonIgnore.decodeFromString<RootsListChangedNotification>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<RootsListChangedNotification>(emptyJson)
+      testJsonIgnore.decodeFromString<RootsListChangedNotification>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -5227,36 +3894,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<RootsListChangedNotificationParams>(json)
+    val decoded = testJsonBoth.decodeFromString<RootsListChangedNotificationParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<RootsListChangedNotificationParams>(unknownJson)
+      testJsonIgnore.decodeFromString<RootsListChangedNotificationParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<RootsListChangedNotificationParams>(emptyJson)
+      testJsonIgnore.decodeFromString<RootsListChangedNotificationParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -5289,36 +3940,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<SamplingMessage>(json)
+    val decoded = testJsonBoth.decodeFromString<SamplingMessage>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<SamplingMessage>(unknownJson)
+      testJsonIgnore.decodeFromString<SamplingMessage>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<SamplingMessage>(emptyJson)
+      testJsonIgnore.decodeFromString<SamplingMessage>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -5350,36 +3985,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ServerCapabilities>(json)
+    val decoded = testJsonBoth.decodeFromString<ServerCapabilities>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ServerCapabilities>(unknownJson)
+      testJsonIgnore.decodeFromString<ServerCapabilities>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ServerCapabilities>(emptyJson)
+      testJsonIgnore.decodeFromString<ServerCapabilities>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -5413,36 +4032,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ServerCapabilitiesPrompts>(json)
+    val decoded = testJsonBoth.decodeFromString<ServerCapabilitiesPrompts>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ServerCapabilitiesPrompts>(unknownJson)
+      testJsonIgnore.decodeFromString<ServerCapabilitiesPrompts>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ServerCapabilitiesPrompts>(emptyJson)
+      testJsonIgnore.decodeFromString<ServerCapabilitiesPrompts>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -5471,36 +4074,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ServerCapabilitiesResources>(json)
+    val decoded = testJsonBoth.decodeFromString<ServerCapabilitiesResources>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ServerCapabilitiesResources>(unknownJson)
+      testJsonIgnore.decodeFromString<ServerCapabilitiesResources>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ServerCapabilitiesResources>(emptyJson)
+      testJsonIgnore.decodeFromString<ServerCapabilitiesResources>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -5529,36 +4116,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ServerCapabilitiesTools>(json)
+    val decoded = testJsonBoth.decodeFromString<ServerCapabilitiesTools>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ServerCapabilitiesTools>(unknownJson)
+      testJsonIgnore.decodeFromString<ServerCapabilitiesTools>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ServerCapabilitiesTools>(emptyJson)
+      testJsonIgnore.decodeFromString<ServerCapabilitiesTools>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -5588,36 +4159,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<SetLevelRequest>(json)
+    val decoded = testJsonBoth.decodeFromString<SetLevelRequest>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<SetLevelRequest>(unknownJson)
+      testJsonIgnore.decodeFromString<SetLevelRequest>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<SetLevelRequest>(emptyJson)
+      testJsonIgnore.decodeFromString<SetLevelRequest>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -5646,36 +4201,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<SetLevelRequestParams>(json)
+    val decoded = testJsonBoth.decodeFromString<SetLevelRequestParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<SetLevelRequestParams>(unknownJson)
+      testJsonIgnore.decodeFromString<SetLevelRequestParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<SetLevelRequestParams>(emptyJson)
+      testJsonIgnore.decodeFromString<SetLevelRequestParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -5704,36 +4243,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<SubscribeRequest>(json)
+    val decoded = testJsonBoth.decodeFromString<SubscribeRequest>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<SubscribeRequest>(unknownJson)
+      testJsonIgnore.decodeFromString<SubscribeRequest>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<SubscribeRequest>(emptyJson)
+      testJsonIgnore.decodeFromString<SubscribeRequest>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -5762,36 +4285,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<SubscribeRequestParams>(json)
+    val decoded = testJsonBoth.decodeFromString<SubscribeRequestParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<SubscribeRequestParams>(unknownJson)
+      testJsonIgnore.decodeFromString<SubscribeRequestParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<SubscribeRequestParams>(emptyJson)
+      testJsonIgnore.decodeFromString<SubscribeRequestParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -5820,36 +4327,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<TextContent>(json)
+    val decoded = testJsonBoth.decodeFromString<TextContent>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<TextContent>(unknownJson)
+      testJsonIgnore.decodeFromString<TextContent>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<TextContent>(emptyJson)
+      testJsonIgnore.decodeFromString<TextContent>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -5878,36 +4369,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<TextResourceContents>(json)
+    val decoded = testJsonBoth.decodeFromString<TextResourceContents>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<TextResourceContents>(unknownJson)
+      testJsonIgnore.decodeFromString<TextResourceContents>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<TextResourceContents>(emptyJson)
+      testJsonIgnore.decodeFromString<TextResourceContents>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -5944,34 +4419,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<Tool>(json)
+    val decoded = testJsonBoth.decodeFromString<Tool>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<Tool>(unknownJson)
+      testJsonIgnore.decodeFromString<Tool>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json.Json { ignoreUnknownKeys = true }.decodeFromString<Tool>(emptyJson)
+      testJsonIgnore.decodeFromString<Tool>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -6004,36 +4465,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ToolInputSchema>(json)
+    val decoded = testJsonBoth.decodeFromString<ToolInputSchema>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ToolInputSchema>(unknownJson)
+      testJsonIgnore.decodeFromString<ToolInputSchema>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ToolInputSchema>(emptyJson)
+      testJsonIgnore.decodeFromString<ToolInputSchema>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -6067,36 +4512,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ToolListChangedNotification>(json)
+    val decoded = testJsonBoth.decodeFromString<ToolListChangedNotification>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ToolListChangedNotification>(unknownJson)
+      testJsonIgnore.decodeFromString<ToolListChangedNotification>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ToolListChangedNotification>(emptyJson)
+      testJsonIgnore.decodeFromString<ToolListChangedNotification>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -6127,36 +4556,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<ToolListChangedNotificationParams>(json)
+    val decoded = testJsonBoth.decodeFromString<ToolListChangedNotificationParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ToolListChangedNotificationParams>(unknownJson)
+      testJsonIgnore.decodeFromString<ToolListChangedNotificationParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<ToolListChangedNotificationParams>(emptyJson)
+      testJsonIgnore.decodeFromString<ToolListChangedNotificationParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -6185,36 +4598,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<UnsubscribeRequest>(json)
+    val decoded = testJsonBoth.decodeFromString<UnsubscribeRequest>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<UnsubscribeRequest>(unknownJson)
+      testJsonIgnore.decodeFromString<UnsubscribeRequest>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<UnsubscribeRequest>(emptyJson)
+      testJsonIgnore.decodeFromString<UnsubscribeRequest>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
@@ -6243,36 +4640,20 @@ class McpModelsCoverageTest {
     assertNotNull(obj1)
 
     // Serialization coverage
-    val json =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .encodeToString(obj1)
+    val json = testJsonBoth.encodeToString(obj1)
     assertNotNull(json)
-    val decoded =
-        kotlinx.serialization.json
-            .Json {
-              ignoreUnknownKeys = true
-              encodeDefaults = true
-            }
-            .decodeFromString<UnsubscribeRequestParams>(json)
+    val decoded = testJsonBoth.decodeFromString<UnsubscribeRequestParams>(json)
     assertEquals(obj1, decoded)
 
     // Fuzz serialization branches
     try {
       val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<UnsubscribeRequestParams>(unknownJson)
+      testJsonIgnore.decodeFromString<UnsubscribeRequestParams>(unknownJson)
     } catch (e: Exception) {}
 
     try {
       val emptyJson = "{}"
-      kotlinx.serialization.json
-          .Json { ignoreUnknownKeys = true }
-          .decodeFromString<UnsubscribeRequestParams>(emptyJson)
+      testJsonIgnore.decodeFromString<UnsubscribeRequestParams>(emptyJson)
     } catch (e: Exception) {}
 
     // Branch coverage for generated equals, hashCode, toString
