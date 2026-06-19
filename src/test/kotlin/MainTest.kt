@@ -253,8 +253,10 @@ class MainTest {
       outDir.mkdirs()
       val result = runCli(arrayOf("to_sdk", "-i", specFile.absolutePath, "-o", outDir.absolutePath))
       assertEquals(0, result)
-      assertTrue(File(outDir, "src/main/kotlin/org/example/Client.kt").exists())
+      assertTrue(
+          File(outDir, "composeApp/src/commonMain/kotlin/org/example/api/ApiClient.kt").exists())
       assertTrue(File(outDir, "build.gradle.kts").exists())
+      assertTrue(File(outDir, "composeApp/build.gradle.kts").exists())
       assertTrue(File(outDir, ".github/workflows/ci.yml").exists())
     }
   }
@@ -356,8 +358,9 @@ class MainTest {
           runCli(
               arrayOf("to_sdk", "-i", specFile.absolutePath, "-o", outDir.absolutePath, "--tests"))
       assertEquals(0, result)
-      assertTrue(File(outDir, "src/main/kotlin/org/example/Mocks.kt").exists())
-      assertTrue(File(outDir, "src/test/kotlin/org/example/ClientTest.kt").exists())
+      assertTrue(File(outDir, "composeApp/src/commonTest/kotlin/org/example/Mocks.kt").exists())
+      assertTrue(
+          File(outDir, "composeApp/src/commonTest/kotlin/org/example/ClientTest.kt").exists())
     }
   }
 
@@ -393,7 +396,8 @@ class MainTest {
               arrayOf(
                   "from_openapi", "to_sdk", "-i", specFile.absolutePath, "-o", outDir.absolutePath))
       assertEquals(0, result)
-      assertTrue(File(outDir, "src/main/kotlin/org/example/Client.kt").exists())
+      assertTrue(
+          File(outDir, "composeApp/src/commonMain/kotlin/org/example/api/ApiClient.kt").exists())
       assertTrue(File(outDir, "build.gradle.kts").exists())
     }
   }

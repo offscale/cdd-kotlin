@@ -286,3 +286,7 @@ actual fun writeToFile(path: String, content: String) {
 actual fun generateOpenApi(inputDir: String, outputFile: String) {
   throw RuntimeException("generateOpenApi is not supported on WASM")
 }
+
+actual fun generateSdkCode(inputJson: String, outputDir: String, packageName: String) {
+  throw RuntimeException("generateSdkCode is not supported on WASM")
+}

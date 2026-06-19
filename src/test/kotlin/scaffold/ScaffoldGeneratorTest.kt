@@ -109,7 +109,7 @@ class ScaffoldGeneratorTest {
     // Assert
     assertTrue(File(outputDir, "settings.gradle.kts").exists())
     assertEquals(
-        "rootProject.name = \"IdempotentTest\"\ninclude(\":composeApp\")",
+        ScaffoldTemplates.createSettingsGradle("IdempotentTest"),
         File(outputDir, "settings.gradle.kts").readText())
   }
 

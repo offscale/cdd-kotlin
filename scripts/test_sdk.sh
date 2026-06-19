@@ -8,12 +8,14 @@ OUT_DIR="out_sdk"
 rm -rf "$OUT_DIR"
 ./gradlew run --args="from_openapi to_sdk -i ${SPEC_FILE} --output ${OUT_DIR} --tests"
 
-# Create settings.gradle.kts to make it a standalone project
-cat << 'SET_EOF' > "$OUT_DIR"/settings.gradle.kts
-rootProject.name = "generated-sdk"
-SET_EOF
-
 cd "$OUT_DIR"
+
+if [ -d "$HOME/Library/Android/sdk" ]; then
+    echo "sdk.dir=$HOME/Library/Android/sdk" > local.properties
+elif [ -n "$ANDROID_HOME" ]; then
+    echo "sdk.dir=$ANDROID_HOME" > local.properties
+fi
+
 ../gradlew test || {
     echo "Tests failed!"
     exit 1

@@ -26,12 +26,14 @@ object ScaffoldTemplates {
         ktor = "2.3.12"
         coroutines = "1.8.1"
         serialization = "1.7.1"
+        datetime = "0.6.0"
 
         [libraries]
         androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidx-core-ktx" }
         androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
         kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
         kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "coroutines" }
+        kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "datetime" }
         
         # Ktor
         ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
@@ -60,6 +62,23 @@ object ScaffoldTemplates {
    */
   fun createSettingsGradle(projectName: String): String =
       """
+        pluginManagement {
+            repositories {
+                google()
+                mavenCentral()
+                gradlePluginPortal()
+                maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
+            }
+        }
+        
+        dependencyResolutionManagement {
+            repositories {
+                google()
+                mavenCentral()
+                maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
+            }
+        }
+
         rootProject.name = "$projectName"
         include(":composeApp")
     """
@@ -153,11 +172,20 @@ object ScaffoldTemplates {
                         
                         implementation(libs.kotlinx.coroutines.core)
                         implementation(libs.kotlinx.serialization.json)
+                        implementation(libs.kotlinx.datetime)
                         
                         // Ktor
                         implementation(libs.ktor.client.core)
                         implementation(libs.ktor.client.content.negotiation)
                         implementation(libs.ktor.serialization.json)
+                    }
+                }
+                
+                val commonTest by getting {
+                    dependencies {
+                        implementation(kotlin("test"))
+                        implementation(kotlin("test-common"))
+                        implementation(kotlin("test-annotations-common"))
                     }
                 }
                 
@@ -177,7 +205,8 @@ object ScaffoldTemplates {
                     }
                 }
                 
-                val iosMain by getting {
+                val iosMain by creating {
+                    dependsOn(commonMain)
                     dependencies {
                          implementation(libs.ktor.client.darwin)
                     }

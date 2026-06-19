@@ -168,6 +168,9 @@ class NetworkGenerator {
       baseImports.add("io.ktor.client.plugins.auth.providers.*")
     }
 
+    val basePackage = packageName.substringBeforeLast(".")
+    baseImports.add("${basePackage}.models.*")
+
     val importsBlock =
         """
             package $packageName
@@ -2637,7 +2640,7 @@ class NetworkGenerator {
   }
 
   /** Generates the Kotlin function signature for an endpoint. Returns Result<T>. */
-  fun generateMethodSignature(ep: EndpointDefinition): String {
+  fun generateMethodSignature(ep: EndpointDefinition, isOverride: Boolean = false): String {
     val params =
         ep.parameters
             .map { param ->
@@ -2645,27 +2648,27 @@ class NetworkGenerator {
               val type = resolveParameterType(param, optional)
               val deprecatedAnnotation =
                   if (param.deprecated) "@Deprecated(\"Deprecated parameter\") " else ""
-              val defaultValue = if (optional) " = null" else ""
+              val defaultValue = if (optional && !isOverride) " = null" else ""
               "$deprecatedAnnotation${param.name}: $type$defaultValue"
             }
             .toMutableList()
 
     val bodySignature = resolveRequestBodySignature(ep)
     if (bodySignature != null) {
-      val defaultValue = if (bodySignature.isOptional) " = null" else ""
+      val defaultValue = if (bodySignature.isOptional && !isOverride) " = null" else ""
       params.add("body: ${bodySignature.kotlinType}$defaultValue")
     }
 
     val paramString = params.joinToString(", ")
     val returnType = resolveResponseType(ep)
-
-    return "suspend fun ${ep.operationId}($paramString): Result<$returnType>"
+    val modifier = if (isOverride) "override suspend" else "suspend"
+    return "$modifier fun ${ep.operationId}($paramString): Result<$returnType>"
   }
 
   /** Generates the Ktor implementation block for an endpoint. */
   fun generateMethodImpl(ep: EndpointDefinition): String {
     val returnType = resolveResponseType(ep)
-    val signature = generateMethodSignature(ep)
+    val signature = generateMethodSignature(ep, isOverride = true)
 
     // 0. Querystring constraint (OAS 3.2): cannot mix query and querystring
     val queryParams = ep.parameters.filter { it.location == ParameterLocation.QUERY }
@@ -2876,7 +2879,7 @@ class NetworkGenerator {
         }
 
     return """
-    override $signature {
+    $signature {
         return try {
             val response = client.request("$fullUrl") {
                 method = $methodStr$paramConfig$queryStringConfig$bodyConfig
