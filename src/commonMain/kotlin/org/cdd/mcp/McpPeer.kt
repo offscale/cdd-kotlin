@@ -17,15 +17,16 @@ class McpPeer(
   private val notificationHandlers = mutableMapOf<String, (JsonElement) -> Unit>()
   private val requestHandlers = mutableMapOf<String, (JsonElement) -> JsonElement>()
 
+  private val jsonParser = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
+  private val jsonEncoder = kotlinx.serialization.json.Json { encodeDefaults = true }
+
   init {
     transport.onReceive { message -> handleMessage(message) }
 
     onRequest("initialize") { params ->
       // In a real scenario, capabilities are verified
       val requestParams =
-          kotlinx.serialization.json
-              .Json { ignoreUnknownKeys = true }
-              .decodeFromJsonElement(InitializeRequestParams.serializer(), params)
+          jsonParser.decodeFromJsonElement(InitializeRequestParams.serializer(), params)
 
       val expectedVersion = "2024-11-05" // Or whatever protocol version is expected
       val actualVersion = requestParams.protocolVersion
@@ -43,9 +44,7 @@ class McpPeer(
               serverInfo = Implementation(name = "cdd-kotlin-mcp", version = "0.0.2"),
               instructions = "cdd-kotlin MCP server")
 
-      kotlinx.serialization.json
-          .Json { encodeDefaults = true }
-          .encodeToJsonElement(InitializeResult.serializer(), result)
+      jsonEncoder.encodeToJsonElement(InitializeResult.serializer(), result)
     }
 
     onNotification("notifications/initialized") { isInitialized = true }
