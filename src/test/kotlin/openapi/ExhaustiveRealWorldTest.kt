@@ -1,15 +1,14 @@
 package openapi
 
-import java.io.File
 import org.junit.jupiter.api.Test
 
 class ExhaustiveRealWorldTest {
   @Test
   fun parseStripe() {
-    val file = File("stripe.json")
-    if (!file.exists()) return // Skip test if file is not present
+    val stream = this::class.java.classLoader.getResourceAsStream("stripe.json")
+    if (stream == null) return // Skip test if file is not present
 
-    val content = file.readText()
+    val content = stream.bufferedReader().use { it.readText() }
     val parser = OpenApiParser()
     try {
       val doc = parser.parseDocumentString(content)

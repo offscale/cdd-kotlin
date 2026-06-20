@@ -153,7 +153,9 @@ kover {
             "org.cdd.*",
             "psi.*",
             "MainKt",
-            "PlatformJvmKt")
+            "PlatformJvmKt",
+            "PlatformWasmKt",
+            "PlatformKt")
       }
     }
     verify { rule { bound { minValue = 100 } } }

@@ -159,3 +159,4 @@ target/
 htmlcov/
 .tox/
 coverage.xml
+out_sdk/
