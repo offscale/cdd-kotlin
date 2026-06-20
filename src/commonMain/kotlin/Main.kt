@@ -45,7 +45,12 @@ fun runCli(args: Array<String>): Int {
       return 0
     }
 
-    val command = if (args.size > 1 && args[0] == "from_openapi") args[1] else args[0]
+    val command =
+        if (args.size > 1 && args[0] == "from_openapi") {
+          if (args[1].startsWith("-")) "to_sdk" else args[1]
+        } else {
+          args[0]
+        }
 
     if (command == "to_sdk" || command == "to_sdk_cli") {
       return org.cdd.CddCli.generateFromOpenApi(args)
