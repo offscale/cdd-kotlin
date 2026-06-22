@@ -1,11 +1,11 @@
 build_wasm:
-	./gradlew --gradle-user-home .gradle_home compileProductionExecutableKotlinWasmWasi
+	./gradlew --gradle-user-home .gradle_home assemble
 	mkdir -p bin
-	cp build/compileSync/wasmWasi/main/productionExecutable/kotlin/cdd-kotlin.wasm bin/cdd-kotlin.wasm
+	cp build/compileSync/wasmWasi/main/productionExecutable/optimized/cdd-kotlin.wasm bin/cdd-kotlin.wasm
 
 .PHONY: run
 run:
-	./gradlew run "--args=$(filter-out $@,$(MAKECMDGOALS))"
+	./gradlew run "--args=\$(filter-out \$@,\$(MAKECMDGOALS))"
 
 %:
 	@:
