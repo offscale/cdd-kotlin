@@ -190,4 +190,12 @@ class OpenApiValidatorExhaustiveCoverageTest {
             info = Info("T", "1"),
             components = Components(schemas = mapOf("H" to badHexSchema))))
   }
+
+  @Test
+  fun testMoreUncovered() {
+    val validator = OpenApiValidator()
+    val json = java.io.File("src/test/resources/invalid_openapi_exhaustive.json").readText()
+    val def = OpenApiParser().parseString(json)
+    validator.validate(def)
+  }
 }

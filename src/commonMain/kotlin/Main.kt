@@ -52,12 +52,16 @@ fun runCli(args: Array<String>): Int {
           args[0]
         }
 
-    if (command == "to_sdk" || command == "to_sdk_cli") {
-      return org.cdd.CddCli.generateFromOpenApi(args)
+    if (command == "to_sdk" || command == "to_sdk_cli" || command == "to_server") {
+      return org.cdd.CddCli.generateFromOpenApi(args, command)
     }
 
     if (command == "to_openapi") {
       return org.cdd.CddCli.generateToOpenApi(args)
+    }
+
+    if (command == "sync") {
+      return org.cdd.SyncCli.sync(args)
     }
 
     if (command == "mcp") {

@@ -13,9 +13,10 @@ object CddCli {
    * Generates code from an OpenAPI specification.
    *
    * @param args Command-line arguments.
+   * @param target The generation target (e.g., to_sdk, to_server).
    * @return Exit code (0 for success).
    */
-  fun generateFromOpenApi(args: Array<String>): Int {
+  fun generateFromOpenApi(args: Array<String>, target: String = "to_sdk"): Int {
     var outputDir = getEnvVar("CDD_OUTPUT") ?: "out"
     var inputFile = getEnvVar("CDD_INPUT") ?: ""
     var inputDir = getEnvVar("CDD_INPUT_DIR") ?: ""
@@ -58,9 +59,13 @@ object CddCli {
               noInstallablePackage = noInstallablePackage,
               tests = tests,
               inputDir = inputDir)
-      CddGenerator.generateSdk(config)
+      if (target == "to_server") {
+        CddGenerator.generateServer(config)
+      } else {
+        CddGenerator.generateSdk(config)
+      }
     } catch (e: Exception) {
-      println("Failed to generate SDK:")
+      println("Failed to generate code:")
       e.printStackTrace()
       return 1
     }

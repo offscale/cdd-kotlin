@@ -52,6 +52,12 @@ jobs:
       - name: OpenAPI 3.2.0 Petstore test
         run: ./cdd.sh to_sdk -i ./cdd-openapi-test-harness/petstore_oas3.json
 
+      - name: Swagger 2.0 Server and Client test
+        run: bash scripts/test_server_and_client.sh ./cdd-openapi-test-harness/petstore.json
+
+      - name: OpenAPI 3.2.0 Server and Client test
+        run: bash scripts/test_server_and_client.sh ./cdd-openapi-test-harness/petstore_oas3.json
+
       - name: Build WASM
         run: make build_wasm
 

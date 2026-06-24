@@ -10,20 +10,32 @@ class ScaffoldGenerator {
       outputDirectory: String,
       projectName: String,
       packageName: String,
-      info: Info? = null
+      info: Info? = null,
+      isServer: Boolean = false,
+      withTests: Boolean = false
   ) {
     writeFile(outputDirectory, "build.gradle.kts", ScaffoldTemplates.createRootBuildGradle(info))
     writeFile(
-        outputDirectory, "settings.gradle.kts", ScaffoldTemplates.createSettingsGradle(projectName))
+        outputDirectory,
+        "settings.gradle.kts",
+        ScaffoldTemplates.createSettingsGradle(projectName, isServer))
     writeFile(outputDirectory, "gradle.properties", ScaffoldTemplates.createGradleProperties())
 
     val gradleFolder = "$outputDirectory/gradle"
-    writeFile(gradleFolder, "libs.versions.toml", ScaffoldTemplates.createVersionCatalog())
+    writeFile(gradleFolder, "libs.versions.toml", ScaffoldTemplates.createVersionCatalog(isServer))
 
-    val appDir = "$outputDirectory/composeApp"
-    writeFile(appDir, "build.gradle.kts", ScaffoldTemplates.createAppBuildGradle(packageName, info))
-
-    generateSourceSets(appDir, packageName)
+    if (isServer) {
+      val serverDir = "$outputDirectory/server"
+      writeFile(
+          serverDir,
+          "build.gradle.kts",
+          ScaffoldTemplates.createServerBuildGradle(packageName, info, withTests))
+    } else {
+      val appDir = "$outputDirectory/composeApp"
+      writeFile(
+          appDir, "build.gradle.kts", ScaffoldTemplates.createAppBuildGradle(packageName, info))
+      generateSourceSets(appDir, packageName)
+    }
   }
 
   private fun generateSourceSets(appModuleDir: String, packageName: String) {

@@ -7,3 +7,12 @@ expect fun writeToFile(path: String, content: String)
 expect fun generateOpenApi(inputDir: String, outputFile: String)
 
 expect fun generateSdkCode(inputJson: String, outputDir: String, packageName: String)
+
+expect fun generateServerCode(
+    inputJson: String,
+    outputDir: String,
+    packageName: String,
+    withTests: Boolean
+)
+
+expect fun performSync(inputDir: String, truth: String)

@@ -12,8 +12,42 @@ object ScaffoldTemplates {
    * Generates the content for gradle/libs.versions.toml. Defines versions for Kotlin, Compose,
    * Ktor, and Serialization.
    */
-  fun createVersionCatalog(): String =
-      """
+  fun createVersionCatalog(isServer: Boolean = false): String {
+    val serverVersions =
+        if (isServer)
+            """
+        exposed = "0.53.0"
+        faker = "1.15.0"
+        sqlite = "3.46.0.0"
+        postgresql = "42.7.3"
+        cli = "4.2.2"
+"""
+        else ""
+
+    val serverLibs =
+        if (isServer)
+            """
+        # Server dependencies
+        ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor" }
+        ktor-server-netty = { module = "io.ktor:ktor-server-netty", version.ref = "ktor" }
+        ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor" }
+        ktor-server-cors = { module = "io.ktor:ktor-server-cors", version.ref = "ktor" }
+        ktor-server-test-host = { module = "io.ktor:ktor-server-test-host", version.ref = "ktor" }
+        
+        # ORM & DB
+        exposed-core = { module = "org.jetbrains.exposed:exposed-core", version.ref = "exposed" }
+        exposed-dao = { module = "org.jetbrains.exposed:exposed-dao", version.ref = "exposed" }
+        exposed-jdbc = { module = "org.jetbrains.exposed:exposed-jdbc", version.ref = "exposed" }
+        sqlite-jdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqlite" }
+        postgresql = { module = "org.postgresql:postgresql", version.ref = "postgresql" }
+        
+        # Faker & CLI
+        faker = { module = "io.github.serpro69:kotlin-faker", version.ref = "faker" }
+        clikt = { module = "com.github.ajalt.clikt:clikt", version.ref = "cli" }
+"""
+        else ""
+
+    return """
         [versions]
         agp = "8.2.2"
         android-compileSdk = "34"
@@ -27,7 +61,7 @@ object ScaffoldTemplates {
         coroutines = "1.8.1"
         serialization = "1.7.1"
         datetime = "0.6.0"
-
+$serverVersions
         [libraries]
         androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidx-core-ktx" }
         androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activityCompose" }
@@ -40,11 +74,12 @@ object ScaffoldTemplates {
         ktor-client-okhttp = { module = "io.ktor:ktor-client-okhttp", version.ref = "ktor" }
         ktor-client-darwin = { module = "io.ktor:ktor-client-darwin", version.ref = "ktor" }
         ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+        ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
         ktor-serialization-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
         
         # Serialization
         kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
-
+$serverLibs
         [plugins]
         androidApplication = { id = "com.android.application", version.ref = "agp" }
         androidLibrary = { id = "com.android.library", version.ref = "agp" }
@@ -53,15 +88,17 @@ object ScaffoldTemplates {
         kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
         kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
     """
-          .trimIndent()
+        .trimIndent()
+  }
 
   /**
    * Generates the root settings.gradle.kts file.
    *
    * @param projectName The name of the project to include.
    */
-  fun createSettingsGradle(projectName: String): String =
-      """
+  fun createSettingsGradle(projectName: String, isServer: Boolean = false): String {
+    val includes = if (isServer) "include(\":server\")" else "include(\":composeApp\")"
+    return """
         pluginManagement {
             repositories {
                 google()
@@ -80,9 +117,10 @@ object ScaffoldTemplates {
         }
 
         rootProject.name = "$projectName"
-        include(":composeApp")
+        $includes
     """
-          .trimIndent()
+        .trimIndent()
+  }
 
   /**
    * Generates the root build.gradle.kts file. Sets up the plugins for the overall project context.
@@ -294,4 +332,74 @@ object ScaffoldTemplates {
         }
     """
           .trimIndent()
+
+  /**
+   * Generates the module-level build.gradle.kts for the 'server' module.
+   *
+   * @param namespace The package name.
+   * @param info Optional Info metadata.
+   */
+  fun createServerBuildGradle(namespace: String, info: Info?, withTests: Boolean = false): String {
+    val versionNameStr = if (info != null && info.version.isNotEmpty()) info.version else "1.0"
+
+    val testBlock =
+        if (withTests)
+            """
+                val jvmTest by getting {
+                    kotlin.srcDir("src/test/kotlin")
+                    dependencies {
+                        implementation(kotlin("test"))
+                        implementation(kotlin("test-junit5"))
+                        implementation("org.junit.jupiter:junit-jupiter:5.10.0")
+                        implementation(libs.ktor.server.test.host)
+                    }
+                }
+    """
+        else ""
+
+    return """
+        plugins {
+            alias(libs.plugins.kotlinMultiplatform)
+            alias(libs.plugins.kotlinSerialization)
+        }
+
+        kotlin {
+            jvm {
+                mainRun {
+                    mainClass.set("$namespace.MainKt")
+                }
+            }
+
+            sourceSets {
+                val jvmMain by getting {
+                    kotlin.srcDir("src/main/kotlin")
+                    dependencies {
+                        implementation(libs.kotlinx.coroutines.core)
+                        implementation(libs.kotlinx.serialization.json)
+                        implementation(libs.kotlinx.datetime)
+                        
+                        implementation(libs.ktor.server.core)
+                        implementation(libs.ktor.server.netty)
+                        implementation(libs.ktor.server.content.negotiation)
+                        implementation(libs.ktor.server.cors)
+                        implementation(libs.ktor.serialization.json)
+                        implementation(libs.ktor.client.core)
+                        implementation(libs.ktor.client.cio)
+                        
+                        implementation(libs.exposed.core)
+                        implementation(libs.exposed.dao)
+                        implementation(libs.exposed.jdbc)
+                        implementation(libs.sqlite.jdbc)
+                        implementation(libs.postgresql)
+                        
+                        implementation(libs.faker)
+                        implementation(libs.clikt)
+                    }
+                }
+                $testBlock
+            }
+        }
+    """
+        .trimIndent()
+  }
 }

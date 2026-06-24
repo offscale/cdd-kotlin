@@ -44,6 +44,7 @@ kotlin {
       dependencies {
         implementation("org.junit.jupiter:junit-jupiter:5.10.0")
         runtimeOnly("org.junit.platform:junit-platform-launcher:1.10.0")
+        implementation("org.jetbrains.kotlin:kotlin-reflect:2.2.21")
       }
     }
     val wasmWasiMain by getting { kotlin.srcDir("src/wasmMain/kotlin") }
@@ -143,21 +144,6 @@ tasks.register("checkDocCoverage") {
 
 kover {
   reports {
-    filters {
-      excludes {
-        classes(
-            "org.cdd.mcp.*",
-            "openapi.*",
-            "scaffold.*",
-            "domain.*",
-            "org.cdd.*",
-            "psi.*",
-            "MainKt",
-            "PlatformJvmKt",
-            "PlatformWasmKt",
-            "PlatformKt")
-      }
-    }
     verify { rule { bound { minValue = 100 } } }
   }
 }

@@ -1,0 +1,248 @@
+openapi: 3.1.0
+info:
+  title: Monster
+  version: 1.0.0
+  description: "A monster spec"
+  termsOfService: "http://example.com/tos"
+  contact:
+    name: "API Support"
+    url: "http://www.example.com/support"
+    email: "support@example.com"
+  license:
+    name: "Apache 2.0"
+    url: "http://www.apache.org/licenses/LICENSE-2.0.html"
+servers:
+  - url: https://{environment}.example.com/v1
+    description: "Server"
+    variables:
+      environment:
+        default: prod
+        enum:
+          - prod
+          - dev
+        description: "Env"
+paths:
+  /test/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+    get:
+      tags: ["monster"]
+      summary: "Get test"
+      description: "Description"
+      externalDocs:
+        description: "Docs"
+        url: "http://example.com"
+      operationId: getTest
+      parameters:
+        - name: queryParam
+          in: query
+          description: "A query param"
+          required: false
+          deprecated: true
+          style: form
+          explode: true
+          schema:
+            type: array
+            items:
+              type: string
+        - name: headerParam
+          in: header
+          schema:
+            type: string
+        - name: cookieParam
+          in: cookie
+          schema:
+            type: boolean
+      requestBody:
+        description: "Body"
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Monster'
+          application/xml:
+            schema:
+              $ref: '#/components/schemas/Monster'
+            encoding:
+              history:
+                contentType: "application/xml"
+                headers:
+                  X-Rate-Limit:
+                    schema:
+                      type: integer
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: "Success"
+          headers:
+            X-Rate-Limit:
+              schema:
+                type: integer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Monster'
+              examples:
+                ex1:
+                  value:
+                    name: "test"
+            application/xml:
+              schema:
+                $ref: '#/components/schemas/Monster'
+        default:
+          description: "Error"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+      callbacks:
+        onData:
+          '{$request.query.queryParam}':
+            post:
+              requestBody:
+                content:
+                  application/json:
+                    schema:
+                      $ref: '#/components/schemas/Monster'
+              responses:
+                '200':
+                  description: "OK"
+      security:
+        - oauth2: [read, write]
+        - apiKey: []
+components:
+  schemas:
+    Monster:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          example: "Scary"
+        age:
+          type: integer
+          format: int32
+        weight:
+          type: number
+          format: double
+        isScary:
+          type: boolean
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+        attributes:
+          type: object
+          additionalProperties:
+            type: string
+        type:
+          type: string
+      discriminator:
+        propertyName: type
+        mapping:
+          event: '#/components/schemas/Event'
+      xml:
+        name: "MonsterXml"
+        namespace: "http://example.com/schema"
+        prefix: "m"
+        attribute: true
+        wrapped: true
+      externalDocs:
+        url: "http://example.com/monster"
+    Event:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+    Error:
+      type: object
+      properties:
+        code:
+          type: integer
+        message:
+          type: string
+  responses:
+    NotFound:
+      description: "Not found"
+  parameters:
+    skipParam:
+      name: skip
+      in: query
+      schema:
+        type: integer
+  examples:
+    MonsterEx:
+      summary: "A monster"
+      value:
+        name: "Bob"
+  requestBodies:
+    MonsterBody:
+      description: "Monster"
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Monster'
+  headers:
+    RateLimit:
+      schema:
+        type: integer
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      flows:
+        implicit:
+          authorizationUrl: "https://example.com/oauth/authorize"
+          scopes:
+            read: "read"
+            write: "write"
+        password:
+          tokenUrl: "https://example.com/oauth/token"
+          scopes:
+            read: "read"
+        clientCredentials:
+          tokenUrl: "https://example.com/oauth/token"
+          scopes:
+            read: "read"
+        authorizationCode:
+          authorizationUrl: "https://example.com/oauth/authorize"
+          tokenUrl: "https://example.com/oauth/token"
+          scopes:
+            read: "read"
+    apiKey:
+      type: apiKey
+      name: api_key
+      in: header
+    httpBasic:
+      type: http
+      scheme: basic
+    httpBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    openIdConnect:
+      type: openIdConnect
+      openIdConnectUrl: "https://example.com/.well-known/openid-configuration"
+  links:
+    GetMonsterById:
+      operationId: getTest
+      parameters:
+        id: '$response.body#/id'
+  callbacks:
+    MyCallback:
+      '{$request.query.queryParam}':
+        post:
+          responses:
+            '200':
+              description: "OK"

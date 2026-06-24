@@ -108,3 +108,29 @@ at your option.
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
+
+## Unified CLI Toolset
+CDD Server generation exposes the following CLI subcommands and options:
+* `cdd-kotlin from_openapi to_sdk -i spec.json` - Generates a Kotlin Multiplatform Client SDK.
+* `cdd-kotlin from_openapi to_sdk_cli -i spec.json` - Generates a Kotlin Multiplatform Client SDK and a CLI.
+* `cdd-kotlin from_openapi to_server -i spec.json` - Generates an exhaustive Mock Server implementation.
+* `cdd-kotlin to_docs_json -i spec.json` - Generates JSON documentation.
+* `cdd-kotlin mcp` - Starts the Model Context Protocol stdio server.
+
+### Decoupled CDD Server Modes
+When running the generated server (`cdd-kotlin from_openapi to_server -i spec.json`), the generated artifact includes a standalone CLI that supports the following decoupled modes for realistic or sandbox mock environments:
+
+* `start` (No DB configured): **Stub Mode**. Server runs using traditional scaffolds, endpoints return `NotImplementedError` or empty bodies.
+* `start` (With `DATABASE_URL`): **Production Mode**. Uses actual ORM interactions against a real database.
+* `start --ephemeral`: **Sandbox Mode**. Uses actual ORM interactions against a fresh, throwaway database (SQLite memory database).
+* `start --ephemeral --seed`: **Full Mock Mode**. Ephemeral database, automatically populated with a localized fake data graph honoring all referential dependencies using `kotlin-faker`.
+
+### Webhooks & Administrative Triggers
+If the OpenAPI specification defines callbacks or webhooks, the generated server exposes an administrative trigger endpoint that acts as a dispatch mechanism:
+
+* `POST /_mock/trigger-webhook/{webhookName}?targetUrl=<URL>`
+This dummy endpoint utilizes an internal HTTP client to immediately dispatch a mock JSON payload representing the given `{webhookName}` to the specified `targetUrl` parameter, returning an HTTP `202 Accepted` response.
+
+### Contract Synchronization
+To force data classes, ORM layers, and API representations into sync based on a specified source of truth, utilize:
+* `cdd-kotlin sync -i <source_dir> --truth class`

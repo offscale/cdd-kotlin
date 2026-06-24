@@ -1,0 +1,188 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mega Spec",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/everything": {
+      "get": {
+        "operationId": "getEverything",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "h",
+            "in": "header",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "c",
+            "in": "cookie",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "p",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AllTypes"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "postEverything",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AllTypes"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            },
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "formField": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AllTypes": {
+        "type": "object",
+        "properties": {
+          "str": {
+            "type": "string"
+          },
+          "int": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "num": {
+            "type": "number",
+            "format": "double"
+          },
+          "bool": {
+            "type": "boolean"
+          },
+          "arr": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "obj": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer"
+            }
+          },
+          "enm": {
+            "type": "string",
+            "enum": [
+              "A",
+              "B"
+            ]
+          },
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "dt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "uri": {
+            "type": "string",
+            "format": "uri"
+          },
+          "all": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Base"
+              }
+            ]
+          },
+          "any": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "one": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          }
+        }
+      },
+      "Base": {
+        "type": "object",
+        "properties": {
+          "baseProp": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

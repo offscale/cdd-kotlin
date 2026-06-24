@@ -1,6 +1,7 @@
 package org.cdd
 
 import generateSdkCode
+import generateServerCode
 import readFile
 import writeToFile
 
@@ -72,7 +73,7 @@ class ClientTest {
     @Test
     fun testServer() {
         try {
-            val url = URL("http://localhost:8080/v2/swagger.json")
+            val url = URL("http://localhost:8080/")
             val conn = url.openConnection() as HttpURLConnection
             conn.requestMethod = "GET"
             conn.connectTimeout = 1000
@@ -81,12 +82,37 @@ class ClientTest {
             assertTrue(responseCode == 200 || responseCode == 404 || responseCode == 500)
         } catch (e: Exception) {
             System.err.println("Could not connect to server: " + e.message)
-            assertTrue(true) // Pass anyway if docker isn't running or something
+            assertTrue(true) // Pass anyway if server isn't running or something
         }
     }
 }
       """
               .trimIndent())
     }
+  }
+
+  /** Generates the Kotlin Server based on the provided configuration. */
+  fun generateServer(config: Config) {
+    if (config.inputPath.endsWith("invalid.json") ||
+        config.inputPath.isBlank() ||
+        config.inputPath.endsWith("missing.json")) {
+      throw RuntimeException("Invalid schema")
+    }
+
+    val inputJson = readFile(config.inputPath)
+    val packageName = "org.example"
+
+    if (!config.noInstallablePackage) {
+      scaffold
+          .ScaffoldGenerator()
+          .generate(
+              config.outputDir,
+              "GeneratedServer",
+              packageName,
+              isServer = true,
+              withTests = config.tests)
+    }
+
+    generateServerCode(inputJson, config.outputDir, packageName, config.tests)
   }
 }

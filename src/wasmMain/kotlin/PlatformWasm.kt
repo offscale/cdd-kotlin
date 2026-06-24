@@ -290,3 +290,16 @@ actual fun generateOpenApi(inputDir: String, outputFile: String) {
 actual fun generateSdkCode(inputJson: String, outputDir: String, packageName: String) {
   throw RuntimeException("generateSdkCode is not supported on WASM")
 }
+
+actual fun generateServerCode(
+    inputJson: String,
+    outputDir: String,
+    packageName: String,
+    withTests: Boolean
+) {
+  throw RuntimeException("generateServerCode is not supported on WASM")
+}
+
+actual fun performSync(inputDir: String, truth: String) {
+  throw RuntimeException("performSync is not supported on WASM")
+}
