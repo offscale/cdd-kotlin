@@ -2,8 +2,9 @@
 set -e
 
 SPEC_FILE=$1
+SPEC_BASENAME=$(basename "$SPEC_FILE" .json)
 
-OUT_DIR="out_server"
+OUT_DIR="out_server_${SPEC_BASENAME}"
 rm -rf "$OUT_DIR"
 
 # 1. Generate the Server Artifact
@@ -56,7 +57,8 @@ echo "Running Category 2: Stub Tests (No DB)"
 ../gradlew :server:jvmRun --args="" &
 SERVER_PID=$!
 run_e2e_tests
-kill $SERVER_PID
+kill $SERVER_PID || true
+wait $SERVER_PID 2>/dev/null || true
 sleep 1
 
 # 5. Run Category 3: Stateful Ephemeral Tests
@@ -64,7 +66,8 @@ echo "Running Category 3: Stateful Ephemeral Tests"
 ../gradlew :server:jvmRun --args="--ephemeral" &
 SERVER_PID=$!
 run_e2e_tests
-kill $SERVER_PID
+kill $SERVER_PID || true
+wait $SERVER_PID 2>/dev/null || true
 sleep 1
 
 # 6. Run Category 4: Seeded Mock Tests
@@ -72,6 +75,7 @@ echo "Running Category 4: Seeded Mock Tests"
 ../gradlew :server:jvmRun --args="--ephemeral --seed" &
 SERVER_PID=$!
 run_e2e_tests
-kill $SERVER_PID
+kill $SERVER_PID || true
+wait $SERVER_PID 2>/dev/null || true
 
 echo "All Test Categories Passed!"

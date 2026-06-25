@@ -160,3 +160,7 @@ htmlcov/
 .tox/
 coverage.xml
 out_sdk/
+out_sdk_*/
+out_server_*/
+out_sdk_integration_*/
+out_server_integration_*/

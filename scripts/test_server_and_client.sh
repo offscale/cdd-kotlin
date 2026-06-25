@@ -2,9 +2,10 @@
 set -e
 
 SPEC_FILE=$1
+SPEC_BASENAME=$(basename "$SPEC_FILE" .json)
 
-OUT_DIR_SERVER="out_server_integration"
-OUT_DIR_SDK="out_sdk_integration"
+OUT_DIR_SERVER="out_server_integration_${SPEC_BASENAME}"
+OUT_DIR_SDK="out_sdk_integration_${SPEC_BASENAME}"
 rm -rf "$OUT_DIR_SERVER" "$OUT_DIR_SDK"
 
 # 1. Generate the Server Artifact
@@ -34,6 +35,7 @@ while ! curl -s http://localhost:$PORT/ > /dev/null; do
     if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
         echo "Server failed to start!"
         kill $SERVER_PID || true
+        wait $SERVER_PID 2>/dev/null || true
         exit 1
     fi
     sleep 2
@@ -54,10 +56,12 @@ echo "Running SDK Tests against the mock server"
 ../gradlew test || {
     echo "SDK Tests failed!"
     kill $SERVER_PID || true
+    wait $SERVER_PID 2>/dev/null || true
     exit 1
 }
 
 echo "Killing server..."
 kill $SERVER_PID || true
+wait $SERVER_PID 2>/dev/null || true
 
 echo "Integration Test Passed!"

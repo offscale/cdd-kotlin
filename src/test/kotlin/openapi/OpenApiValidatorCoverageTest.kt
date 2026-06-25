@@ -158,5 +158,112 @@ class OpenApiValidatorCoverageTest {
             paths = emptyMap(),
             jsonSchemaDialect = "unknown",
             components = Components()))
+
+    // Extra coverage for specific branches
+    val extraDef =
+        OpenApiDefinition(
+            openapi = "3.1.0",
+            info = info,
+            paths =
+                mapOf(
+                    "/extra" to
+                        PathItem(
+                            parameters =
+                                listOf(
+                                    EndpointParameter(
+                                        name = "q",
+                                        location = ParameterLocation.QUERY,
+                                        type = "string")),
+                            get =
+                                EndpointDefinition(
+                                    operationId = "extraGet",
+                                    method = HttpMethod.GET,
+                                    path = "/extra",
+                                    parameters =
+                                        listOf(
+                                            EndpointParameter(
+                                                name = "q",
+                                                location = ParameterLocation.QUERY,
+                                                type = "string")),
+                                    responses =
+                                        mapOf(
+                                            "200" to
+                                                EndpointResponse(
+                                                    statusCode = "200",
+                                                    headers =
+                                                        mapOf(
+                                                            "H1" to Header(type = "string"),
+                                                            "H2" to
+                                                                Header(
+                                                                    type = "string",
+                                                                    reference =
+                                                                        ReferenceObject(
+                                                                            "#/components/headers/Missing"))),
+                                                    content =
+                                                        mapOf(
+                                                            "application/json" to
+                                                                MediaTypeObject(
+                                                                    schema =
+                                                                        SchemaProperty(
+                                                                            type = "string"),
+                                                                    encoding =
+                                                                        mapOf(
+                                                                            "prop" to
+                                                                                EncodingObject(
+                                                                                    contentType =
+                                                                                        "image/png",
+                                                                                    headers =
+                                                                                        mapOf(
+                                                                                            "EH" to
+                                                                                                Header(
+                                                                                                    type =
+                                                                                                        "string")),
+                                                                                    style =
+                                                                                        ParameterStyle
+                                                                                            .SIMPLE,
+                                                                                    explode = true,
+                                                                                    allowReserved =
+                                                                                        false))))))))),
+            components =
+                Components(
+                    securitySchemes =
+                        mapOf(
+                            "oauth2" to
+                                SecurityScheme(
+                                    type = "oauth2",
+                                    flows =
+                                        OAuthFlows(
+                                            implicit =
+                                                OAuthFlow(
+                                                    authorizationUrl = "https://a.b",
+                                                    scopes = mapOf("s" to "desc")),
+                                            password =
+                                                OAuthFlow(
+                                                    tokenUrl = "https://a.b",
+                                                    scopes = mapOf("s" to "desc")),
+                                            clientCredentials =
+                                                OAuthFlow(
+                                                    tokenUrl = "https://a.b",
+                                                    scopes = mapOf("s" to "desc")),
+                                            authorizationCode =
+                                                OAuthFlow(
+                                                    authorizationUrl = "https://a.b",
+                                                    tokenUrl = "https://a.b",
+                                                    scopes = mapOf("s" to "desc")))),
+                            "openId" to
+                                SecurityScheme(
+                                    type = "openIdConnect", openIdConnectUrl = "https://a.b"),
+                            "http" to
+                                SecurityScheme(
+                                    type = "http", scheme = "bearer", bearerFormat = "JWT")),
+                    parameters =
+                        mapOf(
+                            "P2" to
+                                EndpointParameter(
+                                    name = "p",
+                                    location = ParameterLocation.QUERY,
+                                    type = "string")),
+                    headers = mapOf("H3" to Header(type = "string"))))
+    validator.validate(extraDef)
   }
 }
