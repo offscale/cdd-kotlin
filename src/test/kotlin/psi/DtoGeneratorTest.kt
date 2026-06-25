@@ -13,6 +13,92 @@ import org.junit.jupiter.api.TestInstance
 
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DtoGeneratorTest {
+  @Test
+  fun testSchemaPropertyToDocValueExhaustive() {
+    val generator = DtoGenerator()
+    val method =
+        DtoGenerator::class
+            .java
+            .getDeclaredMethod("schemaPropertyToDocValue", domain.SchemaProperty::class.java)
+    method.isAccessible = true
+
+    val schema =
+        domain.SchemaProperty(
+            booleanSchema = null,
+            types = setOf("string"),
+            schemaId = "id",
+            schemaDialect = "dialect",
+            anchor = "anchor",
+            dynamicAnchor = "dynAnchor",
+            comment = "comment",
+            format = "format",
+            contentMediaType = "media",
+            contentEncoding = "enc",
+            minLength = 1,
+            maxLength = 2,
+            pattern = "pat",
+            enumValues = listOf("A"),
+            minimum = 1.0,
+            maximum = 2.0,
+            multipleOf = 3.0,
+            exclusiveMinimum = 1.0,
+            exclusiveMaximum = 2.0,
+            minItems = 1,
+            maxItems = 2,
+            uniqueItems = true,
+            minProperties = 1,
+            maxProperties = 2,
+            items = domain.SchemaProperty(types = setOf("string")),
+            prefixItems = listOf(domain.SchemaProperty(types = setOf("string"))),
+            contains = domain.SchemaProperty(types = setOf("string")),
+            minContains = 1,
+            maxContains = 2,
+            properties = mapOf("a" to domain.SchemaProperty(types = setOf("string"))),
+            required = listOf("a"),
+            additionalProperties = domain.SchemaProperty(types = setOf("string")),
+            defs = mapOf("a" to domain.SchemaProperty(types = setOf("string"))),
+            description = "desc",
+            title = "title",
+            defaultValue = "def",
+            constValue = "const",
+            deprecated = true,
+            readOnly = true,
+            writeOnly = true,
+            externalDocs = domain.ExternalDocumentation("url", "desc"),
+            discriminator = domain.Discriminator("prop", mapOf()),
+            oneOf = listOf(domain.SchemaProperty(types = setOf("string"))),
+            anyOf = listOf(domain.SchemaProperty(types = setOf("string"))),
+            allOf = listOf(domain.SchemaProperty(types = setOf("string"))),
+            not = domain.SchemaProperty(types = setOf("string")),
+            ifSchema = domain.SchemaProperty(types = setOf("string")),
+            thenSchema = domain.SchemaProperty(types = setOf("string")),
+            elseSchema = domain.SchemaProperty(types = setOf("string")),
+            example = domain.ExampleObject("ex"),
+            examples = listOf("ex"),
+            xml = domain.Xml("name", "ns", "prefix", "text", true, true),
+            patternProperties = mapOf("a" to domain.SchemaProperty(types = setOf("string"))),
+            propertyNames = domain.SchemaProperty(types = setOf("string")),
+            dependentRequired = mapOf("a" to listOf("b")),
+            dependentSchemas = mapOf("a" to domain.SchemaProperty(types = setOf("string"))),
+            unevaluatedProperties = domain.SchemaProperty(types = setOf("string")),
+            unevaluatedItems = domain.SchemaProperty(types = setOf("string")),
+            contentSchema = domain.SchemaProperty(types = setOf("string")),
+            customKeywords = mapOf("x-key" to "val"),
+            extensions = mapOf("x-ext" to "val"))
+
+    val result = method.invoke(generator, schema) as Map<String, Any?>
+    org.junit.jupiter.api.Assertions.assertTrue(result.isNotEmpty())
+
+    // Also test booleanSchema
+    val boolSchema = domain.SchemaProperty(booleanSchema = true)
+    val result2 = method.invoke(generator, boolSchema) as Boolean
+    org.junit.jupiter.api.Assertions.assertTrue(result2)
+
+    // Also test dynamicRef
+    val dynRefSchema = domain.SchemaProperty(dynamicRef = "ref")
+    val result3 = method.invoke(generator, dynRefSchema) as Map<String, Any?>
+    org.junit.jupiter.api.Assertions.assertTrue(result3.isNotEmpty())
+  }
 
   private val generator = DtoGenerator()
 

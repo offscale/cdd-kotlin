@@ -42,6 +42,18 @@ class BruteForceTest {
             "psi.NetworkParser",
             "domain.OpenApiPathFlattener",
             "org.cdd.CddCli",
+            "org.cdd.mcp.McpPeer",
+            "org.cdd.mcp.StdioTransportImpl",
+            "org.cdd.SyncCli",
+            "org.cdd.CddGenerator",
+            "psi.DaoTestGenerator",
+            "scaffold.ScaffoldTemplates",
+            "psi.ReferenceResolver",
+            "psi.SeederGenerator",
+            "psi.SeederTestGenerator",
+            "psi.ServerMainTestGenerator",
+            "psi.SyncGenerator",
+            "PlatformJvmKt",
             "MainKt")
 
     for (className in classNames) {

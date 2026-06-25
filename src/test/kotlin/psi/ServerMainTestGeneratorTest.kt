@@ -8,7 +8,13 @@ class ServerMainTestGeneratorTest {
   fun `generateServerMainTestModule produces expected tests`() {
     val generator = ServerMainTestGenerator()
     val result =
-        generator.generateServerMainTests("com.example", emptyList()).values.joinToString("\n")
+        generator
+            .generateServerMainTests(
+                "com.example",
+                listOf(
+                    domain.SchemaDefinition(name = "User"), domain.SchemaDefinition(name = "Post")))
+            .values
+            .joinToString("\n")
 
     assertTrue(result.contains("class MockServerCliTest"), "Missing MockServerCliTest")
     assertTrue(

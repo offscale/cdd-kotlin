@@ -33,7 +33,7 @@ echo "Waiting for server to start on port $PORT..."
 while ! curl -s http://localhost:$PORT/ > /dev/null; do
     if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
         echo "Server failed to start!"
-        kill $SERVER_PID
+        kill $SERVER_PID || true
         exit 1
     fi
     sleep 2
@@ -53,11 +53,11 @@ fi
 echo "Running SDK Tests against the mock server"
 ../gradlew test || {
     echo "SDK Tests failed!"
-    kill $SERVER_PID
+    kill $SERVER_PID || true
     exit 1
 }
 
 echo "Killing server..."
-kill $SERVER_PID
+kill $SERVER_PID || true
 
 echo "Integration Test Passed!"

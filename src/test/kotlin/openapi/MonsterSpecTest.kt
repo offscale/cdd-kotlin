@@ -1,8 +1,8 @@
 package openapi
 
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.Assertions.*
 import java.io.File
+import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Test
 
 class MonsterSpecTest {
   @Test
@@ -14,7 +14,7 @@ class MonsterSpecTest {
     assertTrue(doc is OpenApiDocument.OpenApi)
     val validator = OpenApiValidator()
     validator.validate((doc as OpenApiDocument.OpenApi).definition)
-    
+
     val writer = OpenApiWriter()
     val outStr = writer.writeYaml(doc.definition)
     assertTrue(outStr.contains("Monster"))

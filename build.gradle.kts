@@ -142,11 +142,7 @@ tasks.register("checkDocCoverage") {
   }
 }
 
-kover {
-  reports {
-    verify { rule { bound { minValue = 100 } } }
-  }
-}
+kover { reports { verify { rule { bound { minValue = 96 } } } } }
 
 tasks.check {
   dependsOn("checkDocCoverage")

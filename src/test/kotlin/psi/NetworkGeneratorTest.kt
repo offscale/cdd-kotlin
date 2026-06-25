@@ -34,6 +34,145 @@ import org.junit.jupiter.api.TestInstance
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class NetworkGeneratorTest {
 
+  @Test
+  fun testExhaustiveQueryObjectAndArray() {
+    val endpoints =
+        listOf(
+            EndpointDefinition(
+                path = "/objects",
+                method = HttpMethod.GET,
+                operationId = "getObjects",
+                responses = mapOf("200" to EndpointResponse("200", type = "Unit")),
+                parameters =
+                    listOf(
+                        EndpointParameter(
+                            "o1",
+                            "Map<String, String>",
+                            ParameterLocation.QUERY,
+                            style = ParameterStyle.FORM,
+                            explode = false),
+                        EndpointParameter(
+                            "o2",
+                            "Map<String, String>",
+                            ParameterLocation.QUERY,
+                            style = ParameterStyle.FORM,
+                            explode = true),
+                        EndpointParameter(
+                            "o3",
+                            "Map<String, String>",
+                            ParameterLocation.QUERY,
+                            style = ParameterStyle.DEEP_OBJECT,
+                            explode = false),
+                        EndpointParameter(
+                            "o4",
+                            "Map<String, String>",
+                            ParameterLocation.QUERY,
+                            style = ParameterStyle.SPACE_DELIMITED,
+                            explode = false),
+                        EndpointParameter(
+                            "o5",
+                            "Map<String, String>",
+                            ParameterLocation.QUERY,
+                            style = ParameterStyle.PIPE_DELIMITED,
+                            explode = false),
+                        EndpointParameter(
+                            "a1",
+                            "List<String>",
+                            ParameterLocation.QUERY,
+                            style = ParameterStyle.FORM,
+                            explode = false),
+                        EndpointParameter(
+                            "a2",
+                            "List<String>",
+                            ParameterLocation.QUERY,
+                            style = ParameterStyle.FORM,
+                            explode = true),
+                        EndpointParameter(
+                            "a3",
+                            "List<String>",
+                            ParameterLocation.QUERY,
+                            style = ParameterStyle.SPACE_DELIMITED,
+                            explode = false),
+                        EndpointParameter(
+                            "a4",
+                            "List<String>",
+                            ParameterLocation.QUERY,
+                            style = ParameterStyle.PIPE_DELIMITED,
+                            explode = false))),
+            EndpointDefinition(
+                path = "/objects_reserved",
+                method = HttpMethod.GET,
+                operationId = "getObjectsReserved",
+                responses = mapOf("200" to EndpointResponse("200", type = "Unit")),
+                parameters =
+                    listOf(
+                        EndpointParameter(
+                            "or1",
+                            "Map<String, String>",
+                            ParameterLocation.QUERY,
+                            style = ParameterStyle.FORM,
+                            explode = false,
+                            allowReserved = true),
+                        EndpointParameter(
+                            "or2",
+                            "Map<String, String>",
+                            ParameterLocation.QUERY,
+                            style = ParameterStyle.FORM,
+                            explode = true,
+                            allowReserved = true),
+                        EndpointParameter(
+                            "or3",
+                            "Map<String, String>",
+                            ParameterLocation.QUERY,
+                            style = ParameterStyle.DEEP_OBJECT,
+                            explode = false,
+                            allowReserved = true),
+                        EndpointParameter(
+                            "or4",
+                            "Map<String, String>",
+                            ParameterLocation.QUERY,
+                            style = ParameterStyle.SPACE_DELIMITED,
+                            explode = false,
+                            allowReserved = true),
+                        EndpointParameter(
+                            "or5",
+                            "Map<String, String>",
+                            ParameterLocation.QUERY,
+                            style = ParameterStyle.PIPE_DELIMITED,
+                            explode = false,
+                            allowReserved = true),
+                        EndpointParameter(
+                            "ar1",
+                            "List<String>",
+                            ParameterLocation.QUERY,
+                            style = ParameterStyle.FORM,
+                            explode = false,
+                            allowReserved = true),
+                        EndpointParameter(
+                            "ar2",
+                            "List<String>",
+                            ParameterLocation.QUERY,
+                            style = ParameterStyle.FORM,
+                            explode = true,
+                            allowReserved = true),
+                        EndpointParameter(
+                            "ar3",
+                            "List<String>",
+                            ParameterLocation.QUERY,
+                            style = ParameterStyle.SPACE_DELIMITED,
+                            explode = false,
+                            allowReserved = true),
+                        EndpointParameter(
+                            "ar4",
+                            "List<String>",
+                            ParameterLocation.QUERY,
+                            style = ParameterStyle.PIPE_DELIMITED,
+                            explode = false,
+                            allowReserved = true))))
+    val text = NetworkGenerator().generateApi("com.test", "ExhaustiveApi", endpoints).text
+    assertTrue(text.contains("o1"))
+  }
+
   private val generator = NetworkGenerator()
 
   @AfterAll
