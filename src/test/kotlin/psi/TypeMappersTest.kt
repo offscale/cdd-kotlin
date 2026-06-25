@@ -107,4 +107,74 @@ class TypeMappersTest {
     val fallback = TypeMappers.kotlinToSchemaProperty("custom")
     assertEquals(setOf("string"), fallback.types)
   }
+
+  class UnknownType
+
+  @Test
+  fun `TypeMappers exhaustive cases`() {
+
+    // format = float
+    val floatProp = SchemaProperty(type = "number", format = "float")
+    assertEquals("Float", TypeMappers.mapType(floatProp))
+
+    // constValue = unknown class
+    val unknownConstProp = SchemaProperty(constValue = UnknownType())
+    assertEquals("String", TypeMappers.mapType(unknownConstProp))
+
+    // enum mixed
+    val mixedEnumProp = SchemaProperty(enumValues = listOf("string", 1))
+    assertEquals("String", TypeMappers.mapType(mixedEnumProp))
+
+    // string fallback based on minLength etc
+    val minLengthProp = SchemaProperty(minLength = 1)
+    assertEquals("String", TypeMappers.mapType(minLengthProp))
+    val maxLengthProp = SchemaProperty(maxLength = 1)
+    assertEquals("String", TypeMappers.mapType(maxLengthProp))
+    val patternProp = SchemaProperty(pattern = "^$")
+    assertEquals("String", TypeMappers.mapType(patternProp))
+    val contentEncodingProp = SchemaProperty(contentEncoding = "base64")
+    assertEquals("ByteArray", TypeMappers.mapType(contentEncodingProp))
+
+    // empty enum
+    val emptyEnumProp = SchemaProperty(enumValues = emptyList<Any>())
+    assertEquals("String", TypeMappers.mapType(emptyEnumProp))
+
+    // enum all unknown
+    val unknownEnumProp = SchemaProperty(enumValues = listOf(UnknownType()))
+    assertEquals("String", TypeMappers.mapType(unknownEnumProp))
+
+    // enum with null
+    val nullEnumProp = SchemaProperty(enumValues = listOf("test", null))
+    assertEquals(
+        "String",
+        TypeMappers.mapType(
+            nullEnumProp)) // actually it should be nullable string but mapType just maps type
+
+    // map const
+    val mapConstProp = SchemaProperty(constValue = mapOf("a" to 1))
+    assertEquals("Any", TypeMappers.mapType(mapConstProp))
+
+    // list const
+    val listConstProp = SchemaProperty(constValue = listOf(1))
+    assertEquals("List<Any>", TypeMappers.mapType(listConstProp))
+
+    // Map with 1 arg
+    val map1Arg = TypeMappers.kotlinToSchemaProperty("Map<String>")
+    assertEquals(true, map1Arg.additionalProperties?.booleanSchema)
+
+    // empty cleanType or lower case start
+    val emptyType = TypeMappers.kotlinToSchemaProperty("")
+    assertEquals("string", emptyType.type)
+
+    val lowerType = TypeMappers.kotlinToSchemaProperty("customType")
+    assertEquals("string", lowerType.type)
+
+    // Any?
+    val anyNullable = TypeMappers.kotlinToSchemaProperty("Any?")
+    assertTrue(anyNullable.types.contains("null"))
+
+    // splitTopLevelArgs inner logic
+    val nestedMap = TypeMappers.kotlinToSchemaProperty("Map<String, Map<String, Int>>")
+    assertEquals("object", nestedMap.additionalProperties?.type)
+  }
 }

@@ -3,7 +3,7 @@
 plugins {
   kotlin("multiplatform") version "2.2.21"
   kotlin("plugin.serialization") version "2.2.21"
-  id("org.jetbrains.kotlinx.kover") version "0.8.3"
+  id("org.jetbrains.kotlinx.kover") version "0.9.0"
   id("com.diffplug.spotless") version "6.25.0"
 }
 

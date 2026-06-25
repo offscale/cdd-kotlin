@@ -1,0 +1,176 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Mega Spec",
+    "version": "1.0.0",
+    "description": "A spec to cover all edge cases",
+    "contact": { "name": "API Support", "url": "http://example.com", "email": "support@example.com" },
+    "license": { "name": "MIT", "url": "http://example.com/license" }
+  },
+  "servers": [
+    {
+      "url": "https://{username}.example.com:{port}/{basePath}",
+      "description": "The production API server",
+      "variables": {
+        "username": { "default": "demo", "description": "user" },
+        "port": { "enum": ["8443", "443"], "default": "8443" },
+        "basePath": { "default": "v2" }
+      }
+    }
+  ],
+  "externalDocs": {
+    "description": "Find more info here",
+    "url": "https://example.com"
+  },
+  "tags": [
+    { "name": "pet", "description": "Pets", "externalDocs": { "url": "https://example.com" } }
+  ],
+  "paths": {
+    "/pets/{id}": {
+      "summary": "Path summary",
+      "description": "Path description",
+      "servers": [{ "url": "https://path.example.com" }],
+      "parameters": [
+        { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }
+      ],
+      "get": {
+        "tags": ["pet"],
+        "summary": "Find pet by ID",
+        "description": "Returns a single pet",
+        "operationId": "getPetById",
+        "externalDocs": { "url": "https://example.com" },
+        "parameters": [
+          { "name": "verbose", "in": "query", "schema": { "type": "boolean" }, "style": "form", "explode": true },
+          { "name": "matrixParam", "in": "path", "schema": { "type": "string" }, "style": "matrix" },
+          { "name": "labelParam", "in": "path", "schema": { "type": "string" }, "style": "label" },
+          { "name": "headerParam", "in": "header", "schema": { "type": "string" }, "style": "simple" },
+          { "name": "cookieParam", "in": "cookie", "schema": { "type": "string" }, "style": "form" }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "headers": {
+              "X-Rate-Limit": {
+                "description": "calls per hour allowed by the user",
+                "schema": { "type": "integer", "format": "int32" }
+              }
+            },
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/Pet" } },
+              "application/xml": { "schema": { "$ref": "#/components/schemas/Pet" } },
+              "text/plain": { "schema": { "type": "string" } }
+            },
+            "links": {
+              "GetOwner": {
+                "operationId": "getOwner",
+                "parameters": { "ownerId": "$response.body#/ownerId" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/ErrorResponse" }
+        },
+        "callbacks": {
+          "onData": {
+            "{$request.query.callbackUrl}": {
+              "post": {
+                "requestBody": { "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Pet" } } } },
+                "responses": { "200": { "description": "callback successfully processed" } }
+              }
+            }
+          }
+        },
+        "security": [
+          { "petstore_auth": ["write:pets", "read:pets"] },
+          { "api_key": [] },
+          { "oauth2": ["scope1"] }
+        ]
+      },
+      "post": {
+        "operationId": "updatePet",
+        "requestBody": {
+          "description": "Pet object that needs to be added",
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string" },
+                  "status": { "type": "string" }
+                }
+              },
+              "encoding": {
+                "name": { "contentType": "text/plain", "headers": { "X-Test": { "schema": { "type": "string" } } } }
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": { "type": "string", "format": "binary" }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": { "200": { "description": "Success" } }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Pet": {
+        "type": "object",
+        "required": ["name", "photoUrls"],
+        "discriminator": {
+          "propertyName": "petType",
+          "mapping": { "dog": "#/components/schemas/Dog" }
+        },
+        "properties": {
+          "id": { "type": "integer", "format": "int64", "example": 10 },
+          "petType": { "type": "string" },
+          "name": { "type": "string", "example": "doggie", "xml": { "name": "name", "namespace": "http://example.com/schema/sample", "prefix": "sample", "attribute": true, "wrapped": false } },
+          "photoUrls": { "type": "array", "xml": { "name": "photoUrl", "wrapped": true }, "items": { "type": "string", "xml": { "name": "photoUrl" } } },
+          "tags": { "type": "array", "items": { "$ref": "#/components/schemas/Tag" } },
+          "status": { "type": "string", "description": "pet status in the store", "enum": ["available", "pending", "sold"] }
+        },
+        "xml": { "name": "Pet" }
+      },
+      "Dog": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Pet" },
+          { "type": "object", "properties": { "packSize": { "type": "integer", "format": "int32" } } }
+        ]
+      },
+      "Tag": {
+        "type": "object",
+        "properties": { "id": { "type": "integer", "format": "int64" }, "name": { "type": "string" } },
+        "xml": { "name": "Tag" }
+      }
+    },
+    "responses": {
+      "ErrorResponse": {
+        "description": "An error occurred",
+        "content": { "application/json": { "schema": { "type": "string" } } }
+      }
+    },
+    "parameters": {
+      "SkipParam": { "name": "skip", "in": "query", "description": "number of items to skip", "required": true, "schema": { "type": "integer", "format": "int32" } }
+    },
+    "securitySchemes": {
+      "petstore_auth": {
+        "type": "oauth2",
+        "flows": {
+          "implicit": { "authorizationUrl": "http://example.org/api/oauth/dialog", "scopes": { "write:pets": "modify pets in your account", "read:pets": "read your pets" } },
+          "password": { "tokenUrl": "http://example.org/api/oauth/token", "scopes": {} },
+          "clientCredentials": { "tokenUrl": "http://example.org/api/oauth/token", "scopes": {} },
+          "authorizationCode": { "authorizationUrl": "http://example.org/api/oauth/dialog", "tokenUrl": "http://example.org/api/oauth/token", "scopes": {} }
+        }
+      },
+      "api_key": { "type": "apiKey", "name": "api_key", "in": "header" },
+      "basic_auth": { "type": "http", "scheme": "basic" },
+      "bearer_auth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" },
+      "openIdConnect": { "type": "openIdConnect", "openIdConnectUrl": "https://example.com/.well-known/openid-configuration" }
+    }
+  }
+}

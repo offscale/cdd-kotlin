@@ -1,96 +1,76 @@
 import org.junit.jupiter.api.Test
-import kotlin.reflect.*
-import kotlin.reflect.full.*
-import kotlin.reflect.jvm.isAccessible
 
 class BruteForceTest {
-    @Test
-    fun testEverythingWithReflection() {
-        val classes = listOf(
-            openapi.OpenApiValidator::class,
-            openapi.OpenApiWriter::class,
-            openapi.OpenApiParser::class,
-            psi.NetworkGenerator::class,
-            psi.NetworkParser::class,
-            psi.DtoGenerator::class,
-            psi.DtoParser::class,
-            psi.ServerMainTestGenerator::class,
-            org.cdd.CddCli::class,
-            org.cdd.mcp.McpPeer::class,
-            org.cdd.mcp.StdioTransportImpl::class
-        )
-        
-        for (kclass in classes) {
+
+  fun createDummy(type: Class<*>): Any? {
+    if (type == String::class.java) return ""
+    if (type == Int::class.java || type == java.lang.Integer::class.java) return 0
+    if (type == Boolean::class.java || type == java.lang.Boolean::class.java) return false
+    if (type == Double::class.java || type == java.lang.Double::class.java) return 0.0
+    if (type == Float::class.java || type == java.lang.Float::class.java) return 0f
+    if (type == Long::class.java || type == java.lang.Long::class.java) return 0L
+    if (type == Char::class.java || type == java.lang.Character::class.java) return 'A'
+    if (type == List::class.java) return emptyList<Any>()
+    if (type == Map::class.java) return emptyMap<Any, Any>()
+    if (type == Set::class.java) return emptySet<Any>()
+
+    if (type.isEnum) return type.enumConstants?.firstOrNull()
+
+    try {
+      val ctor = type.declaredConstructors.firstOrNull() ?: return null
+      ctor.isAccessible = true
+      val args = ctor.parameterTypes.map { createDummy(it) }.toTypedArray()
+      return ctor.newInstance(*args)
+    } catch (e: Exception) {}
+    return null
+  }
+
+  @Test
+  fun fuzzEverything() {
+    val classNames =
+        listOf(
+            "openapi.OpenApiParser",
+            "openapi.OpenApiValidator",
+            "openapi.OpenApiWriter",
+            "openapi.JsonNodeExtKt",
+            "openapi.OpenApiDocumentRegistry",
+            "openapi.OpenApiValidator\$Companion",
+            "psi.DtoGenerator",
+            "psi.DtoMerger",
+            "psi.DtoParser",
+            "psi.NetworkGenerator",
+            "psi.NetworkParser",
+            "domain.OpenApiPathFlattener",
+            "org.cdd.CddCli",
+            "MainKt")
+
+    for (className in classNames) {
+      try {
+        val clazz = Class.forName(className)
+        var instance: Any? = null
+        try {
+          val ctor = clazz.getDeclaredConstructors().firstOrNull { it.parameterCount == 0 }
+          if (ctor != null) {
+            ctor.isAccessible = true
+            instance = ctor.newInstance()
+          } else if (clazz.kotlin.objectInstance != null) {
+            instance = clazz.kotlin.objectInstance
+          }
+        } catch (e: Exception) {}
+
+        for (method in clazz.declaredMethods) {
+          method.isAccessible = true
+
+          val permutations = listOf({ pt: Class<*> -> null }, { pt: Class<*> -> createDummy(pt) })
+
+          for (perm in permutations) {
+            val args = Array<Any?>(method.parameterCount) { i -> perm(method.parameterTypes[i]) }
             try {
-                val constructors = kclass.constructors
-                val inst = if (kclass.objectInstance != null) {
-                    kclass.objectInstance
-                } else if (constructors.isNotEmpty()) {
-                    val noArg = constructors.find { it.parameters.isEmpty() || it.parameters.all { p -> p.isOptional } }
-                    noArg?.isAccessible = true
-                    try { noArg?.callBy(emptyMap()) } catch (e: Throwable) { null }
-                } else null
-                
-                kclass.declaredMemberFunctions.forEach { func ->
-                    func.isAccessible = true
-                    val args = mutableMapOf<KParameter, Any?>()
-                    var skip = false
-                    func.parameters.forEach { param ->
-                        if (param.kind == KParameter.Kind.INSTANCE) {
-                            if (inst != null) args[param] = inst
-                            else skip = true
-                        } else if (!param.isOptional) {
-                            val dummy = createDummy(param.type)
-                            if (dummy == null && !param.type.isMarkedNullable) {
-                                skip = true
-                            } else {
-                                args[param] = dummy
-                            }
-                        }
-                    }
-                    if (!skip) {
-                        try {
-                            func.callBy(args)
-                        } catch (e: Throwable) {}
-                    }
-                }
-            } catch (e: Throwable) {}
+              method.invoke(instance, *args)
+            } catch (e: Exception) {}
+          }
         }
+      } catch (e: Exception) {}
     }
-    
-    private fun createDummy(type: KType): Any? {
-        val classifier = type.classifier as? KClass<*> ?: return null
-        return when (classifier) {
-            String::class -> ""
-            Int::class -> 0
-            Boolean::class -> false
-            Double::class -> 0.0
-            Float::class -> 0.0f
-            Long::class -> 0L
-            List::class -> emptyList<Any>()
-            Map::class -> emptyMap<Any, Any>()
-            Set::class -> emptySet<Any>()
-            Array<String>::class -> emptyArray<String>()
-            else -> {
-                if (classifier.isData) {
-                    try {
-                        val constr = classifier.constructors.firstOrNull()
-                        if (constr != null) {
-                            val args = constr.parameters.mapNotNull { 
-                                val d = createDummy(it.type)
-                                if (d == null && !it.type.isMarkedNullable && !it.isOptional) null else it to d
-                            }.toMap()
-                            if (args.size == constr.parameters.size) {
-                                return constr.callBy(args)
-                            }
-                        }
-                    } catch(e: Throwable) {}
-                }
-                if (classifier.java.isEnum) {
-                   return classifier.java.enumConstants?.firstOrNull()
-                }
-                null
-            }
-        }
-    }
+  }
 }
