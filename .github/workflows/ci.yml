@@ -53,10 +53,10 @@ jobs:
         run: ./cdd.sh to_sdk -i ./cdd-openapi-test-harness/petstore_oas3.json
 
       - name: Swagger 2.0 Server and Client test
-        run: bash scripts/test_server_and_client.sh ./cdd-openapi-test-harness/petstore.json
+        run: python3 scripts/test_server_and_client.py ./cdd-openapi-test-harness/petstore.json
 
       - name: OpenAPI 3.2.0 Server and Client test
-        run: bash scripts/test_server_and_client.sh ./cdd-openapi-test-harness/petstore_oas3.json
+        run: python3 scripts/test_server_and_client.py ./cdd-openapi-test-harness/petstore_oas3.json
 
       - name: Build WASM
         run: make build_wasm
