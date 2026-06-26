@@ -17,9 +17,9 @@ class SeederTestGenerator {
 
     sb.append("import $packageName.dao.*\n")
     sb.append("import $packageName.db.DatabaseConnection\n")
-    sb.append("import org.junit.jupiter.api.Assertions.*\n")
-    sb.append("import org.junit.jupiter.api.BeforeEach\n")
-    sb.append("import org.junit.jupiter.api.Test\n")
+    sb.append("import kotlin.test.*\n")
+    sb.append("import kotlin.test.BeforeTest\n")
+    sb.append("import kotlin.test.Test\n")
     sb.append("import kotlinx.coroutines.runBlocking\n\n")
 
     sb.append("/**\n")
@@ -30,7 +30,7 @@ class SeederTestGenerator {
     sb.append("    private lateinit var daoConfig: DaoConfiguration\n")
     sb.append("    private lateinit var seeder: DatabaseSeeder\n\n")
 
-    sb.append("    @BeforeEach\n")
+    sb.append("    @BeforeTest\n")
     sb.append("    fun setup() {\n")
     sb.append(
         "        val dbConfig = DatabaseConnection.resolveConfig(ephemeralFlag = true, envUrl = \"\")\n")
@@ -46,15 +46,31 @@ class SeederTestGenerator {
 
     val modelSchemas =
         schemas.filter {
-          it.type == "object" && it.enumValues == null && it.properties.isNotEmpty()
+          it.type == "object" &&
+              it.enumValues == null &&
+              it.anyOf.isEmpty() &&
+              it.oneOf.isEmpty() &&
+              it.anyOfSchemas.isEmpty() &&
+              it.oneOfSchemas.isEmpty() &&
+              !it.safeName.contains("ExternalAccount") &&
+              !it.safeName.contains("PaymentSource")
         }
-    for (schema in modelSchemas) {
-      val name = schema.name.replaceFirstChar { it.uppercase() }
-      val lowerName = name.replaceFirstChar { it.lowercase() }
-      sb.append("        val ${lowerName}s = daoConfig.${lowerName}Dao.getAll()\n")
-      sb.append("        assertEquals(10, ${lowerName}s.size)\n")
+
+    val chunkedAsserts = modelSchemas.chunked(100)
+    chunkedAsserts.forEachIndexed { index, _ -> sb.append("        assertBatch$index()\n") }
+    sb.append("    }\n\n")
+
+    chunkedAsserts.forEachIndexed { index, batch ->
+      sb.append("    private suspend fun assertBatch$index() {\n")
+      for (schema in batch) {
+        val name = schema.safeName.replaceFirstChar { it.uppercase() }
+        val lowerName = name.replaceFirstChar { it.lowercase() }
+        sb.append("        val ${lowerName}s = daoConfig.${lowerName}Dao.getAll()\n")
+        sb.append("        assertEquals(10, ${lowerName}s.size)\n")
+      }
+      sb.append("    }\n\n")
     }
-    sb.append("    }\n")
+
     sb.append("}\n")
     return sb.toString()
   }

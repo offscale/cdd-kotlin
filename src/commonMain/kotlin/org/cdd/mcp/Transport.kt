@@ -6,12 +6,16 @@ import kotlinx.serialization.json.JsonElement
 interface Transport {
   /** Sends a message. */
   fun send(message: JsonElement)
+
   /** Sets a listener for received messages. */
   fun onReceive(listener: (JsonElement) -> Unit)
+
   /** Sets a listener for errors. */
   fun onError(listener: (Exception) -> Unit)
+
   /** Sets a listener for closing. */
   fun onClose(listener: () -> Unit)
+
   /** Closes the transport. */
   fun close()
 }

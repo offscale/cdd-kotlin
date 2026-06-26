@@ -10,70 +10,70 @@ repos:
     hooks:
       - id: format-and-check
         name: Format & Recheck
-        entry: python3 scripts/xplat.py gradle spotlessApply spotlessCheck
+        entry: python3 scripts/run_with_fallback.py gradle spotlessApply spotlessCheck
         language: system
         pass_filenames: false
         types_or: [kotlin]
 
       - id: build
         name: Build
-        entry: python3 scripts/xplat.py gradle assemble
+        entry: python3 scripts/run_with_fallback.py gradle assemble
         language: system
         pass_filenames: false
         types_or: [kotlin]
 
       - id: test
         name: Test
-        entry: python3 scripts/xplat.py gradle allTests
+        entry: python3 scripts/run_with_fallback.py gradle allTests
         language: system
         pass_filenames: false
         types_or: [kotlin]
 
       - id: lint
         name: Lint (Verify)
-        entry: python3 scripts/xplat.py gradle check
+        entry: python3 scripts/run_with_fallback.py gradle check
         language: system
         pass_filenames: false
         types_or: [kotlin]
 
       - id: test-swagger-2
         name: Swagger 2.0 Petstore test
-        entry: bash scripts/test_sdk.sh ../petstore.json /v2
+        entry: python3 scripts/test_sdk.py src/test/resources/stripe.json /v1
         language: system
         pass_filenames: false
         always_run: true
 
       - id: test-openapi-3
         name: OpenAPI 3.2.0 Petstore test
-        entry: bash scripts/test_sdk.sh ../petstore_oas3.json /api/v3
+        entry: python3 scripts/test_sdk.py src/test/resources/mega_spec.json /api/v3
         language: system
         pass_filenames: false
         always_run: true
 
       - id: test-server-and-client-swagger-2
         name: Swagger 2.0 Server and Client test
-        entry: bash scripts/test_server_and_client.sh ../petstore.json
+        entry: python3 scripts/test_server_and_client.py src/test/resources/stripe.json
         language: system
         pass_filenames: false
         always_run: true
 
       - id: test-server-and-client-openapi-3
         name: OpenAPI 3.2.0 Server and Client test
-        entry: bash scripts/test_server_and_client.sh ../petstore_oas3.json
+        entry: python3 scripts/test_server_and_client.py src/test/resources/mega_spec.json
         language: system
         pass_filenames: false
         always_run: true
 
       - id: build-wasm
         name: Build WASM
-        entry: python3 scripts/xplat.py build_wasm
+        entry: python3 scripts/run_with_fallback.py build_wasm
         language: system
         pass_filenames: false
         always_run: true
 
       - id: update-badges
         name: Update Badges
-        entry: python3 scripts/update_badges.py
+        entry: python3 scripts/run_with_fallback.py python scripts/update_badges.py
         language: system
         pass_filenames: false
         always_run: true

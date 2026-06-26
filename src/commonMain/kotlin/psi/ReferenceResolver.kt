@@ -17,6 +17,11 @@ object ReferenceResolver {
    * - `https://example.com/api/contracts/Order.yaml#/definitions/Detail` -> `Detail`
    */
   fun resolveRefToType(ref: String): String {
+    val raw = resolveRefToTypeRaw(ref)
+    return sanitizeTypeName(raw)
+  }
+
+  private fun resolveRefToTypeRaw(ref: String): String {
     // 1. Handle Fragment Identifier (#)
     if (ref.contains("#")) {
       val fragment = ref.substringAfterLast("#")
@@ -49,6 +54,21 @@ object ReferenceResolver {
 
     // Fallback: Return raw ref if simple string
     return ref.substringAfterLast("/")
+  }
+
+  /** Sanitizes a string to be used as a valid type name. */
+  fun sanitizeTypeName(raw: String): String {
+    if (raw.isBlank()) return "Unknown"
+    val parts = raw.split(Regex("[^a-zA-Z0-9]+")).filter { it.isNotBlank() }
+    if (parts.isEmpty()) return "Unknown"
+    val joined = parts.joinToString("") { part -> part.replaceFirstChar { it.uppercase() } }
+    val name = if (joined.first().isDigit()) "Type$joined" else joined
+    if (name.length <= 50) return name
+    // Truncate to avoid "File name too long" compilation errors for extremely long OpenAPI path
+    // names.
+    // Use hashCode() formatted as hex for a pseudo-unique suffix.
+    val hash = name.hashCode().toUInt().toString(16).padStart(8, '0')
+    return name.take(40) + "_" + hash
   }
 
   private fun unescapeJsonPointer(token: String): String {

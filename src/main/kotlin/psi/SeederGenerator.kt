@@ -8,6 +8,40 @@ import domain.SchemaDefinition
  */
 class SeederGenerator {
 
+  private fun escapeKotlinKeyword(name: String): String {
+    val keywords =
+        setOf(
+            "as",
+            "break",
+            "class",
+            "continue",
+            "do",
+            "else",
+            "false",
+            "for",
+            "fun",
+            "if",
+            "in",
+            "interface",
+            "is",
+            "null",
+            "object",
+            "package",
+            "return",
+            "super",
+            "this",
+            "throw",
+            "true",
+            "try",
+            "typealias",
+            "typeof",
+            "val",
+            "var",
+            "when",
+            "while")
+    return if (name in keywords) "`$name`" else name
+  }
+
   /**
    * Generates the seeder module source code.
    *
@@ -36,12 +70,19 @@ class SeederGenerator {
 
     val modelSchemas =
         schemas.filter {
-          it.type == "object" && it.enumValues == null && it.properties.isNotEmpty()
+          it.type == "object" &&
+              it.enumValues == null &&
+              it.anyOf.isEmpty() &&
+              it.oneOf.isEmpty() &&
+              it.anyOfSchemas.isEmpty() &&
+              it.oneOfSchemas.isEmpty() &&
+              !it.safeName.contains("ExternalAccount") &&
+              !it.safeName.contains("PaymentSource")
         }
 
     // Entity Pools
     for (schema in modelSchemas) {
-      val name = schema.name.replaceFirstChar { it.uppercase() }
+      val name = schema.safeName.replaceFirstChar { it.uppercase() }
       val idProp = schema.properties["id"]
       if (idProp != null) {
         val idType = TypeMappers.mapType(idProp)
@@ -60,10 +101,29 @@ class SeederGenerator {
     sb.append(
         "     * Seeds the database by creating batches of synthetic entities in topological order.\n")
     sb.append("     */\n")
+    sb.append("    private fun generateAny(): Any = \"{}\"\n")
+    sb.append(
+        "    private fun generatekotlinx_serialization_json_JsonElement(): kotlinx.serialization.json.JsonElement = kotlinx.serialization.json.JsonObject(mapOf(\"uuid\" to kotlinx.serialization.json.JsonPrimitive(java.util.UUID.randomUUID().toString())))\n")
+    sb.append("    private fun generateMap(): Map<String, Any> = mapOf(\"key\" to \"value\")\n")
+
     sb.append("    fun seedDatabase() = runBlocking {\n")
+    val chunked = modelSchemas.chunked(100)
+    chunked.forEachIndexed { index, _ -> sb.append("        seedBatch$index()\n") }
+    sb.append("    }\n\n")
+
+    chunked.forEachIndexed { index, batch ->
+      sb.append("    private suspend fun seedBatch$index() {\n")
+      batch.forEach { schema ->
+        val name = schema.safeName.replaceFirstChar { it.uppercase() }
+        sb.append("        seed$name()\n")
+      }
+      sb.append("    }\n\n")
+    }
+
     for (schema in modelSchemas) {
-      val name = schema.name.replaceFirstChar { it.uppercase() }
+      val name = schema.safeName.replaceFirstChar { it.uppercase() }
       val lowerName = name.replaceFirstChar { it.lowercase() }
+      sb.append("    private suspend fun seed$name() {\n")
       sb.append("        for (i in 1..10) {\n")
       sb.append("            val entity = generate$name()\n")
       sb.append("            val created = daoConfig.${lowerName}Dao.create(entity)\n")
@@ -73,8 +133,8 @@ class SeederGenerator {
         sb.append("            if (created.id != null) pool${name}Ids.add(created.id!!)\n")
       }
       sb.append("        }\n")
+      sb.append("    }\n\n")
     }
-    sb.append("    }\n")
     sb.append("}\n")
 
     return sb.toString()
@@ -82,7 +142,7 @@ class SeederGenerator {
 
   private fun generateFactory(schema: SchemaDefinition): String {
     val sb = StringBuilder()
-    val name = schema.name.replaceFirstChar { it.uppercase() }
+    val name = schema.safeName.replaceFirstChar { it.uppercase() }
     sb.append("    /**\n")
     sb.append("     * Generates a synthetic [$name] using Faker.\n")
     sb.append("     */\n")
@@ -112,17 +172,22 @@ class SeederGenerator {
                     "kotlinx.datetime.Instant" -> "kotlinx.datetime.Clock.System.now()"
                     else ->
                         if (isNullable) "null"
-                        else if (type.startsWith("List")) "emptyList()" else "generate$type()"
+                        else if (type.startsWith("List")) "emptyList()"
+                        else if (type.contains("Map<")) "emptyMap()"
+                        else if (type.startsWith("Any")) "\"\""
+                        else "generate${type.replace(".", "_")}()"
                   }
-              if (propName == "id") {
-                if (type == "Long") "$propName = 0L" else "$propName = 0"
+              if (propName == "id" && (type == "String" || type == "Int" || type == "Long")) {
+                if (type == "Long") "${escapeKotlinKeyword(propName)} = 0L"
+                else if (type == "Int") "${escapeKotlinKeyword(propName)} = 0"
+                else "${escapeKotlinKeyword(propName)} = \"id_\${java.util.UUID.randomUUID()}\""
               } else if (propName.endsWith("Id") && (type == "Int" || type == "Long")) {
                 val parentName = propName.removeSuffix("Id").replaceFirstChar { it.uppercase() }
                 // Use a random from the pool if it exists, else 1
                 val defaultVal = if (type == "Long") "1L" else "1"
-                "$propName = if (pool${parentName}Ids.isNotEmpty()) pool${parentName}Ids.random() else $defaultVal"
+                "${escapeKotlinKeyword(propName)} = if (pool${parentName}Ids.isNotEmpty()) pool${parentName}Ids.random() else $defaultVal"
               } else {
-                "$propName = $valGen"
+                "${escapeKotlinKeyword(propName)} = $valGen"
               }
             }
             .joinToString(",\n            ")

@@ -1000,6 +1000,7 @@ data class UnsubscribeRequestParams(
     /** The uri property. */
     val uri: String,
 )
+
 /** Represents the ClientNotification MCP model. */
 @Serializable class ClientNotification()
 

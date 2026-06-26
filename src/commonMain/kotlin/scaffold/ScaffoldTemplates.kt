@@ -49,14 +49,14 @@ object ScaffoldTemplates {
 
     return """
         [versions]
-        agp = "8.2.2"
+        agp = "8.8.0"
         android-compileSdk = "34"
         android-minSdk = "24"
         android-targetSdk = "34"
         androidx-activityCompose = "1.9.0"
         androidx-core-ktx = "1.13.1"
-        compose-plugin = "1.6.11"
-        kotlin = "2.0.0"
+        compose-plugin = "1.7.3"
+        kotlin = "2.2.21"
         ktor = "2.3.12"
         coroutines = "1.8.1"
         serialization = "1.7.1"
@@ -152,9 +152,12 @@ $serverLibs
   /** Generates the gradle.properties file used for JVM arguments. */
   fun createGradleProperties(): String =
       """
-        org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
+        org.gradle.jvmargs=-Xmx6g -Dfile.encoding=UTF-8
+        kotlin.daemon.jvmargs=-Xmx6g
         kotlin.code.style=official
         android.useAndroidX=true
+        kotlin.mpp.androidGradlePluginCompatibility.nowarn=true
+        kotlin.mpp.applyDefaultHierarchyTemplate=false
     """
           .trimIndent()
 
@@ -179,10 +182,8 @@ $serverLibs
 
         kotlin {
             androidTarget {
-                compilations.all {
-                    kotlinOptions {
-                        jvmTarget = "1.8"
-                    }
+                compilerOptions {
+                    jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
                 }
             }
             
@@ -349,8 +350,6 @@ $serverLibs
                     kotlin.srcDir("src/test/kotlin")
                     dependencies {
                         implementation(kotlin("test"))
-                        implementation(kotlin("test-junit5"))
-                        implementation("org.junit.jupiter:junit-jupiter:5.10.0")
                         implementation(libs.ktor.server.test.host)
                     }
                 }
@@ -398,6 +397,10 @@ $serverLibs
                 }
                 $testBlock
             }
+        }
+        
+        tasks.withType<JavaExec> {
+            maxHeapSize = "4g"
         }
     """
         .trimIndent()

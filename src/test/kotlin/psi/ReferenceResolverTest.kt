@@ -36,7 +36,7 @@ class ReferenceResolverTest {
   @Test
   fun `resolveRefToType handles lists wrapped in definitions`() {
     // Edge case where key might be complex
-    assertEquals("My_Type", ReferenceResolver.resolveRefToType("#/definitions/My_Type"))
+    assertEquals("MyType", ReferenceResolver.resolveRefToType("#/definitions/My_Type"))
   }
 
   @Test
@@ -51,21 +51,21 @@ class ReferenceResolverTest {
 
   @Test
   fun `resolveRefToType decodes JSON pointer escapes`() {
-    assertEquals("Foo~Bar", ReferenceResolver.resolveRefToType("#/components/schemas/Foo~0Bar"))
+    assertEquals("FooBar", ReferenceResolver.resolveRefToType("#/components/schemas/Foo~0Bar"))
   }
 
   @Test
   fun `resolveRefToType decodes percent-encoded fragments`() {
-    assertEquals("My Schema", ReferenceResolver.resolveRefToType("#My%20Schema"))
+    assertEquals("MySchema", ReferenceResolver.resolveRefToType("#My%20Schema"))
   }
 
   @Test
   fun `resolveRefToType decodes percent-encoded filenames`() {
-    assertEquals("My Type", ReferenceResolver.resolveRefToType("./schemas/My%20Type.json"))
+    assertEquals("MyType", ReferenceResolver.resolveRefToType("./schemas/My%20Type.json"))
   }
 
   @Test
   fun `resolveRefToType falls back on empty path`() {
-    assertEquals("#", ReferenceResolver.resolveRefToType("#"))
+    assertEquals("Unknown", ReferenceResolver.resolveRefToType("#"))
   }
 }

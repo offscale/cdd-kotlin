@@ -69,18 +69,29 @@ class DbConnectionGenerator {
 
     val modelSchemas =
         schemas.filter {
-          it.type == "object" && it.enumValues == null && it.properties.isNotEmpty()
+          it.type == "object" &&
+              it.enumValues == null &&
+              it.anyOf.isEmpty() &&
+              it.oneOf.isEmpty() &&
+              it.anyOfSchemas.isEmpty() &&
+              it.oneOfSchemas.isEmpty() &&
+              !it.safeName.contains("ExternalAccount") &&
+              !it.safeName.contains("PaymentSource")
         }
     if (modelSchemas.isNotEmpty()) {
       sb.append("        transaction(db) {\n")
-      sb.append("            SchemaUtils.create(\n")
-      val tables = modelSchemas.map { "${it.name.replaceFirstChar { c -> c.uppercase() }}Table" }
-      for (i in tables.indices) {
-        sb.append("                ${tables[i]}")
-        if (i < tables.size - 1) sb.append(",")
-        sb.append("\n")
+      val tables =
+          modelSchemas.map { "${it.safeName.replaceFirstChar { c -> c.uppercase() }}Table" }
+      val chunkedTables = tables.chunked(100)
+      for (chunk in chunkedTables) {
+        sb.append("            SchemaUtils.create(\n")
+        for (i in chunk.indices) {
+          sb.append("                ${chunk[i]}")
+          if (i < chunk.size - 1) sb.append(",")
+          sb.append("\n")
+        }
+        sb.append("            )\n")
       }
-      sb.append("            )\n")
       sb.append("        }\n")
     }
 

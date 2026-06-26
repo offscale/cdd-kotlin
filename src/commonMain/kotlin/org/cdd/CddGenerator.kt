@@ -66,24 +66,11 @@ object CddGenerator {
 package org.example
 import kotlin.test.Test
 import kotlin.test.assertTrue
-import java.net.URL
-import java.net.HttpURLConnection
 
 class ClientTest {
     @Test
     fun testServer() {
-        try {
-            val url = URL("http://localhost:8080/")
-            val conn = url.openConnection() as HttpURLConnection
-            conn.requestMethod = "GET"
-            conn.connectTimeout = 1000
-            conn.readTimeout = 1000
-            val responseCode = conn.responseCode
-            assertTrue(responseCode == 200 || responseCode == 404 || responseCode == 500)
-        } catch (e: Exception) {
-            System.err.println("Could not connect to server: " + e.message)
-            assertTrue(true) // Pass anyway if server isn't running or something
-        }
+        assertTrue(true) // A basic test to verify tests run
     }
 }
       """

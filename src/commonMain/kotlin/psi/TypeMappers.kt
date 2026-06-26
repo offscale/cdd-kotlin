@@ -40,11 +40,11 @@ object TypeMappers {
       dynamicRefResolver: ((SchemaProperty, String) -> SchemaProperty?)?,
       stack: MutableSet<SchemaProperty>
   ): String {
-    if (!stack.add(prop)) return "Any"
+    if (!stack.add(prop)) return "kotlinx.serialization.json.JsonElement"
 
     try {
       prop.booleanSchema?.let { booleanValue ->
-        return if (booleanValue) "Any" else "Nothing"
+        return if (booleanValue) "kotlinx.serialization.json.JsonElement" else "Nothing"
       }
 
       prop.dynamicRef?.let { dynamicRef ->
@@ -74,7 +74,7 @@ object TypeMappers {
         "array" -> {
           val itemType =
               if (prop.items != null) mapTypeInternal(prop.items, dynamicRefResolver, stack)
-              else "Any"
+              else "kotlinx.serialization.json.JsonElement"
           "List<$itemType>"
         }
         "object" -> {
@@ -82,10 +82,10 @@ object TypeMappers {
             val valueType = mapTypeInternal(prop.additionalProperties, dynamicRefResolver, stack)
             "Map<String, $valueType>"
           } else {
-            "Any"
+            "kotlinx.serialization.json.JsonElement"
           }
         }
-        else -> "Any" // Fallback for unknown types
+        else -> "kotlinx.serialization.json.JsonElement" // Fallback for unknown types
       }
     } finally {
       stack.remove(prop)

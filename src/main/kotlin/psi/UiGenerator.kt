@@ -15,7 +15,7 @@ class UiGenerator {
 
   /** Generates a Kotlin file containing the Composable Form. */
   fun generateForm(packageName: String, schema: SchemaDefinition): KtFile {
-    val className = schema.name
+    val className = schema.safeName
     val formName = "${className}Form"
 
     val imports =
@@ -106,7 +106,7 @@ class UiGenerator {
 
   /** Generates a Kotlin file containing the Composable Data Grid. */
   fun generateGrid(packageName: String, schema: SchemaDefinition): KtFile {
-    val className = schema.name
+    val className = schema.safeName
     val gridName = "${className}Grid"
 
     val imports =
@@ -239,7 +239,7 @@ class UiGenerator {
       apiClassName: String,
       listOperationId: String
   ): KtFile {
-    val modelName = schema.name
+    val modelName = schema.safeName
     val gridName = "${modelName}Grid"
 
     val content =

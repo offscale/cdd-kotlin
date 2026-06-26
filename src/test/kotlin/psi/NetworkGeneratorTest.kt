@@ -894,7 +894,7 @@ class NetworkGeneratorTest {
 
     assertTrue(text.contains("parameter(\"q\", q)"))
     assertTrue(text.contains("header(\"auth\", auth)"))
-    assertTrue(text.contains("cookie(\"session\", session)"))
+    assertTrue(text.contains("cookie(\"session\", session.toString())"))
   }
 
   @Test
@@ -1409,8 +1409,9 @@ class NetworkGeneratorTest {
     assertTrue(
         text.contains(
             "header(\"filter\", filter.entries.joinToString(\",\") { \"${'$'}{it.key}=${'$'}{it.value}\" })"))
-    assertTrue(text.contains("session.forEach { value -> cookie(\"session\", value) }"))
-    assertTrue(text.contains("prefs.forEach { (key, value) -> cookie(key, value) }"))
+    assertTrue(text.contains("session.forEach { value -> cookie(\"session\", value.toString()) }"))
+    assertTrue(
+        text.contains("prefs.forEach { (key, value) -> cookie(key.toString(), value.toString()) }"))
     assertTrue(
         text.contains(
             "header(\"Cookie\", rawCookie.joinToString(\"&\") { \"rawCookie=${'$'}it\" })"))

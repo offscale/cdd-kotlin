@@ -18,6 +18,7 @@ data class SchemaDefinition(
      * Generation context.
      */
     val name: String,
+    val safeName: String = psi.ReferenceResolver.sanitizeTypeName(name),
 
     /**
      * If this schema is a reference to another schema, this holds the URI Reference. JSON Schema

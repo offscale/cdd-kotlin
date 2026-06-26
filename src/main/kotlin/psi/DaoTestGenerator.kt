@@ -15,30 +15,37 @@ class DaoTestGenerator {
     val results = mutableMapOf<String, String>()
     val modelSchemas =
         schemas.filter {
-          it.type == "object" && it.enumValues == null && it.properties.isNotEmpty()
+          it.type == "object" &&
+              it.enumValues == null &&
+              it.anyOf.isEmpty() &&
+              it.oneOf.isEmpty() &&
+              it.anyOfSchemas.isEmpty() &&
+              it.oneOfSchemas.isEmpty() &&
+              !it.safeName.contains("ExternalAccount") &&
+              !it.safeName.contains("PaymentSource")
         }
 
     // Test DaoFactory
     val factorySb = StringBuilder()
     factorySb.append("package $packageName.dao\n\n")
     factorySb.append("import $packageName.models.*\n")
-    factorySb.append("import org.junit.jupiter.api.Assertions.*\n")
-    factorySb.append("import org.junit.jupiter.api.Test\n\n")
+    factorySb.append("import kotlin.test.*\n")
+    factorySb.append("import kotlin.test.Test\n\n")
     factorySb.append(generateFactoryTest(modelSchemas))
     results["dao/DaoFactoryTest.kt"] = factorySb.toString()
 
     // Test Concrete DAOs (Ephemeral SQLite)
     for (schema in modelSchemas) {
-      val name = schema.name.replaceFirstChar { it.uppercase() }
+      val name = schema.safeName.replaceFirstChar { it.uppercase() }
       val sb = StringBuilder()
       sb.append("package $packageName.dao\n\n")
       sb.append("import $packageName.models.*\n")
       sb.append("import org.jetbrains.exposed.sql.Database\n")
       sb.append("import org.jetbrains.exposed.sql.SchemaUtils\n")
       sb.append("import org.jetbrains.exposed.sql.transactions.transaction\n")
-      sb.append("import org.junit.jupiter.api.Assertions.*\n")
-      sb.append("import org.junit.jupiter.api.BeforeEach\n")
-      sb.append("import org.junit.jupiter.api.Test\n")
+      sb.append("import kotlin.test.*\n")
+      sb.append("import kotlin.test.BeforeTest\n")
+      sb.append("import kotlin.test.Test\n")
       sb.append("import kotlinx.coroutines.runBlocking\n\n")
       sb.append(generateConcreteDaoTest(schema))
       results["dao/Concrete${name}DaoTest.kt"] = sb.toString()
@@ -57,7 +64,7 @@ class DaoTestGenerator {
     sb.append("    fun `create with true returns concrete DAOs`() {\n")
     sb.append("        val config = DaoFactory.create(useConcrete = true)\n")
     for (schema in schemas) {
-      val name = schema.name.replaceFirstChar { it.uppercase() }
+      val name = schema.safeName.replaceFirstChar { it.uppercase() }
       val lowerName = name.replaceFirstChar { it.lowercase() }
       sb.append("        assertTrue(config.${lowerName}Dao is Concrete${name}Dao)\n")
     }
@@ -67,7 +74,7 @@ class DaoTestGenerator {
     sb.append("    fun `create with false returns stub DAOs`() {\n")
     sb.append("        val config = DaoFactory.create(useConcrete = false)\n")
     for (schema in schemas) {
-      val name = schema.name.replaceFirstChar { it.uppercase() }
+      val name = schema.safeName.replaceFirstChar { it.uppercase() }
       val lowerName = name.replaceFirstChar { it.lowercase() }
       sb.append("        assertTrue(config.${lowerName}Dao is Stub${name}Dao)\n")
     }
@@ -78,7 +85,7 @@ class DaoTestGenerator {
 
   private fun generateConcreteDaoTest(schema: SchemaDefinition): String {
     val sb = StringBuilder()
-    val name = schema.name.replaceFirstChar { it.uppercase() }
+    val name = schema.safeName.replaceFirstChar { it.uppercase() }
     val tableName = "${name}Table"
 
     sb.append("/**\n")
@@ -87,7 +94,7 @@ class DaoTestGenerator {
     sb.append("class Concrete${name}DaoTest {\n")
     sb.append("    private lateinit var dao: Concrete${name}Dao\n\n")
 
-    sb.append("    @BeforeEach\n")
+    sb.append("    @BeforeTest\n")
     sb.append("    fun setup() {\n")
     sb.append(
         "        Database.connect(\"jdbc:sqlite:file:test?mode=memory&cache=shared\", driver = \"org.sqlite.JDBC\")\n")

@@ -27,17 +27,18 @@ class DtoMerger {
 
     // Find the target class
     val targetClass =
-        file.collectDescendantsOfType<KtClass>().firstOrNull { it.name == schema.name }
-            ?: throw IllegalArgumentException("Class ${schema.name} not found in provided code")
+        file.collectDescendantsOfType<KtClass>().firstOrNull { it.name == schema.safeName }
+            ?: throw IllegalArgumentException("Class ${schema.safeName} not found in provided code")
 
     // Validate structure
     val primaryConstructor =
         targetClass.primaryConstructor
-            ?: throw IllegalStateException("Class ${schema.name} must have a primary constructor")
+            ?: throw IllegalStateException(
+                "Class ${schema.safeName} must have a primary constructor")
 
     val parameterList =
         primaryConstructor.valueParameterList
-            ?: throw IllegalStateException("Class ${schema.name} constructor config error")
+            ?: throw IllegalStateException("Class ${schema.safeName} constructor config error")
 
     // Identify existing properties
     val existingNames = parameterList.parameters.mapNotNull { it.name }.toSet()

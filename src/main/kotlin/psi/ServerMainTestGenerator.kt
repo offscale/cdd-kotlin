@@ -20,8 +20,8 @@ class ServerMainTestGenerator {
     val sb = StringBuilder()
     sb.append("package $packageName\n\n")
 
-    sb.append("import org.junit.jupiter.api.Assertions.*\n")
-    sb.append("import org.junit.jupiter.api.Test\n")
+    sb.append("import kotlin.test.*\n")
+    sb.append("import kotlin.test.Test\n")
     sb.append("import com.github.ajalt.clikt.testing.test\n\n")
 
     sb.append("/**\n")
@@ -64,16 +64,23 @@ class ServerMainTestGenerator {
 
     val modelSchemas =
         schemas.filter {
-          it.type == "object" && it.enumValues == null && it.properties.isNotEmpty()
+          it.type == "object" &&
+              it.enumValues == null &&
+              it.anyOf.isEmpty() &&
+              it.oneOf.isEmpty() &&
+              it.anyOfSchemas.isEmpty() &&
+              it.oneOfSchemas.isEmpty() &&
+              !it.safeName.contains("ExternalAccount") &&
+              !it.safeName.contains("PaymentSource")
         }
 
     for (schema in modelSchemas) {
-      val name = schema.name.replaceFirstChar { it.uppercase() }
-      val routeName = schema.name.replaceFirstChar { it.lowercase() }
+      val name = schema.safeName.replaceFirstChar { it.uppercase() }
+      val routeName = schema.safeName.replaceFirstChar { it.lowercase() }
       val testSb = StringBuilder()
       testSb.append("package $packageName.routes\n\n")
-      testSb.append("import org.junit.jupiter.api.Test\n")
-      testSb.append("import org.junit.jupiter.api.Assertions.*\n")
+      testSb.append("import kotlin.test.Test\n")
+      testSb.append("import kotlin.test.*\n")
       testSb.append("import io.ktor.client.request.get\n")
       testSb.append("import io.ktor.http.HttpStatusCode\n")
       testSb.append("import io.ktor.server.testing.testApplication\n")

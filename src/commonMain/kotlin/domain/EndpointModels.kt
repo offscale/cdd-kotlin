@@ -162,7 +162,42 @@ data class EndpointParameter(
 
     /** Specification extensions (keys starting with `x-`). */
     val extensions: Map<String, Any?> = emptyMap()
-)
+) {
+  val safeName: String
+    get() {
+      val keywords =
+          setOf(
+              "as",
+              "break",
+              "class",
+              "continue",
+              "do",
+              "else",
+              "false",
+              "for",
+              "fun",
+              "if",
+              "in",
+              "interface",
+              "is",
+              "null",
+              "object",
+              "package",
+              "return",
+              "super",
+              "this",
+              "throw",
+              "true",
+              "try",
+              "typealias",
+              "typeof",
+              "val",
+              "var",
+              "when",
+              "while")
+      return if (name in keywords) "`$name`" else name
+    }
+}
 
 /**
  * Describes a single header for HTTP responses and for individual parts in multipart

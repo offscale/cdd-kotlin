@@ -1,0 +1,84 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Invalid Spec",
+    "version": "1.0",
+    "contact": {
+      "email": "not-an-email",
+      "url": "not-a-url"
+    },
+    "license": {
+      "url": "invalid-url"
+    }
+  },
+  "servers": [
+    {
+      "url": "/relative-url"
+    }
+  ],
+  "paths": {
+    "/items/{id}": {
+      "get": {
+        "operationId": "getItems",
+        "responses": {
+          "200": {
+            "description": "ok",
+            "links": {
+              "MyLink": {
+                "operationId": "unknown",
+                "operationRef": "bad-ref"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "getItems"
+      }
+    },
+    "/items/{id2}": {
+      "get": {
+        "operationId": "getItems2",
+        "responses": {
+          "200": {
+            "description": "ok"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Valid": {
+        "type": "string"
+      },
+      "BadRef": {
+        "$ref": "#/components/schemas/Unknown"
+      }
+    },
+    "links": {
+      "BadLink": {
+        "operationId": "un",
+        "operationRef": "xx"
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "A",
+      "parent": "B"
+    },
+    {
+      "name": "B",
+      "parent": "A"
+    },
+    {
+      "name": "A"
+    }
+  ],
+  "security": [
+    {
+      "Unknown": []
+    }
+  ]
+}

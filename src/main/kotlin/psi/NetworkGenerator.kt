@@ -153,7 +153,7 @@ class NetworkGenerator {
     }
 
     if (needsJsonEncoding) {
-      baseImports.add("kotlinx.serialization.encodeToJsonElement")
+      baseImports.add("kotlinx.serialization.json.encodeToJsonElement")
       baseImports.add("kotlinx.serialization.encodeToString")
       if (needsSequentialJsonDecoding) {
         baseImports.add("kotlinx.serialization.decodeFromString")
@@ -667,7 +667,7 @@ class NetworkGenerator {
                             i += 1
                             continue
                         }
-                        val bytes = ch.toString().toByteArray(Charsets.UTF_8)
+                        val bytes = ch.toString().encodeToByteArray()
                         for (b in bytes) {
                             sb.append('%')
                             sb.append(byteToHex(b))
@@ -704,7 +704,7 @@ class NetworkGenerator {
                             i += 1
                             continue
                         }
-                        val bytes = ch.toString().toByteArray(Charsets.UTF_8)
+                        val bytes = ch.toString().encodeToByteArray()
                         for (b in bytes) {
                             sb.append('%')
                             sb.append(byteToHex(b))
@@ -729,13 +729,13 @@ class NetworkGenerator {
                     return when {
                         normalized == "application/x-www-form-urlencoded" -> encodeFormUrlEncoded(value)
                         normalized == "application/json" || normalized.endsWith("+json") -> encodeJsonQuery(value)
-                        else -> encodeURLQueryComponent(value.toString())
+                        else -> value.toString().encodeURLQueryComponent()
                     }
                 }
 
                 private inline fun <reified T> encodeJsonQuery(value: T): String {
                     val json = Json.encodeToString(value)
-                    return encodeURLQueryComponent(json)
+                    return json.encodeURLQueryComponent()
                 }
             """
               .trimIndent()
@@ -761,7 +761,7 @@ class NetworkGenerator {
                         }
                         return params.formUrlEncode()
                     }
-                    return encodeURLQueryComponent(jsonElementToString(element))
+                    return jsonElementToString(element).encodeURLQueryComponent()
                 }
             """
               .trimIndent()
@@ -992,7 +992,7 @@ class NetworkGenerator {
                 }
 
                 private fun encodeFormComponent(value: String, allowReserved: Boolean): String {
-                    val encoded = if (allowReserved) encodeAllowReserved(value) else encodeURLQueryComponent(value)
+                    val encoded = if (allowReserved) encodeAllowReserved(value) else value.encodeURLQueryComponent()
                     return encoded.replace("%20", "+")
                 }
             """
@@ -1298,6 +1298,40 @@ class NetworkGenerator {
             }
         """
         .trimIndent()
+  }
+
+  private fun escapeKotlinKeyword(name: String): String {
+    val keywords =
+        setOf(
+            "as",
+            "break",
+            "class",
+            "continue",
+            "do",
+            "else",
+            "false",
+            "for",
+            "fun",
+            "if",
+            "in",
+            "interface",
+            "is",
+            "null",
+            "object",
+            "package",
+            "return",
+            "super",
+            "this",
+            "throw",
+            "true",
+            "try",
+            "typealias",
+            "typeof",
+            "val",
+            "var",
+            "when",
+            "while")
+    return if (name in keywords) "`$name`" else name
   }
 
   private fun sanitizeVariableName(raw: String): String {
@@ -2649,7 +2683,7 @@ class NetworkGenerator {
               val deprecatedAnnotation =
                   if (param.deprecated) "@Deprecated(\"Deprecated parameter\") " else ""
               val defaultValue = if (optional && !isOverride) " = null" else ""
-              "$deprecatedAnnotation${param.name}: $type$defaultValue"
+              "$deprecatedAnnotation${param.safeName}: $type$defaultValue"
             }
             .toMutableList()
 
@@ -2720,15 +2754,15 @@ class NetworkGenerator {
           when (param.location) {
             ParameterLocation.QUERY -> {
               val queryLines = buildQueryParamLines(param, paramType)
-              wrapOptional(optional, param.name, queryLines.lines, queryLines.emptyValueLine)
+              wrapOptional(optional, param.safeName, queryLines.lines, queryLines.emptyValueLine)
             }
             ParameterLocation.HEADER -> {
               val baseLines = buildHeaderParamLines(param, paramType)
-              wrapOptional(optional, param.name, baseLines)
+              wrapOptional(optional, param.safeName, baseLines)
             }
             ParameterLocation.COOKIE -> {
               val baseLines = buildCookieParamLines(param, paramType)
-              wrapOptional(optional, param.name, baseLines)
+              wrapOptional(optional, param.safeName, baseLines)
             }
             ParameterLocation.PATH,
             ParameterLocation.QUERYSTRING,
@@ -3347,9 +3381,9 @@ class NetworkGenerator {
       val contentType = resolveParameterContentType(param)
       val serialized =
           if (contentType != null) {
-            "serializeContentValue(${param.name}, \"$contentType\")"
+            "serializeContentValue(${param.safeName}, \"$contentType\")"
           } else {
-            "${param.name}.toString()"
+            "${param.safeName}.toString()"
           }
       val emptyValueLine =
           if (param.allowEmptyValue == true) {
@@ -3384,9 +3418,9 @@ class NetworkGenerator {
           !isList && !isMap -> {
             if (allowReserved) {
               listOf(
-                  "url.encodedParameters.append(\"${param.name}\", encodeAllowReserved(${param.name}.toString()))")
+                  "url.encodedParameters.append(\"${param.name}\", encodeAllowReserved(${param.safeName}.toString()))")
             } else {
-              listOf("parameter(\"${param.name}\", ${param.name})")
+              listOf("parameter(\"${param.name}\", ${param.safeName})")
             }
           }
           isList -> buildQueryArrayLines(param, style, explode, allowReserved)
@@ -3407,10 +3441,10 @@ class NetworkGenerator {
         ParameterStyle.FORM -> {
           if (explode) {
             listOf(
-                "${param.name}.forEach { value -> url.encodedParameters.append(\"${param.name}\", encodeAllowReserved(value.toString())) }")
+                "${param.safeName}.forEach { value -> url.encodedParameters.append(\"${param.name}\", encodeAllowReserved(value.toString())) }")
           } else {
             listOf(
-                "url.encodedParameters.append(\"${param.name}\", encodeAllowReserved(${param.name}.joinToString(\",\")))")
+                "url.encodedParameters.append(\"${param.name}\", encodeAllowReserved(${param.safeName}.joinToString(\",\")))")
           }
         }
         ParameterStyle.SPACE_DELIMITED -> {
@@ -3419,7 +3453,7 @@ class NetworkGenerator {
                 "OAS 3.2: spaceDelimited does not support explode=true for ${param.name}")
           }
           listOf(
-              "url.encodedParameters.append(\"${param.name}\", encodeAllowReserved(${param.name}.joinToString(\" \")))")
+              "url.encodedParameters.append(\"${param.name}\", encodeAllowReserved(${param.safeName}.joinToString(\" \")))")
         }
         ParameterStyle.PIPE_DELIMITED -> {
           if (explode) {
@@ -3427,24 +3461,25 @@ class NetworkGenerator {
                 "OAS 3.2: pipeDelimited does not support explode=true for ${param.name}")
           }
           listOf(
-              "url.encodedParameters.append(\"${param.name}\", encodeAllowReserved(${param.name}.joinToString(\"|\")))")
+              "url.encodedParameters.append(\"${param.name}\", encodeAllowReserved(${param.safeName}.joinToString(\"|\")))")
         }
         ParameterStyle.DEEP_OBJECT -> {
-          throw IllegalArgumentException(
-              "OAS 3.2: deepObject only applies to objects for ${param.name}")
+          // Many specs use deepObject for arrays to indicate [] notation
+          listOf(
+              "${param.safeName}.forEach { value -> url.encodedParameters.append(\"${param.name}[]\", encodeAllowReserved(value.toString())) }")
         }
         else ->
             listOf(
-                "url.encodedParameters.append(\"${param.name}\", encodeAllowReserved(${param.name}.toString()))")
+                "url.encodedParameters.append(\"${param.name}\", encodeAllowReserved(${param.safeName}.toString()))")
       }
     }
 
     return when (style) {
       ParameterStyle.FORM -> {
         if (explode) {
-          listOf("${param.name}.forEach { value -> parameter(\"${param.name}\", value) }")
+          listOf("${param.safeName}.forEach { value -> parameter(\"${param.name}\", value) }")
         } else {
-          listOf("parameter(\"${param.name}\", ${param.name}.joinToString(\",\"))")
+          listOf("parameter(\"${param.name}\", ${param.safeName}.joinToString(\",\"))")
         }
       }
       ParameterStyle.SPACE_DELIMITED -> {
@@ -3452,20 +3487,19 @@ class NetworkGenerator {
           throw IllegalArgumentException(
               "OAS 3.2: spaceDelimited does not support explode=true for ${param.name}")
         }
-        listOf("parameter(\"${param.name}\", ${param.name}.joinToString(\" \"))")
+        listOf("parameter(\"${param.name}\", ${param.safeName}.joinToString(\" \"))")
       }
       ParameterStyle.PIPE_DELIMITED -> {
         if (explode) {
           throw IllegalArgumentException(
               "OAS 3.2: pipeDelimited does not support explode=true for ${param.name}")
         }
-        listOf("parameter(\"${param.name}\", ${param.name}.joinToString(\"|\"))")
+        listOf("parameter(\"${param.name}\", ${param.safeName}.joinToString(\"|\"))")
       }
       ParameterStyle.DEEP_OBJECT -> {
-        throw IllegalArgumentException(
-            "OAS 3.2: deepObject only applies to objects for ${param.name}")
+        listOf("${param.safeName}.forEach { value -> parameter(\"${param.name}[]\", value) }")
       }
-      else -> listOf("parameter(\"${param.name}\", ${param.name})")
+      else -> listOf("parameter(\"${param.name}\", ${param.safeName})")
     }
   }
 
@@ -3480,17 +3514,17 @@ class NetworkGenerator {
         ParameterStyle.FORM -> {
           if (explode) {
             listOf(
-                "${param.name}.forEach { (key, value) -> url.encodedParameters.append(encodeAllowReserved(key.toString()), encodeAllowReserved(value.toString())) }")
+                "${param.safeName}.forEach { (key, value) -> url.encodedParameters.append(encodeAllowReserved(key.toString()), encodeAllowReserved(value.toString())) }")
           } else {
             val joinExpr =
-                "${param.name}.entries.joinToString(\",\") { \"${'$'}{it.key},${'$'}{it.value}\" }"
+                "${param.safeName}.entries.joinToString(\",\") { \"${'$'}{it.key},${'$'}{it.value}\" }"
             listOf(
                 "url.encodedParameters.append(\"${param.name}\", encodeAllowReserved($joinExpr))")
           }
         }
         ParameterStyle.DEEP_OBJECT -> {
           listOf(
-              "${param.name}.forEach { (key, value) -> url.encodedParameters.append(encodeAllowReserved(\"${param.name}[${'$'}key]\"), encodeAllowReserved(value.toString())) }")
+              "${param.safeName}.forEach { (key, value) -> url.encodedParameters.append(encodeAllowReserved(\"${param.name}[${'$'}key]\"), encodeAllowReserved(value.toString())) }")
         }
         ParameterStyle.SPACE_DELIMITED -> {
           if (explode) {
@@ -3498,7 +3532,7 @@ class NetworkGenerator {
                 "OAS 3.2: spaceDelimited does not support explode=true for ${param.name}")
           }
           val joinExpr =
-              "${param.name}.entries.flatMap { listOf(it.key, it.value) }.joinToString(\" \")"
+              "${param.safeName}.entries.flatMap { listOf(it.key, it.value) }.joinToString(\" \")"
           listOf("url.encodedParameters.append(\"${param.name}\", encodeAllowReserved($joinExpr))")
         }
         ParameterStyle.PIPE_DELIMITED -> {
@@ -3507,28 +3541,28 @@ class NetworkGenerator {
                 "OAS 3.2: pipeDelimited does not support explode=true for ${param.name}")
           }
           val joinExpr =
-              "${param.name}.entries.flatMap { listOf(it.key, it.value) }.joinToString(\"|\")"
+              "${param.safeName}.entries.flatMap { listOf(it.key, it.value) }.joinToString(\"|\")"
           listOf("url.encodedParameters.append(\"${param.name}\", encodeAllowReserved($joinExpr))")
         }
         else ->
             listOf(
-                "url.encodedParameters.append(\"${param.name}\", encodeAllowReserved(${param.name}.toString()))")
+                "url.encodedParameters.append(\"${param.name}\", encodeAllowReserved(${param.safeName}.toString()))")
       }
     }
 
     return when (style) {
       ParameterStyle.FORM -> {
         if (explode) {
-          listOf("${param.name}.forEach { (key, value) -> parameter(key, value) }")
+          listOf("${param.safeName}.forEach { (key, value) -> parameter(key, value) }")
         } else {
           val joinExpr =
-              "${param.name}.entries.joinToString(\",\") { \"${'$'}{it.key},${'$'}{it.value}\" }"
+              "${param.safeName}.entries.joinToString(\",\") { \"${'$'}{it.key},${'$'}{it.value}\" }"
           listOf("parameter(\"${param.name}\", $joinExpr)")
         }
       }
       ParameterStyle.DEEP_OBJECT -> {
         listOf(
-            "${param.name}.forEach { (key, value) -> parameter(\"${param.name}[${'$'}key]\", value) }")
+            "${param.safeName}.forEach { (key, value) -> parameter(\"${param.name}[${'$'}key]\", value) }")
       }
       ParameterStyle.SPACE_DELIMITED -> {
         if (explode) {
@@ -3536,7 +3570,7 @@ class NetworkGenerator {
               "OAS 3.2: spaceDelimited does not support explode=true for ${param.name}")
         }
         val joinExpr =
-            "${param.name}.entries.flatMap { listOf(it.key, it.value) }.joinToString(\" \")"
+            "${param.safeName}.entries.flatMap { listOf(it.key, it.value) }.joinToString(\" \")"
         listOf("parameter(\"${param.name}\", $joinExpr)")
       }
       ParameterStyle.PIPE_DELIMITED -> {
@@ -3545,10 +3579,10 @@ class NetworkGenerator {
               "OAS 3.2: pipeDelimited does not support explode=true for ${param.name}")
         }
         val joinExpr =
-            "${param.name}.entries.flatMap { listOf(it.key, it.value) }.joinToString(\"|\")"
+            "${param.safeName}.entries.flatMap { listOf(it.key, it.value) }.joinToString(\"|\")"
         listOf("parameter(\"${param.name}\", $joinExpr)")
       }
-      else -> listOf("parameter(\"${param.name}\", ${param.name})")
+      else -> listOf("parameter(\"${param.name}\", ${param.safeName})")
     }
   }
 
@@ -3578,9 +3612,9 @@ class NetworkGenerator {
       val contentType = resolveParameterContentType(param)
       val serialized =
           if (contentType != null) {
-            "serializeContentValue(${param.name}, \"$contentType\")"
+            "serializeContentValue(${param.safeName}, \"$contentType\")"
           } else {
-            "${param.name}.toString()"
+            "${param.safeName}.toString()"
           }
       return listOf("header(\"${param.name}\", $serialized)")
     }
@@ -3593,13 +3627,13 @@ class NetworkGenerator {
 
     val valueExpr =
         when {
-          !isList && !isMap -> param.name
-          isList -> buildArrayJoinExpr(param.name, ",")
+          !isList && !isMap -> param.safeName
+          isList -> buildArrayJoinExpr(param.safeName, ",")
           isMap -> {
             val keyValueDelimiter = if (explode) "=" else ","
-            buildObjectJoinExpr(param.name, ",", keyValueDelimiter)
+            buildObjectJoinExpr(param.safeName, ",", keyValueDelimiter)
           }
-          else -> param.name
+          else -> param.safeName
         }
 
     // Headers only allow "simple" style in OAS, treat all as simple.
@@ -3615,9 +3649,9 @@ class NetworkGenerator {
       val contentType = resolveParameterContentType(param)
       val serialized =
           if (contentType != null) {
-            "serializeContentValue(${param.name}, \"$contentType\")"
+            "serializeContentValue(${param.safeName}, \"$contentType\")"
           } else {
-            "${param.name}.toString()"
+            "${param.safeName}.toString()"
           }
       return listOf("cookie(\"${param.name}\", $serialized)")
     }
@@ -3630,7 +3664,7 @@ class NetworkGenerator {
     val isMap = isMapType(cleanType)
 
     if (!isList && !isMap) {
-      return listOf("cookie(\"${param.name}\", ${param.name})")
+      return listOf("cookie(\"${param.name}\", ${param.safeName}.toString())")
     }
 
     return when (style) {
@@ -3648,11 +3682,14 @@ class NetworkGenerator {
   ): List<String> {
     return when {
       isList && explode ->
-          listOf("${param.name}.forEach { value -> cookie(\"${param.name}\", value) }")
-      isList -> listOf("cookie(\"${param.name}\", ${buildArrayJoinExpr(param.name, ",")})")
-      isMap && explode -> listOf("${param.name}.forEach { (key, value) -> cookie(key, value) }")
-      isMap -> listOf("cookie(\"${param.name}\", ${buildObjectJoinExpr(param.name, ",", ",")})")
-      else -> listOf("cookie(\"${param.name}\", ${param.name})")
+          listOf(
+              "${param.safeName}.forEach { value -> cookie(\"${param.name}\", value.toString()) }")
+      isList -> listOf("cookie(\"${param.name}\", ${buildArrayJoinExpr(param.safeName, ",")})")
+      isMap && explode ->
+          listOf(
+              "${param.safeName}.forEach { (key, value) -> cookie(key.toString(), value.toString()) }")
+      isMap -> listOf("cookie(\"${param.name}\", ${buildObjectJoinExpr(param.safeName, ",", ",")})")
+      else -> listOf("cookie(\"${param.name}\", ${param.safeName}.toString())")
     }
   }
 
@@ -3665,21 +3702,21 @@ class NetworkGenerator {
     if (explode) {
       return when {
         isList -> {
-          val expr = "${param.name}.joinToString(\"&\") { \"${param.name}=${'$'}it\" }"
+          val expr = "${param.safeName}.joinToString(\"&\") { \"${param.name}=${'$'}it\" }"
           listOf("header(\"Cookie\", $expr)")
         }
         isMap -> {
-          val expr = buildObjectJoinExpr(param.name, "&", "=")
+          val expr = buildObjectJoinExpr(param.safeName, "&", "=")
           listOf("header(\"Cookie\", $expr)")
         }
-        else -> listOf("cookie(\"${param.name}\", ${param.name})")
+        else -> listOf("cookie(\"${param.name}\", ${param.safeName}.toString())")
       }
     }
 
     return when {
-      isList -> listOf("cookie(\"${param.name}\", ${buildArrayJoinExpr(param.name, ",")})")
-      isMap -> listOf("cookie(\"${param.name}\", ${buildObjectJoinExpr(param.name, ",", ",")})")
-      else -> listOf("cookie(\"${param.name}\", ${param.name})")
+      isList -> listOf("cookie(\"${param.name}\", ${buildArrayJoinExpr(param.safeName, ",")})")
+      isMap -> listOf("cookie(\"${param.name}\", ${buildObjectJoinExpr(param.safeName, ",", ",")})")
+      else -> listOf("cookie(\"${param.name}\", ${param.safeName}.toString())")
     }
   }
 
@@ -3692,9 +3729,9 @@ class NetworkGenerator {
       val contentType = resolveParameterContentType(param)
       val serialized =
           if (contentType != null) {
-            "serializeContentValue(${param.name}, \"$contentType\")"
+            "serializeContentValue(${param.safeName}, \"$contentType\")"
           } else {
-            "${param.name}.toString()"
+            "${param.safeName}.toString()"
           }
       return template("encodePathComponent($serialized, false)")
     }
@@ -3708,7 +3745,7 @@ class NetworkGenerator {
     val isMap = isMapType(cleanType)
 
     if (!isList && !isMap) {
-      val encoded = "encodePathComponent(${param.name}.toString(), $allowReserved)"
+      val encoded = "encodePathComponent(${param.safeName}.toString(), $allowReserved)"
       return when (style) {
         ParameterStyle.MATRIX -> ";${param.name}=${template(encoded)}"
         ParameterStyle.LABEL -> ".${template(encoded)}"
@@ -3718,10 +3755,10 @@ class NetworkGenerator {
 
     return when (style) {
       ParameterStyle.MATRIX ->
-          buildMatrixPathReplacement(param.name, isList, isMap, explode, allowReserved)
+          buildMatrixPathReplacement(param.safeName, isList, isMap, explode, allowReserved)
       ParameterStyle.LABEL ->
-          buildLabelPathReplacement(param.name, isList, isMap, explode, allowReserved)
-      else -> buildSimplePathReplacement(param.name, isList, isMap, explode, allowReserved)
+          buildLabelPathReplacement(param.safeName, isList, isMap, explode, allowReserved)
+      else -> buildSimplePathReplacement(param.safeName, isList, isMap, explode, allowReserved)
     }
   }
 

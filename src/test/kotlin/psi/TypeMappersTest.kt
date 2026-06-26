@@ -17,7 +17,7 @@ class TypeMappersTest {
     assertEquals("Pet", TypeMappers.mapType(dynamicRefProp))
 
     val anySchema = SchemaProperty(booleanSchema = true)
-    assertEquals("Any", TypeMappers.mapType(anySchema))
+    assertEquals("kotlinx.serialization.json.JsonElement", TypeMappers.mapType(anySchema))
 
     val neverSchema = SchemaProperty(booleanSchema = false)
     assertEquals("Nothing", TypeMappers.mapType(neverSchema))
@@ -35,10 +35,10 @@ class TypeMappersTest {
     assertEquals("String", TypeMappers.mapType(emptyTypesProp))
 
     val unknownProp = SchemaProperty(types = setOf("object"))
-    assertEquals("Any", TypeMappers.mapType(unknownProp))
+    assertEquals("kotlinx.serialization.json.JsonElement", TypeMappers.mapType(unknownProp))
 
     val arrayProp = SchemaProperty(type = "array")
-    assertEquals("List<Any>", TypeMappers.mapType(arrayProp))
+    assertEquals("List<kotlinx.serialization.json.JsonElement>", TypeMappers.mapType(arrayProp))
 
     val mapProp =
         SchemaProperty(type = "object", additionalProperties = SchemaProperty(type = "string"))
@@ -48,7 +48,7 @@ class TypeMappersTest {
   @Test
   fun `mapType infers types when schema type is omitted`() {
     val objectProp = SchemaProperty(properties = mapOf("id" to SchemaProperty(type = "string")))
-    assertEquals("Any", TypeMappers.mapType(objectProp))
+    assertEquals("kotlinx.serialization.json.JsonElement", TypeMappers.mapType(objectProp))
 
     val mapProp = SchemaProperty(additionalProperties = SchemaProperty(type = "string"))
     assertEquals("Map<String, String>", TypeMappers.mapType(mapProp))
@@ -152,11 +152,11 @@ class TypeMappersTest {
 
     // map const
     val mapConstProp = SchemaProperty(constValue = mapOf("a" to 1))
-    assertEquals("Any", TypeMappers.mapType(mapConstProp))
+    assertEquals("kotlinx.serialization.json.JsonElement", TypeMappers.mapType(mapConstProp))
 
     // list const
     val listConstProp = SchemaProperty(constValue = listOf(1))
-    assertEquals("List<Any>", TypeMappers.mapType(listConstProp))
+    assertEquals("List<kotlinx.serialization.json.JsonElement>", TypeMappers.mapType(listConstProp))
 
     // Map with 1 arg
     val map1Arg = TypeMappers.kotlinToSchemaProperty("Map<String>")

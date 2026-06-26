@@ -511,7 +511,7 @@ class DtoGeneratorTest {
     assertTrue(text.contains("sealed interface PolymorphicPet"))
     assertTrue(text.contains("@JsonClassDiscriminator(\"petType\")"))
     assertTrue(text.contains("val id: Int?"))
-    assertTrue(text.contains("import kotlinx.serialization.JsonClassDiscriminator"))
+    assertTrue(text.contains("import kotlinx.serialization.json.JsonClassDiscriminator"))
   }
 
   @Test

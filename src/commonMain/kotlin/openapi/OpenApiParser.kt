@@ -149,6 +149,7 @@ class OpenApiParser() {
     val normalizedRefBase = refBase.trimEnd('#')
     return normalizedRefBase == selfBase
   }
+
   /** Supported input formats for OpenAPI sources. */
   enum class Format {
     /** Auto-detect format based on file extension or content. */

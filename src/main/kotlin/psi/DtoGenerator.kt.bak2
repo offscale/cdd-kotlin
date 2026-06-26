@@ -15,39 +15,6 @@ import org.jetbrains.kotlin.psi.KtFile
  * Content Encoding.
  */
 class DtoGenerator {
-  private fun escapeKotlinKeyword(name: String): String {
-    val keywords =
-        setOf(
-            "as",
-            "break",
-            "class",
-            "continue",
-            "do",
-            "else",
-            "false",
-            "for",
-            "fun",
-            "if",
-            "in",
-            "interface",
-            "is",
-            "null",
-            "object",
-            "package",
-            "return",
-            "super",
-            "this",
-            "throw",
-            "true",
-            "try",
-            "typealias",
-            "typeof",
-            "val",
-            "var",
-            "when",
-            "while")
-    return if (name in keywords) "`$name`" else name
-  }
 
   private val psiFactory = PsiInfrastructure.createPsiFactory()
   private val jsonMapper = ObjectMapper(JsonFactory())
@@ -62,7 +29,7 @@ class DtoGenerator {
    */
   fun generateDto(packageName: String, definition: SchemaDefinition): KtFile {
     val content = buildSource(packageName, definition)
-    return psiFactory.createFile("${definition.safeName}.kt", content)
+    return psiFactory.createFile("${safeName}.kt", content)
   }
 
   private fun buildSource(packageName: String, definition: SchemaDefinition): String {
@@ -137,7 +104,7 @@ class DtoGenerator {
             ${imports.sorted().joinToString("\n") { "import $it" }}
 
             $kdoc$deprecatedAnnotation
-            typealias ${definition.safeName} = $kotlinType
+            typealias ${safeName} = $kotlinType
         """
         .trimIndent()
   }
@@ -155,7 +122,7 @@ class DtoGenerator {
             package $packageName
 
             $kdoc$deprecatedAnnotation
-            typealias ${definition.safeName} = $kotlinType
+            typealias ${safeName} = $kotlinType
         """
         .trimIndent()
   }
@@ -173,7 +140,7 @@ class DtoGenerator {
             package $packageName
 
             $kdoc$deprecatedAnnotation
-            typealias ${definition.safeName} = $target
+            typealias ${safeName} = $target
         """
         .trimIndent()
   }
@@ -198,7 +165,7 @@ class DtoGenerator {
             ${imports.sorted().joinToString("\n") { "import $it" }}
 
             $kdoc$deprecatedAnnotation
-            typealias ${definition.safeName} = Map<String, $valueType>
+            typealias ${safeName} = Map<String, $valueType>
         """
         .trimIndent()
   }
@@ -211,7 +178,7 @@ class DtoGenerator {
     val imports =
         mutableSetOf(
             "kotlinx.serialization.Serializable",
-            "kotlinx.serialization.json.JsonClassDiscriminator",
+            "kotlinx.serialization.JsonClassDiscriminator",
             "kotlinx.serialization.ExperimentalSerializationApi")
     addTypeImports(imports, definition)
 
@@ -233,7 +200,7 @@ class DtoGenerator {
               val desc = buildPropertyKDoc(prop)
               val deprecatedPropAnnotation =
                   buildDeprecatedAnnotation(prop.deprecated, indent = "    ")
-              "$desc$deprecatedPropAnnotation    val ${escapeKotlinKeyword(name)}: $kotlinType"
+              "$desc$deprecatedPropAnnotation    val $name: $kotlinType"
             }
             .joinToString("\n\n")
 
@@ -244,7 +211,7 @@ class DtoGenerator {
 
             $kdoc$deprecatedAnnotation@Serializable
             $discriminatorAnnotation
-            sealed interface ${definition.safeName} { 
+            sealed interface ${safeName} { 
             $propertyLines
             } 
         """
@@ -258,7 +225,6 @@ class DtoGenerator {
   ): String {
     val imports = mutableSetOf<String>()
     imports.add("kotlinx.serialization.Serializable")
-    imports.add("kotlinx.serialization.Contextual")
     imports.add("kotlinx.serialization.SerialName")
     addTypeImports(imports, definition)
 
@@ -281,29 +247,23 @@ class DtoGenerator {
               val deprecatedPropAnnotation =
                   buildDeprecatedAnnotation(prop.deprecated, indent = "    ")
               val serialName = "    @SerialName(\"$name\")"
-              val contextual =
-                  if (kotlinType.startsWith("Any") || kotlinType.startsWith("Map<String, Any"))
-                      "    @Contextual\n"
-                  else ""
-              "$desc$deprecatedPropAnnotation$serialName\n$contextual    val ${escapeKotlinKeyword(name)}: $kotlinType$defaultVal"
+
+              "$desc$deprecatedPropAnnotation$serialName\n    val $name: $kotlinType$defaultVal"
             }
             .joinToString(",\n\n")
 
     val kdoc = buildClassKDoc(definition)
     val deprecatedAnnotation = buildDeprecatedAnnotation(definition.deprecated)
 
-    val isDataClass = propertyLines.isNotBlank()
-    val classKeyword = if (isDataClass) "data class" else "class"
-    val classBody =
-        if (isDataClass) "( \n            $propertyLines\n            )$inheritanceClause"
-        else "$inheritanceClause"
     return """ 
             package $packageName
             
             ${imports.sorted().joinToString("\n") { "import $it" }} 
             
             $kdoc$deprecatedAnnotation@Serializable
-            $classKeyword ${escapeKotlinKeyword(definition.safeName)}$classBody
+            data class ${safeName}( 
+            $propertyLines
+            )$inheritanceClause
         """
         .trimIndent()
   }
@@ -328,7 +288,7 @@ class DtoGenerator {
             ${imports.sorted().joinToString("\n") { "import $it" }} 
 
             $kdoc$deprecatedAnnotation@Serializable
-            enum class ${definition.safeName} { 
+            enum class ${safeName} { 
             $entries
             } 
         """

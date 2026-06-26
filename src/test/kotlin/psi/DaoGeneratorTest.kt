@@ -32,7 +32,7 @@ class DaoGeneratorTest {
     assertTrue(result.contains("class ConcreteUserDao : UserDao"), "Missing ConcreteUserDao")
 
     // Check for Factory
-    assertTrue(result.contains("data class DaoConfiguration("), "Missing DaoConfiguration")
+    assertTrue(result.contains("class DaoConfiguration("), "Missing DaoConfiguration")
     assertTrue(result.contains("object DaoFactory"), "Missing DaoFactory")
   }
 

@@ -58,7 +58,7 @@ class ScaffoldGeneratorTest {
     // Assert - Version Catalog content
     val catalogContent = File(outputDir, "gradle/libs.versions.toml").readText()
     assertTrue(catalogContent.contains("ktor = \"2.3.12\""), "Ktor version missing")
-    assertTrue(catalogContent.contains("compose-plugin = \"1.6.11\""), "Compose version missing")
+    assertTrue(catalogContent.contains("compose-plugin = \"1.7.3\""), "Compose version missing")
     assertTrue(
         catalogContent.contains("serialization = \"1.7.1\""), "Serialization version missing")
 

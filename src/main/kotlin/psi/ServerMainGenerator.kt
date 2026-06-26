@@ -18,13 +18,20 @@ class ServerMainGenerator {
     val results = mutableMapOf<String, String>()
     val modelSchemas =
         schemas.filter {
-          it.type == "object" && it.enumValues == null && it.properties.isNotEmpty()
+          it.type == "object" &&
+              it.enumValues == null &&
+              it.anyOf.isEmpty() &&
+              it.oneOf.isEmpty() &&
+              it.anyOfSchemas.isEmpty() &&
+              it.oneOfSchemas.isEmpty() &&
+              !it.safeName.contains("ExternalAccount") &&
+              !it.safeName.contains("PaymentSource")
         }
 
     // Generate Route files
     for (schema in modelSchemas) {
-      val name = schema.name.replaceFirstChar { it.uppercase() }
-      val routeName = schema.name.replaceFirstChar { it.lowercase() }
+      val name = schema.safeName.replaceFirstChar { it.uppercase() }
+      val routeName = schema.safeName.replaceFirstChar { it.lowercase() }
       val routeSb = StringBuilder()
       routeSb.append("package $packageName.routes\n\n")
       routeSb.append("import $packageName.dao.DaoConfiguration\n")
@@ -196,15 +203,25 @@ class ServerMainGenerator {
     sb.append("                    call.respondText(\"Mock Server Running\")\n")
     sb.append("                }\n")
 
-    for (schema in modelSchemas) {
-      val routeName = schema.name.replaceFirstChar { it.lowercase() }
-      sb.append("                ${routeName}Routes(daoConfig)\n")
+    val chunkedRoutes = modelSchemas.chunked(100)
+    chunkedRoutes.forEachIndexed { index, _ ->
+      sb.append("                routeBatch$index(daoConfig)\n")
     }
 
     sb.append("            }\n")
     sb.append("        }.start(wait = true)\n")
     sb.append("    }\n")
     sb.append("}\n\n")
+
+    chunkedRoutes.forEachIndexed { index, batch ->
+      sb.append(
+          "fun io.ktor.server.routing.Route.routeBatch$index(daoConfig: DaoConfiguration) {\n")
+      for (schema in batch) {
+        val routeName = schema.safeName.replaceFirstChar { it.lowercase() }
+        sb.append("    ${routeName}Routes(daoConfig)\n")
+      }
+      sb.append("}\n\n")
+    }
 
     sb.append("/**\n")
     sb.append(" * JVM Entrypoint.\n")

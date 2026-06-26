@@ -13,6 +13,40 @@ import domain.SchemaDefinition
  */
 class DaoGenerator {
 
+  private fun escapeKotlinKeyword(name: String): String {
+    val keywords =
+        setOf(
+            "as",
+            "break",
+            "class",
+            "continue",
+            "do",
+            "else",
+            "false",
+            "for",
+            "fun",
+            "if",
+            "in",
+            "interface",
+            "is",
+            "null",
+            "object",
+            "package",
+            "return",
+            "super",
+            "this",
+            "throw",
+            "true",
+            "try",
+            "typealias",
+            "typeof",
+            "val",
+            "var",
+            "when",
+            "while")
+    return if (name in keywords) "`$name`" else name
+  }
+
   /**
    * Generates the entire DAO module source code as a single string.
    *
@@ -22,7 +56,14 @@ class DaoGenerator {
   fun generateDaos(packageName: String, schemas: List<SchemaDefinition>): Map<String, String> {
     val modelSchemas =
         schemas.filter {
-          it.type == "object" && it.enumValues == null && it.properties.isNotEmpty()
+          it.type == "object" &&
+              it.enumValues == null &&
+              it.anyOf.isEmpty() &&
+              it.oneOf.isEmpty() &&
+              it.anyOfSchemas.isEmpty() &&
+              it.oneOfSchemas.isEmpty() &&
+              !it.safeName.contains("ExternalAccount") &&
+              !it.safeName.contains("PaymentSource")
         }
 
     val results = mutableMapOf<String, String>()
@@ -44,7 +85,7 @@ class DaoGenerator {
       sb.append(generateStubDao(schema))
       sb.append(generateConcreteDao(schema))
 
-      val name = schema.name.replaceFirstChar { it.uppercase() }
+      val name = schema.safeName.replaceFirstChar { it.uppercase() }
       results["dao/${name}Dao.kt"] = sb.toString()
     }
 
@@ -60,7 +101,7 @@ class DaoGenerator {
 
   private fun generateAbstractInterface(schema: SchemaDefinition): String {
     val sb = StringBuilder()
-    val name = schema.name.replaceFirstChar { it.uppercase() }
+    val name = schema.safeName.replaceFirstChar { it.uppercase() }
     sb.append("/**\n")
     sb.append(" * Data Access Object interface for [$name].\n")
     sb.append(" */\n")
@@ -97,7 +138,7 @@ class DaoGenerator {
 
   private fun generateStubDao(schema: SchemaDefinition): String {
     val sb = StringBuilder()
-    val name = schema.name.replaceFirstChar { it.uppercase() }
+    val name = schema.safeName.replaceFirstChar { it.uppercase() }
     sb.append("/**\n")
     sb.append(" * Traditional Scaffold Stub DAO for [$name].\n")
     sb.append(" * Throws NotImplementedError for all operations.\n")
@@ -123,13 +164,17 @@ class DaoGenerator {
 
   private fun generateConcreteDao(schema: SchemaDefinition): String {
     val sb = StringBuilder()
-    val name = schema.name.replaceFirstChar { it.uppercase() }
+    val name = schema.safeName.replaceFirstChar { it.uppercase() }
     val tableName = "${name}Table"
 
     sb.append("/**\n")
     sb.append(" * Exposed Table definition for [$name].\n")
     sb.append(" */\n")
     sb.append("object $tableName : Table(\"${name.lowercase()}s\") {\n")
+
+    if (schema.properties.isEmpty()) {
+      sb.append("    val _dummy = integer(\"_dummy\").default(0)\n")
+    }
 
     for ((propName, prop) in schema.properties) {
       val ktTypeWithNull = TypeMappers.mapType(prop)
@@ -146,10 +191,16 @@ class DaoGenerator {
           }
       val dbType = if (isNullable && propName != "id") "$dbTypeBase.nullable()" else dbTypeBase
       if (propName == "id") {
-        sb.append("    val id = $dbType.autoIncrement()\n")
-        sb.append("    override val primaryKey = PrimaryKey(id)\n")
+        val ktTypeWithNullId = TypeMappers.mapType(schema.properties["id"]!!)
+        val isAutoInc = ktTypeWithNullId == "Int" || ktTypeWithNullId == "Long"
+        if (isAutoInc) {
+          sb.append("    val idColumn = $dbType.autoIncrement()\n")
+        } else {
+          sb.append("    val idColumn = $dbType\n")
+        }
+        sb.append("    override val primaryKey = PrimaryKey(idColumn)\n")
       } else {
-        sb.append("    val $propName = $dbType\n")
+        sb.append("    val ${propName}Column = $dbType\n")
       }
     }
     sb.append("}\n\n")
@@ -174,12 +225,13 @@ class DaoGenerator {
       if (isComplex) {
         if (isNullable) {
           sb.append(
-              "        $propName = row[$tableName.$propName]?.let { Json.decodeFromString(it) },\n")
+              "        ${escapeKotlinKeyword(propName)} = row[$tableName.${propName}Column]?.let { Json.decodeFromString(it) },\n")
         } else {
-          sb.append("        $propName = Json.decodeFromString(row[$tableName.$propName]),\n")
+          sb.append(
+              "        ${escapeKotlinKeyword(propName)} = Json.decodeFromString(row[$tableName.${propName}Column]),\n")
         }
       } else {
-        sb.append("        $propName = row[$tableName.$propName],\n")
+        sb.append("        ${escapeKotlinKeyword(propName)} = row[$tableName.${propName}Column],\n")
       }
     }
     sb.append("    )\n\n")
@@ -194,26 +246,32 @@ class DaoGenerator {
       sb.append(
           "    override suspend fun getById(id: $idType): $name? = withContext(Dispatchers.IO) {\n")
       sb.append(
-          "        transaction { $tableName.selectAll().where { $tableName.id eq id }.map { toEntity(it) }.singleOrNull() }\n")
+          "        transaction { $tableName.selectAll().where { $tableName.idColumn eq ${if (idType != "String" && idType != "Int" && idType != "Long") "Json.encodeToString(id)" else "id"} }.map { toEntity(it) }.singleOrNull() }\n")
       sb.append("    }\n\n")
 
       sb.append(
           "    override suspend fun delete(id: $idType): Boolean = withContext(Dispatchers.IO) {\n")
       sb.append(
-          "        transaction { $tableName.deleteWhere { with(SqlExpressionBuilder) { $tableName.id eq id } } > 0 }\n")
+          "        transaction { $tableName.deleteWhere { with(SqlExpressionBuilder) { $tableName.idColumn eq ${if (idType != "String" && idType != "Int" && idType != "Long") "Json.encodeToString(id)" else "id"} } } > 0 }\n")
       sb.append("    }\n\n")
     }
 
     sb.append(
         "    override suspend fun create(entity: $name): $name = withContext(Dispatchers.IO) {\n")
     sb.append("        transaction {\n")
-    if (idProp != null) {
+    val isAutoInc =
+        idProp != null &&
+            (TypeMappers.mapType(idProp) == "Int" || TypeMappers.mapType(idProp) == "Long")
+    if (isAutoInc) {
       sb.append("            val insertedId = $tableName.insert { \n")
     } else {
       sb.append("            $tableName.insert { \n")
     }
+    if (schema.properties.isEmpty()) {
+      sb.append("                it[$tableName._dummy] = 0\n")
+    }
     for ((propName, prop) in schema.properties) {
-      if (propName != "id") {
+      if (propName != "id" || !isAutoInc) {
         val ktTypeWithNull = TypeMappers.mapType(prop)
         val isNullable = !schema.required.contains(propName) || ktTypeWithNull.endsWith("?")
         val ktType = ktTypeWithNull.removeSuffix("?")
@@ -225,19 +283,29 @@ class DaoGenerator {
                 ktType != "String"
         if (isComplex) {
           if (isNullable) {
+            val fallback =
+                if (propName == "id")
+                    "\"{ \\\"uuid\\\": \\\"id_\${java.util.UUID.randomUUID()}\\\" }\""
+                else "\"{}\""
             sb.append(
-                "                it[$tableName.$propName] = entity.$propName?.let { v -> Json.encodeToString(v) }\n")
+                "                it[$tableName.${propName}Column] = entity.${escapeKotlinKeyword(propName)}?.let { v -> Json.encodeToString(v) } ?: $fallback\n")
           } else {
             sb.append(
-                "                it[$tableName.$propName] = Json.encodeToString(entity.$propName)\n")
+                "                it[$tableName.${propName}Column] = Json.encodeToString(entity.${escapeKotlinKeyword(propName)})\n")
           }
         } else {
-          sb.append("                it[$tableName.$propName] = entity.$propName\n")
+          if (propName == "id" && isNullable) {
+            sb.append(
+                "                it[$tableName.${propName}Column] = entity.${escapeKotlinKeyword(propName)} ?: \"id_\${java.util.UUID.randomUUID()}\"\n")
+          } else {
+            sb.append(
+                "                it[$tableName.${propName}Column] = entity.${escapeKotlinKeyword(propName)}\n")
+          }
         }
       }
     }
-    if (idProp != null) {
-      sb.append("            } [${tableName}.id]\n")
+    if (isAutoInc) {
+      sb.append("            } [${tableName}.idColumn]\n")
       sb.append("            entity.copy(id = insertedId)\n")
     } else {
       sb.append("            }\n")
@@ -249,17 +317,18 @@ class DaoGenerator {
     return sb.toString()
   }
 
-  private fun generateDaoFactory(schemas: List<SchemaDefinition>): String {
+  private fun generateDaoFactory(modelSchemas: List<SchemaDefinition>): String {
     val sb = StringBuilder()
     sb.append("/**\n")
     sb.append(" * Configuration object containing DAOs.\n")
     sb.append(" */\n")
-    sb.append("data class DaoConfiguration(\n")
-    for (schema in schemas) {
-      val name = schema.name.replaceFirstChar { it.uppercase() }
-      sb.append("    val ${name.replaceFirstChar { it.lowercase() }}Dao: ${name}Dao,\n")
+    sb.append("class DaoConfiguration(private val daos: Map<String, Any>) {\n")
+    for (schema in modelSchemas) {
+      val name = schema.safeName.replaceFirstChar { it.uppercase() }
+      sb.append(
+          "    val ${name.replaceFirstChar { it.lowercase() }}Dao: ${name}Dao get() = daos[\"${name.replaceFirstChar { it.lowercase() }}Dao\"] as ${name}Dao\n")
     }
-    sb.append(")\n\n")
+    sb.append("}\n\n")
 
     sb.append("/**\n")
     sb.append(" * Dependency Injection routing for DAOs.\n")
@@ -271,24 +340,32 @@ class DaoGenerator {
         "     * @param useConcrete If true, initializes concrete DAOs (and requires DB setup). Otherwise, initializes Stub DAOs.\n")
     sb.append("     */\n")
     sb.append("    fun create(useConcrete: Boolean): DaoConfiguration {\n")
-    sb.append("        return if (useConcrete) {\n")
-    sb.append("            DaoConfiguration(\n")
-    for (schema in schemas) {
-      val name = schema.name.replaceFirstChar { it.uppercase() }
-      sb.append(
-          "                ${name.replaceFirstChar { it.lowercase() }}Dao = Concrete${name}Dao(),\n")
+    sb.append("        val map = mutableMapOf<String, Any>()\n")
+    val chunkedDaos = modelSchemas.chunked(100)
+    chunkedDaos.forEachIndexed { index, _ ->
+      sb.append("        populateBatch$index(map, useConcrete)\n")
     }
-    sb.append("            )\n")
-    sb.append("        } else {\n")
-    sb.append("            DaoConfiguration(\n")
-    for (schema in schemas) {
-      val name = schema.name.replaceFirstChar { it.uppercase() }
+    sb.append("        return DaoConfiguration(map)\n")
+    sb.append("    }\n\n")
+
+    chunkedDaos.forEachIndexed { index, batch ->
       sb.append(
-          "                ${name.replaceFirstChar { it.lowercase() }}Dao = Stub${name}Dao(),\n")
+          "    private fun populateBatch$index(map: MutableMap<String, Any>, useConcrete: Boolean) {\n")
+      sb.append("        if (useConcrete) {\n")
+      for (schema in batch) {
+        val name = schema.safeName.replaceFirstChar { it.uppercase() }
+        sb.append(
+            "            map[\"${name.replaceFirstChar { it.lowercase() }}Dao\"] = Concrete${name}Dao()\n")
+      }
+      sb.append("        } else {\n")
+      for (schema in batch) {
+        val name = schema.safeName.replaceFirstChar { it.uppercase() }
+        sb.append(
+            "            map[\"${name.replaceFirstChar { it.lowercase() }}Dao\"] = Stub${name}Dao()\n")
+      }
+      sb.append("        }\n")
+      sb.append("    }\n\n")
     }
-    sb.append("            )\n")
-    sb.append("        }\n")
-    sb.append("    }\n")
     sb.append("}\n")
     return sb.toString()
   }

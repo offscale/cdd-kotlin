@@ -1,2 +1,2 @@
 #!/bin/bash
-./gradlew run --args="$*"
+python3 scripts/run_with_fallback.py gradle run --args="$*"

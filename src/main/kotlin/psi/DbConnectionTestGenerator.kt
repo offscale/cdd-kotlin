@@ -15,8 +15,8 @@ class DbConnectionTestGenerator {
     val sb = StringBuilder()
     sb.append("package $packageName.db\n\n")
 
-    sb.append("import org.junit.jupiter.api.Assertions.*\n")
-    sb.append("import org.junit.jupiter.api.Test\n\n")
+    sb.append("import kotlin.test.*\n")
+    sb.append("import kotlin.test.Test\n\n")
 
     sb.append("/**\n")
     sb.append(" * Tests for [DatabaseConnection].\n")
