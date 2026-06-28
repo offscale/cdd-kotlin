@@ -17,21 +17,21 @@ repos:
 
       - id: build
         name: Build
-        entry: python3 scripts/run_with_fallback.py gradle assemble
+        entry: ./scripts/run_slow.sh python3 scripts/run_with_fallback.py gradle assemble
         language: system
         pass_filenames: false
         types_or: [kotlin]
 
       - id: test
         name: Test
-        entry: python3 scripts/run_with_fallback.py gradle allTests
+        entry: ./scripts/run_slow.sh python3 scripts/run_with_fallback.py gradle allTests
         language: system
         pass_filenames: false
         types_or: [kotlin]
 
       - id: lint
         name: Lint (Verify)
-        entry: python3 scripts/run_with_fallback.py gradle check
+        entry: ./scripts/run_slow.sh python3 scripts/run_with_fallback.py gradle check
         language: system
         pass_filenames: false
         types_or: [kotlin]

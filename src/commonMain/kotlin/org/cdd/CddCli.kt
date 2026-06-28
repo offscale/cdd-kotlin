@@ -1,6 +1,6 @@
 package org.cdd
 
-import generateOpenApi
+import generateToOpenApi
 import getEnvVar
 import openapi.OpenApiDocument
 import openapi.OpenApiParser
@@ -98,7 +98,7 @@ object CddCli {
     }
 
     try {
-      generateOpenApi(inputFile, outputDir)
+      generateToOpenApi(inputFile, outputDir)
     } catch (e: Exception) {
       println("Failed to generate OpenAPI:")
       e.printStackTrace()
@@ -276,6 +276,20 @@ object CddCli {
     peer.onRequest("router/in_memory_generation") { _ ->
       kotlinx.serialization.json.JsonObject(emptyMap())
     }
+
+    transport.startReading()
+    return 0
+  }
+
+  /**
+   * Serves JSON RPC via stdio.
+   *
+   * @param args Command-line arguments.
+   * @return Exit code (0 for success).
+   */
+  fun serveJsonRpc(args: Array<String>): Int {
+    val transport = org.cdd.mcp.StdioTransportImpl()
+    val peer = org.cdd.mcp.McpPeer(transport)
 
     transport.startReading()
     return 0

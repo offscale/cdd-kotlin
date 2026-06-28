@@ -33,7 +33,7 @@ class PlatformJvmCoverageTest {
       java.io.File("dummy").delete()
     } catch (e: Exception) {}
     try {
-      generateOpenApi("dummy", "dummy")
+      generateToOpenApi("dummy", "dummy")
     } catch (e: Exception) {}
   }
 }

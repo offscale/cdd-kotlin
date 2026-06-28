@@ -81,6 +81,20 @@ class CliCoverageTest {
   }
 
   @Test
+  fun testServeJsonRpc() {
+    val inStream = ByteArrayInputStream("".toByteArray())
+    val oldIn = System.`in`
+    System.setIn(inStream)
+    try {
+      val args = arrayOf("serve_json_rpc")
+      val exitCode = runCli(args)
+      assertEquals(0, exitCode)
+    } finally {
+      System.setIn(oldIn)
+    }
+  }
+
+  @Test
   fun testCliToOpenApi() {
     val outDir = Files.createTempDirectory("test_openapi").toFile()
     val outFile = File(outDir, "out.json")

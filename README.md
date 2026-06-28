@@ -89,8 +89,35 @@ The `cdd-kotlin` compiler leverages a unified architecture to support various fa
 ## CLI Options
 
 ```text
-Usage: cdd-kotlin [OPTIONS] <COMMAND>
+Usage: cdd-kotlin [subcommand] [options]
 ```
+
+### `from_openapi`
+Generate code from an OpenAPI specification.
+* **Usage:** `cdd-kotlin from_openapi [target] -i <spec.json> -o <target_directory> [flags]`
+* **Targets:** `to_sdk`, `to_sdk_cli`, `to_server`
+* **Flags:** `--no-github-actions`, `--no-installable-package`, `--tests`
+
+### `to_openapi`
+Generate an OpenAPI specification from source code.
+* **Usage:** `cdd-kotlin to_openapi -i <src_directory_or_file> -o <out.json>`
+
+### `mcp`
+Run the Model Context Protocol server via stdio.
+* **Usage:** `cdd-kotlin mcp`
+
+### `serve_json_rpc`
+Run the JSON RPC server via stdio.
+* **Usage:** `cdd-kotlin serve_json_rpc`
+
+### `to_docs_json`
+Generate JSON documentation with code snippets for an OpenAPI specification.
+* **Usage:** `cdd-kotlin to_docs_json -i <spec.json> -o <docs.json> [flags]`
+* **Flags:** `--no-imports`, `--no-wrapping`
+
+### `sync`
+Synchronize code to maintain contract alignment.
+* **Usage:** `cdd-kotlin sync -i <source_dir> --truth <class>`
 
 ---
 

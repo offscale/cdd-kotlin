@@ -8,7 +8,7 @@ import openapi.OpenApiWriter
 /** Generator for producing OpenAPI specifications from Kotlin source. */
 object ApiGenerator {
   /** Parses all Kotlin files in [inputDir] and generates an OpenAPI JSON to [outputFile]. */
-  fun generateOpenApi(inputDir: String, outputFile: String) {
+  fun generateToOpenApi(inputDir: String, outputFile: String) {
     val dir = File(inputDir)
     if (!dir.exists() || !dir.isDirectory) {
       throw IllegalArgumentException("Input must be a directory: $inputDir")

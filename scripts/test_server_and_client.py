@@ -4,94 +4,78 @@ import os
 import shutil
 import subprocess
 import time
-import signal
 import urllib.request
 import urllib.error
+import socket
 
-def cleanup_port():
+def is_pingable(port):
     try:
-        if shutil.which("lsof"):
-            output = subprocess.check_output(["lsof", "-i", ":8080", "-sTCP:LISTEN", "-t"]).decode().strip()
-            if output:
-                for pid in output.split('\n'):
-                    try:
-                        os.kill(int(pid), signal.SIGKILL)
-                    except ProcessLookupError:
-                        pass
-        elif shutil.which("fuser"):
-            subprocess.run(["fuser", "-k", "-9", "8080/tcp"], stderr=subprocess.DEVNULL)
-    except subprocess.CalledProcessError:
-        pass
+        urllib.request.urlopen(f"http://localhost:{port}/", timeout=1)
+        return True
+    except:
+        return False
 
 def main():
     if len(sys.argv) < 2:
         sys.exit("Usage: test_server_and_client.py <spec_file>")
 
-    cleanup_port()
-
     spec_file = sys.argv[1]
+    
+    # Use different ports to avoid conflicts when run in parallel or sequence
+    port = 8080 if "stripe.json" in spec_file else 8081
+    
     if ("stripe.json" in spec_file or "mega_spec.json" in spec_file) and os.environ.get("RUN_SLOW_TESTS") != "1":
         print(f"Skipping slow test for {spec_file} because RUN_SLOW_TESTS is not 1")
         sys.exit(0)
 
     spec_basename = os.path.splitext(os.path.basename(spec_file))[0]
-
-    out_dir_server = f"out_server_integration_{spec_basename}"
     out_dir_sdk = f"out_sdk_integration_{spec_basename}"
 
-    for d in [out_dir_server, out_dir_sdk]:
-        if os.path.exists(d):
-            shutil.rmtree(d)
+    if os.path.exists(out_dir_sdk):
+        shutil.rmtree(out_dir_sdk)
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     run_with_fallback = os.path.join(script_dir, "run_with_fallback.py")
-
-    print(f"Generating Mock Server from {spec_file}")
-    cmd_gen_server = [sys.executable, run_with_fallback, "gradle", "run", f"--args=from_openapi to_server -i {spec_file} --output {out_dir_server} --tests"]
-    if subprocess.run(cmd_gen_server).returncode != 0:
-        sys.exit("Failed to generate server.")
 
     print(f"Generating SDK from {spec_file}")
     cmd_gen_sdk = [sys.executable, run_with_fallback, "gradle", "run", f"--args=from_openapi to_sdk -i {spec_file} --output {out_dir_sdk} --tests"]
     if subprocess.run(cmd_gen_sdk).returncode != 0:
         sys.exit("Failed to generate SDK.")
 
-    os.chdir(out_dir_server)
+    docker_container_id = None
+    if is_pingable(port):
+        print(f"Reusing active mock server on port {port}")
+    else:
+        print(f"Starting docker mock server on port {port}")
+        abs_spec = os.path.abspath(spec_file)
+        cmd_run = [
+            "docker", "run", "--rm", "-d", "-p", f"{port}:4010",
+            "-v", f"{abs_spec}:/spec.json", "stoplight/prism:3",
+            "mock", "-h", "0.0.0.0", "/spec.json"
+        ]
+        proc = subprocess.run(cmd_run, capture_output=True, text=True)
+        if proc.returncode != 0:
+            sys.exit(f"Failed to start docker mock server: {proc.stderr}")
+        docker_container_id = proc.stdout.strip()
 
-    print("Building the Mock Server")
-    cmd_build = [sys.executable, run_with_fallback, "gradle", ":server:jvmMainClasses"]
-    if subprocess.run(cmd_build).returncode != 0:
-        sys.exit("Failed to build server.")
-
-    print("Starting Server in Ephemeral Seeded Mode")
-    cmd_run = [sys.executable, run_with_fallback, "gradle", ":server:jvmRun", "--args=--ephemeral --seed"]
-    server_process = subprocess.Popen(cmd_run)
-
-    port = 8080
-    max_retries = 300
-    retry_count = 0
-
-    print(f"Waiting for server to start on port {port}...")
-    server_up = False
-    while retry_count < max_retries:
-        try:
-            req = urllib.request.urlopen(f"http://localhost:{port}/", timeout=1)
-            server_up = True
-            break
-        except urllib.error.URLError:
-            time.sleep(2)
+        max_retries = 30
+        retry_count = 0
+        server_up = False
+        print(f"Waiting for mock server to start on port {port}...")
+        while retry_count < max_retries:
+            if is_pingable(port):
+                server_up = True
+                break
+            time.sleep(1)
             retry_count += 1
             
-    if not server_up:
-        print("Server failed to start!")
-        server_process.kill()
-        server_process.wait()
-        cleanup_port()
-        sys.exit(1)
+        if not server_up:
+            if docker_container_id:
+                subprocess.run(["docker", "stop", docker_container_id])
+            sys.exit("Mock server failed to start!")
+        print("Mock server is up!")
 
-    print("Server is up!")
-
-    os.chdir(f"../{out_dir_sdk}")
+    os.chdir(out_dir_sdk)
     
     android_home = os.environ.get("ANDROID_HOME")
     home = os.path.expanduser("~")
@@ -108,10 +92,9 @@ def main():
     cmd_test = [sys.executable, run_with_fallback, "gradle", "allTests"]
     res = subprocess.run(cmd_test)
 
-    print("Killing server...")
-    server_process.kill()
-    server_process.wait()
-    cleanup_port()
+    if docker_container_id:
+        print("Killing docker mock server...")
+        subprocess.run(["docker", "stop", docker_container_id])
 
     if res.returncode != 0:
         sys.exit("SDK Tests failed!")

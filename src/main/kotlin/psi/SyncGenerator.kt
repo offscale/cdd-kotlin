@@ -53,7 +53,7 @@ object SyncGenerator {
     // As a side-effect, we also update the OpenAPI spec
     println("Re-generating OpenAPI specification to match $truth...")
     val openApiOut = File(dir, "openapi_sync.json")
-    ApiGenerator.generateOpenApi(inputDir, openApiOut.absolutePath)
+    ApiGenerator.generateToOpenApi(inputDir, openApiOut.absolutePath)
     println("Synchronization complete. Specs and Code are aligned.")
   }
 }

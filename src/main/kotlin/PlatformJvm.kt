@@ -9,8 +9,8 @@ actual fun writeToFile(path: String, content: String) {
   file.writeText(content)
 }
 
-actual fun generateOpenApi(inputDir: String, outputFile: String) {
-  psi.ApiGenerator.generateOpenApi(inputDir, outputFile)
+actual fun generateToOpenApi(inputDir: String, outputFile: String) {
+  psi.ApiGenerator.generateToOpenApi(inputDir, outputFile)
 }
 
 actual fun generateSdkCode(inputJson: String, outputDir: String, packageName: String) {

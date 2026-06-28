@@ -4,7 +4,7 @@ expect fun readFile(path: String): String
 
 expect fun writeToFile(path: String, content: String)
 
-expect fun generateOpenApi(inputDir: String, outputFile: String)
+expect fun generateToOpenApi(inputDir: String, outputFile: String)
 
 expect fun generateSdkCode(inputJson: String, outputDir: String, packageName: String)
 

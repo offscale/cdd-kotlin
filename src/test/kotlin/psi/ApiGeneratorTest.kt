@@ -35,7 +35,7 @@ class ApiGeneratorTest {
 
     val outputFile = File(tempDir, "out.json")
 
-    ApiGenerator.generateOpenApi(tempDir.absolutePath, outputFile.absolutePath)
+    ApiGenerator.generateToOpenApi(tempDir.absolutePath, outputFile.absolutePath)
 
     assertTrue(outputFile.exists())
     val content = outputFile.readText()
@@ -48,7 +48,7 @@ class ApiGeneratorTest {
   @Test
   fun testGenerateOpenApiInvalidDir() {
     assertThrows(IllegalArgumentException::class.java) {
-      ApiGenerator.generateOpenApi("/nonexistent_directory_12345", "out.json")
+      ApiGenerator.generateToOpenApi("/nonexistent_directory_12345", "out.json")
     }
   }
 
@@ -56,7 +56,7 @@ class ApiGeneratorTest {
   fun testGenerateOpenApiFileInsteadOfDir() {
     val tempFile = File.createTempFile("api-generator-test-file", ".kt")
     assertThrows(IllegalArgumentException::class.java) {
-      ApiGenerator.generateOpenApi(tempFile.absolutePath, "out.json")
+      ApiGenerator.generateToOpenApi(tempFile.absolutePath, "out.json")
     }
     tempFile.delete()
   }
@@ -80,7 +80,7 @@ class ApiGeneratorTest {
 
     val outputFile = File(tempDir, "out.json")
 
-    ApiGenerator.generateOpenApi(tempDir.absolutePath, outputFile.absolutePath)
+    ApiGenerator.generateToOpenApi(tempDir.absolutePath, outputFile.absolutePath)
 
     assertTrue(outputFile.exists())
     val content = outputFile.readText()
@@ -96,7 +96,7 @@ class ApiGeneratorTest {
     val tempDir = Files.createTempDirectory("api-generator-empty").toFile()
     val outputFile = File(tempDir, "out.json")
 
-    ApiGenerator.generateOpenApi(tempDir.absolutePath, outputFile.absolutePath)
+    ApiGenerator.generateToOpenApi(tempDir.absolutePath, outputFile.absolutePath)
 
     assertTrue(outputFile.exists())
     val content = outputFile.readText()
