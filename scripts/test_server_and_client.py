@@ -22,7 +22,10 @@ def main():
     spec_file = sys.argv[1]
     
     # Use different ports to avoid conflicts when run in parallel or sequence
-    port = 8080 if "stripe.json" in spec_file else 8081
+    if "stripe.json" in spec_file or ("petstore.json" in spec_file and "oas3" not in spec_file):
+        port = 8080
+    else:
+        port = 8081
     
     if ("stripe.json" in spec_file or "mega_spec.json" in spec_file) and os.environ.get("RUN_SLOW_TESTS") != "1":
         print(f"Skipping slow test for {spec_file} because RUN_SLOW_TESTS is not 1")

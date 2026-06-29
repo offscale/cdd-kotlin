@@ -19,10 +19,12 @@ jobs:
         image: stoplight/prism:3
         ports:
           - 8080:4010
+        command: mock -h 0.0.0.0 https://raw.githubusercontent.com/SamuelMarks/cdd-openapi-test-harness/master/petstore.json
       mock-openapi:
         image: stoplight/prism:3
         ports:
           - 8081:4010
+        command: mock -h 0.0.0.0 https://raw.githubusercontent.com/SamuelMarks/cdd-openapi-test-harness/master/petstore_oas3.json
 
     steps:
       - name: Checkout code
