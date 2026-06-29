@@ -10,8 +10,10 @@ import socket
 
 def is_pingable(port):
     try:
-        urllib.request.urlopen(f"http://localhost:{port}/", timeout=1)
-        return True
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(1)
+            s.connect(("localhost", port))
+            return True
     except:
         return False
 

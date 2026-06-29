@@ -30,12 +30,15 @@ def run_e2e_tests():
     
     print(f"Waiting for server to start on port {port}...")
     server_up = False
+    import socket
     while retry_count < max_retries:
         try:
-            req = urllib.request.urlopen(f"http://localhost:{port}/", timeout=1)
-            server_up = True
-            break
-        except urllib.error.URLError:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(1)
+                s.connect(("localhost", port))
+                server_up = True
+                break
+        except Exception:
             time.sleep(2)
             retry_count += 1
             
