@@ -133,6 +133,7 @@ class NetworkGenerator {
             "io.ktor.client.*",
             "io.ktor.client.call.*",
             "io.ktor.client.request.*",
+            "io.ktor.client.request.setBody",
             "io.ktor.http.*")
 
     if (needsFormBodyEncoding || needsMultipartEncoding || needsOAuthHelpers) {
