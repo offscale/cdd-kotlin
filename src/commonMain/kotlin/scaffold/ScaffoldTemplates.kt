@@ -225,6 +225,7 @@ $serverLibs
                         implementation(kotlin("test"))
                         implementation(kotlin("test-common"))
                         implementation(kotlin("test-annotations-common"))
+                        implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
                     }
                 }
                 

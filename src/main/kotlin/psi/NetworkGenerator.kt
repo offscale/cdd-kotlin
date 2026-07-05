@@ -2688,6 +2688,7 @@ class NetworkGenerator {
             }
             .toMutableList()
 
+    
     val bodySignature = resolveRequestBodySignature(ep)
     if (bodySignature != null) {
       val defaultValue = if (bodySignature.isOptional && !isOverride) " = null" else ""
@@ -2807,18 +2808,25 @@ class NetworkGenerator {
           ""
         }
 
+    
     val bodySignature = resolveRequestBodySignature(ep)
+    val bodyParam = ep.parameters.find { it.location == ParameterLocation.BODY }
+    val hasBody = bodySignature != null || bodyParam != null
+    val bodyVarName = bodyParam?.safeName ?: "body"
+    val isBodyOptional = bodySignature?.isOptional ?: (bodyParam?.let { isOptionalParam(it) } ?: false)
+
     val requestMediaType = resolveRequestMediaTypeEntry(ep)
-    val contentType = requestMediaType?.key
+    val contentType = requestMediaType?.key ?: if (bodyParam != null) "application/json" else null
     val isFormUrlEncoded = contentType?.let { isFormUrlEncodedMediaType(it) } == true
     val isMultipartFormData = contentType?.let { isMultipartFormDataMediaType(it) } == true
     val isMultipart = contentType?.let { isMultipartMediaType(it) } == true
     val usesPositionalMultipart = isMultipart && hasPositionalEncoding(requestMediaType?.value)
     val sequentialRequestElementType =
         if (contentType != null &&
-            bodySignature != null &&
+            hasBody &&
             isSequentialJsonMediaType(contentType)) {
-          extractListElementType(bodySignature.kotlinType)
+          val t = bodySignature?.kotlinType ?: resolveParameterType(bodyParam!!, isBodyOptional)
+          extractListElementType(t)
         } else {
           null
         }
@@ -2834,7 +2842,7 @@ class NetworkGenerator {
         renderItemEncodingContentTypeLiteral(requestMediaType?.value)
     val itemEncodingHeadersLiteral = renderItemEncodingHeadersLiteral(requestMediaType?.value)
     val bodyConfig =
-        if (bodySignature != null) {
+        if (hasBody) {
           val lines = mutableListOf<String>()
           if (contentType != null &&
               !isFormUrlEncoded &&
@@ -2864,19 +2872,19 @@ class NetworkGenerator {
           val bodyLine =
               when {
                 sequentialRequestElementType != null ->
-                    "setBody(encodeSequentialJson(body, \"${escapeKotlinString(contentType ?: "")}\"))"
-                usesPositionalMultipart -> "setBody(encodeMultipartPositional(body$positionalArgs))"
+                    "setBody(encodeSequentialJson($bodyVarName, \"${escapeKotlinString(contentType ?: "")}\"))"
+                usesPositionalMultipart -> "setBody(encodeMultipartPositional($bodyVarName$positionalArgs))"
                 isFormUrlEncoded ->
-                    "setBody(encodeFormBody(body$encodingArg$encodingStyleArg$encodingExplodeArg$encodingAllowReservedArg))"
+                    "setBody(encodeFormBody($bodyVarName$encodingArg$encodingStyleArg$encodingExplodeArg$encodingAllowReservedArg))"
                 isMultipartFormData ->
-                    "setBody(encodeMultipartBody(body$encodingArg$encodingHeadersArg))"
-                else -> "setBody(body)"
+                    "setBody(encodeMultipartBody($bodyVarName$encodingArg$encodingHeadersArg))"
+                else -> "setBody($bodyVarName)"
               }
           lines.add(bodyLine)
 
-          if (bodySignature.isOptional) {
+          if (isBodyOptional) {
             val joined = lines.joinToString("\n                ")
-            "\n            if (body != null) {\n                $joined\n            }"
+            "\n            if ($bodyVarName != null) {\n                $joined\n            }"
           } else {
             "\n            " + lines.joinToString("\n            ")
           }
@@ -3002,6 +3010,7 @@ class NetworkGenerator {
   private fun requiresSequentialJsonRequest(ep: EndpointDefinition): Boolean {
     val contentType = resolveRequestContentType(ep) ?: return false
     if (!isSequentialJsonMediaType(contentType)) return false
+    
     val bodySignature = resolveRequestBodySignature(ep) ?: return false
     return extractListElementType(bodySignature.kotlinType) != null
   }
