@@ -14,6 +14,7 @@ petstore_oas3.json
 prism.log
 patch*.py
 run_*.sh
+!scripts/run_slow.sh
 test*.kt
 test*.js
 
