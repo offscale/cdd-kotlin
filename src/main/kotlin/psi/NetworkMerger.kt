@@ -1,3 +1,4 @@
+/** Spec-driven endpoint reconciliation and merging service for Ktor network interfaces. */
 package psi
 
 import domain.EndpointDefinition

@@ -1,5 +1,10 @@
 package psi
 
+import domain.OpenApiArray
+import domain.OpenApiBoolean
+import domain.OpenApiInt
+import domain.OpenApiObject
+import domain.OpenApiString
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestInstance
@@ -90,8 +95,8 @@ class DtoParserTest {
     assertEquals("string", schema.type) // Enums simplified to string sets
 
     assertNotNull(schema.enumValues)
-    assertTrue(schema.enumValues!!.contains("ACTIVE"))
-    assertTrue(schema.enumValues.contains("INACTIVE"))
+    assertTrue(schema.enumValues!!.contains(OpenApiString("ACTIVE")))
+    assertTrue(schema.enumValues.contains(OpenApiString("INACTIVE")))
   }
 
   @Test
@@ -114,9 +119,9 @@ class DtoParserTest {
     val values = schema.enumValues!!
     assertEquals(2, values.size)
     // Should parse the SerialName values, NOT the Kotlin identifier names
-    assertTrue(values.contains("asc"))
-    assertTrue(values.contains("desc"))
-    assertFalse(values.contains("Ascending"))
+    assertTrue(values.contains(OpenApiString("asc")))
+    assertTrue(values.contains(OpenApiString("desc")))
+    assertFalse(values.contains(OpenApiString("Ascending")))
   }
 
   @Test
@@ -136,9 +141,11 @@ class DtoParserTest {
             .trimIndent()
 
     val schema = parser.parse(code).first()
-    assertEquals("alpha", schema.customKeywords["vendorKeyword"])
+    assertEquals(OpenApiString("alpha"), schema.customKeywords["vendorKeyword"])
     val nameProp = schema.properties["name"]
-    assertEquals(listOf(1, 2), nameProp?.customKeywords?.get("custom"))
+    assertEquals(
+        OpenApiArray(listOf(OpenApiInt(1L), OpenApiInt(2L))),
+        nameProp?.customKeywords?.get("custom"))
   }
 
   @Test
@@ -155,7 +162,7 @@ class DtoParserTest {
             .trimIndent()
 
     val schema = parser.parse(code).first()
-    assertEquals(42, (schema.contains?.customKeywords?.get("extra") as? Number)?.toInt())
+    assertEquals(OpenApiInt(42L), schema.contains?.customKeywords?.get("extra"))
   }
 
   @Test
@@ -172,7 +179,9 @@ class DtoParserTest {
             .trimIndent()
 
     val schema = parser.parse(code).first()
-    assertEquals(listOf(1, 2, mapOf("k" to "v")), schema.enumValues)
+    assertEquals(
+        listOf(OpenApiInt(1L), OpenApiInt(2L), OpenApiObject(mapOf("k" to OpenApiString("v")))),
+        schema.enumValues)
   }
 
   @Test
@@ -381,12 +390,12 @@ class DtoParserTest {
     val schema = parser.parse(code).first()
 
     assertEquals("Example entity.", schema.description)
-    assertEquals("simpleExample", schema.example)
-    val keyedExample = schema.examples?.get("keyed") as? Map<*, *>
-    assertEquals(1, keyedExample?.get("id"))
+    assertEquals(OpenApiString("simpleExample"), schema.example)
+    val keyedExample = schema.examples?.get("keyed") as? OpenApiObject
+    assertEquals(OpenApiInt(1L), keyedExample?.properties?.get("id"))
     assertEquals("https://example.com/docs", schema.externalDocs?.url)
     assertEquals("Entity docs", schema.externalDocs?.description)
-    assertEquals("propExample", schema.properties["id"]?.example)
+    assertEquals(OpenApiString("propExample"), schema.properties["id"]?.example)
     assertEquals("https://example.com/props", schema.properties["id"]?.externalDocs?.url)
     assertEquals("Property docs", schema.properties["id"]?.externalDocs?.description)
     assertEquals("kind", schema.properties["id"]?.discriminator?.propertyName)
@@ -394,6 +403,19 @@ class DtoParserTest {
         "#/components/schemas/User", schema.properties["id"]?.discriminator?.mapping?.get("user"))
     assertEquals(
         "#/components/schemas/User", schema.properties["id"]?.discriminator?.defaultMapping)
+
+    val floatCode =
+        """
+            /**
+             * @default 3.14
+             * @const null
+             */
+            data class FloatHolder(val v: Double)
+        """
+            .trimIndent()
+    val floatSchema = parser.parse(floatCode).first()
+    assertEquals(domain.OpenApiNumber(3.14, "3.14"), floatSchema.defaultValue)
+    assertEquals(domain.OpenApiNull, floatSchema.constValue)
   }
 
   @Test
@@ -411,7 +433,7 @@ class DtoParserTest {
 
     val schema = parser.parse(code).first()
 
-    assertEquals(listOf("alpha", "beta"), schema.examplesList)
+    assertEquals(listOf(OpenApiString("alpha"), OpenApiString("beta")), schema.examplesList)
   }
 
   @Test
@@ -506,10 +528,10 @@ class DtoParserTest {
     val schema = parser.parse(code).first()
 
     assertEquals("Annotated schema", schema.title)
-    val defaultValue = schema.defaultValue as? Map<*, *>
-    val constValue = schema.constValue as? Map<*, *>
-    assertEquals(1, defaultValue?.get("id"))
-    assertEquals(1, constValue?.get("id"))
+    val defaultValue = schema.defaultValue as? OpenApiObject
+    val constValue = schema.constValue as? OpenApiObject
+    assertEquals(OpenApiInt(1L), defaultValue?.properties?.get("id"))
+    assertEquals(OpenApiInt(1L), constValue?.properties?.get("id"))
     assertEquals("https://example.com/schemas/Annotated", schema.schemaId)
     assertEquals("https://json-schema.org/draft/2020-12/schema", schema.schemaDialect)
     assertEquals("annotated", schema.anchor)
@@ -520,8 +542,8 @@ class DtoParserTest {
 
     val idProp = schema.properties["id"]
     assertEquals("Identifier", idProp?.title)
-    assertEquals(1, idProp?.defaultValue)
-    assertEquals(1, idProp?.constValue)
+    assertEquals(OpenApiInt(1L), idProp?.defaultValue)
+    assertEquals(OpenApiInt(1L), idProp?.constValue)
     assertEquals("https://example.com/schemas/Identifier", idProp?.schemaId)
     assertEquals("https://json-schema.org/draft/2020-12/schema", idProp?.schemaDialect)
     assertEquals("id", idProp?.anchor)
@@ -640,7 +662,7 @@ class DtoParserTest {
     val schema = parser.parse(code).first()
     val countProp = schema.properties["count"]
 
-    assertEquals(listOf(1, 2), countProp?.examples)
+    assertEquals(listOf(OpenApiInt(1L), OpenApiInt(2L)), countProp?.examples)
     assertEquals(null, countProp?.example)
   }
 
@@ -859,5 +881,165 @@ class DtoParserTest {
     assertTrue(valueProp?.oneOf?.any { it.ref == "#/components/schemas/Name" } == true)
     assertEquals("null", valueProp?.not?.type)
     assertEquals("string", valueProp?.additionalProperties?.type)
+  }
+
+  @Test
+  fun `parse handles nested schema nodes, sealed explicit oneOf, and tag literal edge cases`() {
+    val code =
+        """
+            /**
+             * @oneOf [{"${'$'}ref":"#/components/schemas/SubA"}]
+             * @discriminator kind
+             */
+            sealed interface ExplicitUnion
+
+            data class SubA(val kind: String) : ExplicitUnion
+
+            /**
+             * @oneOf {"not":"an_array"}
+             * @anyOf {invalid_json
+             * @not {"type":["string","integer"],"prefixItems":[{"type":123}],"properties":{"p":{"type":"string"}},"additionalProperties":true,"dependentRequired":{"a":["b"],"c":1},"externalDocs":{"url":"https://example.com","description":"d"},"discriminator":{"propertyName":"t","mapping":{"a":"b","c":[]},"defaultMapping":"d"},"xml":{"name":"n","namespace":"ns","prefix":"pr","nodeType":"element","attribute":true,"wrapped":true},"examples":["e1",2]}
+             * @if {"additionalProperties":{"type":"string"},"externalDocs":{},"discriminator":{}}
+             * @then {"additionalProperties":123}
+             * @examples 123
+             * @default null
+             * @const false
+             * @xmlAttribute
+             * @xmlWrapped invalid_bool
+             */
+            data class NestedSchemaHolder(
+                val id: String
+            )
+        """
+            .trimIndent()
+
+    val schemas = parser.parse(code)
+    val unionSchema = schemas.first { it.name == "ExplicitUnion" }
+    assertEquals(listOf("#/components/schemas/SubA"), unionSchema.oneOf)
+
+    val holder = schemas.first { it.name == "NestedSchemaHolder" }
+    assertNotNull(holder.not)
+    assertEquals(setOf("string", "integer"), holder.not?.types)
+    assertEquals("string", holder.not?.properties?.get("p")?.type)
+    assertEquals(true, holder.not?.additionalProperties?.booleanSchema)
+    assertEquals(listOf("b"), holder.not?.dependentRequired?.get("a"))
+    assertEquals("https://example.com", holder.not?.externalDocs?.url)
+    assertEquals("t", holder.not?.discriminator?.propertyName)
+    assertEquals("n", holder.not?.xml?.name)
+    assertEquals(2, holder.not?.examples?.size)
+    assertEquals("string", holder.ifSchema?.additionalProperties?.type)
+    assertNull(holder.ifSchema?.externalDocs)
+    assertNull(holder.thenSchema?.additionalProperties)
+    assertEquals(OpenApiBoolean(false), holder.constValue)
+    assertEquals(true, holder.xml?.attribute)
+
+    val edgeKDocCode =
+        """
+            /**
+             * @see
+             * @discriminator kind
+             * @discriminatorMapping {"a": null}
+             * @xmlNamespace https://ns.example.com
+             * @xmlPrefix p
+             * @xmlNodeType element
+             * @xmlWrapped
+             * @keywords 123
+             * @oneOf {bad
+             * @anyOf {"notArray":1}
+             * @allOf ["RefA", {"${'$'}ref": ""}, {"${'$'}ref": null}, 123]
+             * @not {bad
+             * @if {"${'$'}dynamicRef":"#node"}
+             * @then {"items":{"type":"string"},"prefixItems":[{"type":"string"}],"contains":{"type":"string"},"minContains":1,"maxContains":2,"properties":{"p":{"type":["string",null]}},"required":[null,"p"],"additionalProperties":{"type":"string"},"${'$'}defs":{"d":{"type":"string"}},"patternProperties":{"^a":{"type":"string"}},"propertyNames":{"type":"string"},"dependentRequired":{"a":[null,"b"],"c":123},"dependentSchemas":{"a":{"type":"string"}},"default":"def","const":"c","deprecated":true,"readOnly":true,"writeOnly":true,"externalDocs":{"url":"https://e.com","description":"d"},"discriminator":{"propertyName":"t","mapping":{"k":null},"defaultMapping":"D"},"enum":["a"],"oneOf":[{"type":"string"}],"anyOf":[{"type":"string"}],"allOf":[{"type":"string"}],"not":{"type":"null"},"if":{"type":"string"},"then":{"type":"string"},"else":{"type":"string"},"example":"ex","examples":["ex"],"xml":{"name":"n","namespace":"ns","prefix":"pr","nodeType":"element","attribute":true,"wrapped":true},"unevaluatedProperties":{"type":"string"},"unevaluatedItems":{"type":"string"},"contentSchema":{"type":"string"},"x-ignored":1,"customKw":2}
+             * @else {"required":123,"discriminator":{"mapping":123},"examples":123,"xml":{}}
+             * @prefixItems {bad
+             * @defs {bad
+             * @patternProperties [1]
+             * @dependentRequired {bad
+             * @enumvalue ignored
+             * @enum
+             * @enum   
+             * @example true
+             * @example {badJson
+             * @example "quotedStr"
+             * @example :noKey
+             * @example bad-key!: val
+             * @examples notAnArray
+             */
+            data class EdgeParsed(
+                /**
+                 * @xmlPrefix propPref
+                 */
+                val x: String,
+                /**
+                 * @xmlNodeType attribute
+                 */
+                val y: String,
+                /**
+                 * @xmlWrapped true
+                 */
+                val z: String
+            )
+        """
+            .trimIndent()
+    val edgeParsed = parser.parse(edgeKDocCode).first()
+    assertNull(edgeParsed.externalDocs)
+    assertEquals("null", edgeParsed.discriminator?.mapping?.get("a"))
+    assertEquals("#node", edgeParsed.ifSchema?.dynamicRef)
+    assertNotNull(edgeParsed.thenSchema?.items)
+    assertEquals("type", edgeParsed.elseSchema?.discriminator?.propertyName)
+
+    val aliasAndSealedEdgeCode =
+        """
+            import kotlinx.serialization.SerialName
+
+            /**
+             * @additionalProperties {"type":"integer"}
+             * @contentMediaType application/json
+             * @contentEncoding utf-8
+             */
+            typealias CustomMapAlias = Map<String, String>
+
+            /**
+             * @contentMediaType application/octet-stream
+             * @contentEncoding base64
+             */
+            typealias CustomByteAlias = ByteArray
+
+            typealias PlainByteAlias = ByteArray
+
+            /**
+             * @oneOf [{"type":"string"}]
+             */
+            sealed interface InlineUnion {
+                @SerialName("opt_prop")
+                val optProp: String?
+            }
+
+            sealed interface SelfCycle : SelfCycle, OtherInterface
+
+            interface OtherInterface
+
+            typealias NonScalarAlias = OtherInterface
+
+            data class ImplSerializable(val id: String) : Any, Serializable
+        """
+            .trimIndent()
+    val aliasAndSealedSchemas = parser.parse(aliasAndSealedEdgeCode)
+    val customMap = aliasAndSealedSchemas.first { it.name == "CustomMapAlias" }
+    assertEquals("integer", customMap.additionalProperties?.type)
+    assertEquals("application/json", customMap.contentMediaType)
+    assertEquals("utf-8", customMap.contentEncoding)
+
+    val customByte = aliasAndSealedSchemas.first { it.name == "CustomByteAlias" }
+    assertEquals("application/octet-stream", customByte.contentMediaType)
+    assertEquals("base64", customByte.contentEncoding)
+
+    val plainByte = aliasAndSealedSchemas.first { it.name == "PlainByteAlias" }
+    assertEquals("base64", plainByte.contentEncoding)
+
+    val inlineUnion = aliasAndSealedSchemas.first { it.name == "InlineUnion" }
+    assertEquals(1, inlineUnion.oneOfSchemas.size)
+    assertTrue(inlineUnion.properties.containsKey("opt_prop"))
+    assertTrue(inlineUnion.required.isEmpty())
   }
 }

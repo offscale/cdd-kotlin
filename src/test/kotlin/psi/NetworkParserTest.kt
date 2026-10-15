@@ -2,6 +2,10 @@ package psi
 
 import domain.Callback
 import domain.HttpMethod
+import domain.OpenApiBoolean
+import domain.OpenApiInt
+import domain.OpenApiObject
+import domain.OpenApiString
 import domain.ParameterLocation
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -356,8 +360,8 @@ class NetworkParserTest {
 
     val endpoint = parser.parse(code).first()
 
-    assertEquals(10, endpoint.extensions["x-rate-limit"])
-    assertEquals(true, endpoint.extensions["x-flag"])
+    assertEquals(OpenApiInt(10L), endpoint.extensions["x-rate-limit"])
+    assertEquals(OpenApiBoolean(true), endpoint.extensions["x-flag"])
   }
 
   @Test
@@ -385,8 +389,8 @@ class NetworkParserTest {
     val endpoint = parser.parse(code).first()
     val schema = endpoint.responses["200"]?.content?.get("application/json")?.schema
 
-    assertEquals(123, schema?.customKeywords?.get("customKeyword"))
-    assertEquals("yes", schema?.extensions?.get("x-extra"))
+    assertEquals(OpenApiInt(123L), schema?.customKeywords?.get("customKeyword"))
+    assertEquals(OpenApiString("yes"), schema?.extensions?.get("x-extra"))
   }
 
   @Test
@@ -517,7 +521,7 @@ class NetworkParserTest {
     val param = endpoint.parameters.firstOrNull { it.name == "limit" }
 
     assertNotNull(param)
-    assertEquals(50, param?.extensions?.get("x-rate-limit"))
+    assertEquals(OpenApiInt(50L), param?.extensions?.get("x-rate-limit"))
   }
 
   @Test
@@ -701,7 +705,7 @@ class NetworkParserTest {
     val response = endpoint.responses["200"]
 
     assertNotNull(response)
-    assertEquals("yes", response?.extensions?.get("x-response"))
+    assertEquals(OpenApiString("yes"), response?.extensions?.get("x-response"))
   }
 
   @Test
@@ -727,7 +731,7 @@ class NetworkParserTest {
 
     assertEquals("https://docs.example.com", endpoint.externalDocs?.url)
     assertEquals("Docs", endpoint.externalDocs?.description)
-    assertEquals(1, endpoint.externalDocs?.extensions?.get("x-docs"))
+    assertEquals(OpenApiInt(1L), endpoint.externalDocs?.extensions?.get("x-docs"))
   }
 
   @Test
@@ -815,8 +819,8 @@ class NetworkParserTest {
     val param = endpoint.parameters.first { it.name == "filter" }
 
     assertEquals("Filter", param.example?.summary)
-    val data = param.example?.dataValue as? Map<*, *>
-    assertEquals("active", data?.get("status"))
+    val data = param.example?.dataValue as? OpenApiObject
+    assertEquals(OpenApiString("active"), data?.properties?.get("status"))
   }
 
   @Test
@@ -1232,11 +1236,12 @@ class NetworkParserTest {
     assertEquals("Docs", meta.externalDocs?.description)
     assertTrue(meta.pathsExplicitEmpty)
     assertTrue(meta.webhooksExplicitEmpty)
-    assertEquals(true, meta.extensions["x-root"])
-    assertEquals("paths-ext", meta.pathsExtensions["x-paths"])
+    assertEquals(OpenApiBoolean(true), meta.extensions["x-root"])
+    assertEquals(OpenApiString("paths-ext"), meta.pathsExtensions["x-paths"])
     assertEquals("Pets", meta.pathItems["/pets"]?.summary)
     assertEquals("All pets", meta.pathItems["/pets"]?.description)
-    assertEquals(mapOf("flag" to true), meta.webhooksExtensions["x-webhooks"])
+    assertEquals(
+        OpenApiObject(mapOf("flag" to OpenApiBoolean(true))), meta.webhooksExtensions["x-webhooks"])
     assertEquals("apiKey", meta.securitySchemes["api_key"]?.type)
   }
 
@@ -1268,5 +1273,363 @@ class NetworkParserTest {
 
     val result = parser.parseWithMetadata(code)
     assertTrue(result.metadata.webhooksExplicitEmpty)
+  }
+
+  @Test
+  fun `parse covers serializeContentValue, joinToString, ContentType constants, and parameter styles`() {
+    val code =
+        """
+            import io.ktor.client.*
+            import io.ktor.client.request.*
+            import io.ktor.http.*
+
+            class EdgeApi(private val client: HttpClient) {
+                /**
+                 * @paramStyle p1 matrix
+                 * @paramStyle p2 label
+                 * @paramStyle p3 simple
+                 * @paramStyle p4 form
+                 * @paramStyle p5 cookie
+                 * @paramStyle p6 spaceDelimited
+                 * @paramStyle p7 pipeDelimited
+                 * @paramStyle p8 deepObject
+                 * @paramStyle p9 unknownStyle
+                 * @paramExample p1 {"x-ext":1}
+                 * @paramExample p2 {"notAnExampleKey":1}
+                 * @paramExplode p1 false
+                 * @paramRef p1 "#/components/parameters/P1"
+                 * @paramRef p2 {"notRef":"x"}
+                 * @requestBody {"${'$'}ref":"#/components/requestBodies/RB","summary":"RB sum","description":"RB desc"}
+                 * @deprecated true
+                 * @securityEmpty true
+                 */
+                suspend fun testStyles(
+                    p1: String,
+                    p2: String,
+                    p3: String,
+                    p4: String,
+                    p5: String,
+                    p6: String,
+                    p7: String,
+                    p8: String,
+                    p9: String
+                ): Result<Unit> {
+                    client.request("/items/${'$'}{serializeContentValue(p1, "application/json")}/${'$'}{p2.entries.joinToString(",")}/${'$'}{p3.joinToString(",")}") {
+                        method = HttpMethod.InvalidMethodName
+                        contentType(ContentType.Application.Json)
+                        parameter("p4", p4)
+                        parameter("p5", p5)
+                        parameter("p6", p6)
+                        parameter("p7", p7)
+                        parameter("p8", p8)
+                        parameter("p9", p9)
+                        parameter("onlyOneArg")
+                        p1.forEach { parameter(it, "v") }
+                    }
+                }
+
+                /**
+                 * @security {"apiKey":"notArray"}
+                 * @paramExample body {"x-ext":1}
+                 */
+                @Deprecated("old")
+                suspend fun testUnknownContentType(body: String): Result<Unit> {
+                    client.request("/other") {
+                        method = CustomMethodExpr
+                        contentType(CustomType)
+                        forEach { parameter(it, "v") }
+                        setBody(body)
+                    }
+                }
+            }
+        """
+            .trimIndent()
+
+    val endpoints = parser.parse(code)
+    assertEquals(2, endpoints.size)
+    val ep1 = endpoints[0]
+    assertEquals("/items/{p1}/{p2}/{p3}", ep1.path)
+    assertEquals(HttpMethod.GET, ep1.method)
+    assertTrue(ep1.deprecated)
+    assertTrue(ep1.securityExplicitEmpty)
+    assertEquals("#/components/requestBodies/RB", ep1.requestBody?.reference?.ref)
+    assertEquals(domain.ParameterStyle.MATRIX, ep1.parameters.first { it.name == "p1" }.style)
+    assertEquals(domain.ParameterStyle.LABEL, ep1.parameters.first { it.name == "p2" }.style)
+    assertEquals(domain.ParameterStyle.SIMPLE, ep1.parameters.first { it.name == "p3" }.style)
+    assertEquals(domain.ParameterStyle.FORM, ep1.parameters.first { it.name == "p4" }.style)
+    assertEquals(domain.ParameterStyle.COOKIE, ep1.parameters.first { it.name == "p5" }.style)
+    assertEquals(
+        domain.ParameterStyle.SPACE_DELIMITED, ep1.parameters.first { it.name == "p6" }.style)
+    assertEquals(
+        domain.ParameterStyle.PIPE_DELIMITED, ep1.parameters.first { it.name == "p7" }.style)
+    assertEquals(domain.ParameterStyle.DEEP_OBJECT, ep1.parameters.first { it.name == "p8" }.style)
+    assertNull(ep1.parameters.first { it.name == "p9" }.style)
+
+    val ep2 = endpoints[1]
+    assertEquals(HttpMethod.GET, ep2.method)
+    assertTrue(ep2.deprecated)
+    assertEquals(emptyList<String>(), ep2.security.first()["apiKey"])
+    assertEquals(true, psi.network.AuthPsiParser.parseBooleanTagValue(null))
+    assertEquals(false, psi.network.AuthPsiParser.parseBooleanTagValue("false"))
+    assertNull(psi.network.AuthPsiParser.parseBooleanTagValue("invalid"))
+    assertEquals(
+        "{unclosed", psi.network.RequestBodyPsiParser.parseReferenceObjectValue("{unclosed")?.ref)
+    assertNull(psi.network.RequestBodyPsiParser.parseReferenceObjectValue("123"))
+
+    // AuthPsiParser edge cases for invalid/empty root metadata tags
+    val badMetaCode =
+        """
+            /**
+             * @pathsEmpty invalidBool
+             * @webhooksEmpty false
+             * @extensions
+             * @extensions {bad
+             * @extensions [1]
+             * @extensions {"x-e":1}
+             * @pathsExtensions [1]
+             * @webhooksExtensions {bad
+             * @componentExamples
+             * @componentExamples {bad
+             * @componentLinks
+             * @componentLinks {bad
+             * @componentCallbacks
+             * @componentCallbacks {bad
+             * @componentCallbacks [1]
+             */
+            interface IBadMeta
+
+            class UnannotatedClass {
+                /** Regular kdoc without root tags */
+                fun noop() {}
+            }
+        """
+            .trimIndent()
+    val badMetaRes = parser.parseWithMetadata(badMetaCode)
+    assertFalse(badMetaRes.metadata.pathsExplicitEmpty)
+    assertEquals(1, badMetaRes.metadata.extensions.size)
+    assertTrue(badMetaRes.metadata.pathsExtensions.isEmpty())
+    assertTrue(badMetaRes.metadata.componentExamples.isEmpty())
+    assertTrue(badMetaRes.metadata.componentLinks.isEmpty())
+    assertTrue(badMetaRes.metadata.componentCallbacks.isEmpty())
+
+    // RequestBodyPsiParser edge cases
+    val rbEdgeCode =
+        """
+            import io.ktor.client.*
+            import io.ktor.client.request.*
+            import io.ktor.http.*
+
+            class RbEdgeApi(private val client: HttpClient) {
+                /**
+                 * @requestBody
+                 * @response 200 Unit ok
+                 * @response 211
+                 * @responseHeaders 200
+                 * @responseHeaders 200   
+                 * @responseHeaders 200 {bad
+                 * @responseHeaders 208 {"X-H":{"type":"string"}}
+                 * @responseLinks 200
+                 * @responseLinks 200 {"L0":{"operationId":"op"}}
+                 * @responseLinks 206 {"L":{"operationId":"op"}}
+                 * @responseContent 200
+                 * @responseContent 200 {"application/json":{"schema":{"type":"string"}}}
+                 * @responseContent 201 {"application/json":{}}
+                 * @responseContent 210 {"application/json":{"schema":{"type":"string"}}}
+                 * @responseContent 205 {"application/json":{"schema":{"type":"string"}}}
+                 * @responseSummary
+                 * @responseSummary 200
+                 * @responseSummary 200   
+                 * @responseSummary 200 Summary for 200
+                 * @responseSummary 202 Valid summary
+                 * @responseRef 203 "#/components/responses/R203"
+                 * @responseRef 200 {"${'$'}ref":"#/components/responses/R200","summary":"S200","description":"D200"}
+                 * @responseRef 204 {"notRef":1}
+                 * @response 205 String ok
+                 * @responseExtensions 205 {"x-ext":1}
+                 * @responseExtensions 205 {"x-ext2":2}
+                 * @responseExtensions 205 {bad
+                 * @responseExtensions 205 [1]
+                 * @responseExtensions 205 {"non-x":1}
+                 * @responseExtensions 207 {"x-new":1}
+                 * @responseExtensions 209
+                 */
+                suspend fun op1(): Result<Unit> {
+                    client.request("/op1") {
+                        contentType()
+                        contentType(ContentType.Application)
+                    }
+                }
+
+                /**
+                 * @param body Body param doc
+                 * @requestBody {"required":false}
+                 */
+                suspend fun op2(body: String): Result<Unit> {
+                    client.request("/op2") { setBody(body) }
+                }
+
+                /**
+                 * @requestBody {bad
+                 * @responseRef 200
+                 */
+                suspend fun op2b(body: String): Result<Unit> {
+                    client.request("/op2b") { setBody(body) }
+                }
+
+                /**
+                 * @requestBody [1]
+                 */
+                suspend fun op3(body: String): Result<Unit> {
+                    client.request("/op3") { setBody(body) }
+                }
+
+                /**
+                 * @requestBody {"description":"only desc"}
+                 */
+                suspend fun op4(): Result<Unit> {
+                    client.request("/op4") {}
+                }
+
+                /**
+                 * @requestBody {"description":"desc5","content":{"text/plain":{"schema":{"type":"string"}}},"required":false,"x-rb":1}
+                 */
+                suspend fun op5(body: String): Result<Unit> {
+                    client.request("/op5") { setBody(body) }
+                }
+            }
+        """
+            .trimIndent()
+    val rbEps = parser.parse(rbEdgeCode)
+    assertEquals(6, rbEps.size)
+    assertEquals("S200", rbEps[0].responses["200"]?.summary)
+    assertEquals("D200", rbEps[0].responses["200"]?.description)
+    assertEquals("Valid summary", rbEps[0].responses["202"]?.summary)
+    assertEquals("#/components/responses/R203", rbEps[0].responses["203"]?.reference?.ref)
+    assertEquals(2, rbEps[0].responses["205"]?.extensions?.size)
+    assertEquals(1, rbEps[0].responses["207"]?.extensions?.size)
+    assertEquals(false, rbEps[1].requestBody?.required)
+    val mergedRb =
+        psi.network.RequestBodyPsiParser.mergeRequestBody(
+            domain.RequestBody(description = "base desc"),
+            psi.network.RequestBodyParseResult(domain.RequestBody(description = null), false))
+    assertEquals("base desc", mergedRb.description)
+    assertEquals("only desc", rbEps[4].requestBody?.description)
+    assertEquals(false, rbEps[5].requestBody?.required)
+    assertEquals(OpenApiInt(1L), rbEps[5].requestBody?.extensions?.get("x-rb"))
+    assertTrue(psi.network.AuthPsiParser.parseCallbacksJson("[1]").isEmpty())
+    assertTrue(psi.network.AuthPsiParser.parseCallbacksJson("{bad").isEmpty())
+    assertTrue(psi.network.RequestBodyPsiParser.parseContentJson("{bad").isEmpty())
+    assertTrue(psi.network.RequestBodyPsiParser.contentForType(null).isEmpty())
+    assertTrue(psi.network.RequestBodyPsiParser.contentForType("Unit").isEmpty())
+
+    // EndpointPsiParser comprehensive edge cases
+    val epEdgeCode =
+        """
+            import io.ktor.client.*
+            import io.ktor.client.request.*
+            import io.ktor.http.*
+
+            class EpEdgeApi(private val client: HttpClient) {
+                fun noLambdaRequest() {
+                    client.request()
+                }
+
+                /**
+                 * @param
+                 * @param pOnlyName
+                 * @paramExample
+                 * @paramExample p1
+                 * @paramExample p1 bad k: v
+                 * @paramExample p1 {"x-ext":1,"value":"v"}
+                 * @paramExample p1 [1, 2]
+                 * @paramExample p1 {badJson
+                 * @paramStyle
+                 * @paramStyle p1
+                 * @paramStyle p1 invalidStyle
+                 * @paramStyle p1 matrix
+                 * @paramStyle p2 label
+                 * @paramStyle p3 simple
+                 * @paramStyle p4 form
+                 * @paramStyle p5 cookie
+                 * @paramStyle p6 spaceDelimited
+                 * @paramStyle p7 pipeDelimited
+                 * @paramStyle p8 deepObject
+                 * @paramExplode
+                 * @paramExplode p1 invalidBool
+                 * @paramExplode p1 true
+                 * @paramAllowReserved
+                 * @paramAllowReserved p1 invalidBool
+                 * @paramAllowReserved p1 true
+                 * @paramAllowEmptyValue
+                 * @paramAllowEmptyValue p1 invalidBool
+                 * @paramAllowEmptyValue p1 true
+                 * @paramSchema
+                 * @paramSchema p1
+                 * @paramSchema p1 {bad
+                 * @paramContent
+                 * @paramContent p1
+                 * @paramContent p1 {bad
+                 * @paramContent p2 {}
+                 * @paramRef
+                 * @paramRef p1
+                 * @paramRef p1 123
+                 * @paramExtensions
+                 * @paramExtensions p1
+                 * @paramExtensions p1 {bad
+                 * @paramExtensions p1 {"non-x":1}
+                 * @paramExtensions p1 {"x-a":1}
+                 * @paramExtensions p1 {"x-b":2}
+                 * @callbacks
+                 * @callbacks {"cb":{}}
+                 * @extensions
+                 * @extensions {bad
+                 * @extensions [1]
+                 * @description
+                 * @operationIdOmitted true
+                 * @deprecated reason
+                 * @tag a, , b
+                 */
+                suspend fun edgeOp(
+                    @Deprecated("old") p1: String,
+                    p2: String = "def",
+                    `class`: String,
+                    optBody: String? = null
+                ) {
+                    client.request("http://example.com/${'$'}{1 + 2}/${'$'}{`class`}") {
+                        method = HttpMethod("GET")
+                        url.encodedQuery = ""
+                        parameter("onlyOneArg")
+                        header("onlyOneArg")
+                        cookie("onlyOneArg")
+                        parameter(123, "unknownKey")
+                        someObj.otherCall { parameter(123, "notForEach") }
+                        setBody()
+                        setBody(unknownBodyVar)
+                    }
+                }
+
+                suspend fun edgeOp2(optBody: String = "def"): String {
+                    client.request("http://example.com:8080/sub") {
+                        method = HttpMethod("")
+                        setBody(optBody)
+                    }
+                }
+
+                suspend fun edgeOp3(): Unit {
+                    client.request("httpnotproto") {
+                        method = OtherMethod
+                    }
+                }
+            }
+        """
+            .trimIndent()
+    val epEdges = parser.parse(epEdgeCode)
+    assertEquals(4, epEdges.size)
+    assertFalse(epEdges[1].operationIdExplicit)
+    assertTrue(epEdges[1].deprecated)
+    assertEquals(listOf("a", "b"), epEdges[1].tags)
+    assertEquals(false, epEdges[2].requestBody?.required)
+    assertEquals("String", epEdges[2].responses["200"]?.type)
+    assertNull(epEdges[3].responses["200"]?.type)
   }
 }

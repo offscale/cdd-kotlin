@@ -1,3 +1,4 @@
+/** Sealed hierarchy representing parsed OpenAPI or JSON Schema 2020-12 documents. */
 package openapi
 
 import domain.OpenApiDefinition

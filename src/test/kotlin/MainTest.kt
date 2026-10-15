@@ -2,7 +2,6 @@ import java.io.File
 import java.nio.file.Path
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -27,8 +26,11 @@ class MainTest {
   }
 
   @Test
-  fun `main with unknown command throws RuntimeException`() {
-    assertThrows(RuntimeException::class.java) { main(arrayOf("unknown_command")) }
+  fun `main with unknown command returns failure Result`() {
+    main(arrayOf("unknown_command"))
+    val res = runCliResult(arrayOf("unknown_command"))
+    assertTrue(res.isFailure)
+    assertEquals(0, runCliResult(emptyArray()).getOrThrow())
   }
 
   @Test
@@ -68,7 +70,7 @@ class MainTest {
   @Test
   fun `to_sdk handles CDD_INPUT env variable`(@TempDir tempDir: Path) {
     val specFile = tempDir.resolve("spec.json").toFile()
-    specFile.writeText("{}")
+    specFile.writeText("{invalid_json")
     val original = System.getenv("CDD_INPUT") ?: System.getProperty("CDD_INPUT")
     try {
       System.setProperty("CDD_INPUT", specFile.absolutePath)

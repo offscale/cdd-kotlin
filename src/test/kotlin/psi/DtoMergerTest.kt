@@ -44,7 +44,7 @@ class DtoMergerTest {
                     ),
             required = listOf("name"))
 
-    val result = merger.mergeDto(existing, schema)
+    val result = merger.mergeDto(existing, schema).getOrThrow()
 
     // Check new field exists with annotation and default value
     assertTrue(
@@ -74,7 +74,7 @@ class DtoMergerTest {
                 mapOf("id" to SchemaProperty("integer"), "score" to SchemaProperty("integer")),
             required = listOf("id", "score"))
 
-    val result = merger.mergeDto(existing, schema)
+    val result = merger.mergeDto(existing, schema).getOrThrow()
 
     // Should not duplicate id
     val idCount = result.split("val id").size - 1
@@ -98,7 +98,7 @@ class DtoMergerTest {
                     "b" to SchemaProperty("boolean")),
             required = listOf("id", "a", "b"))
 
-    val result = merger.mergeDto(existing, schema)
+    val result = merger.mergeDto(existing, schema).getOrThrow()
 
     assertTrue(result.contains("val a: Boolean"))
     assertTrue(result.contains("val b: Boolean"))
@@ -121,7 +121,7 @@ class DtoMergerTest {
             properties = mapOf("id" to SchemaProperty("integer")),
             required = listOf("id"))
 
-    val result = merger.mergeDto(existing, schema)
+    val result = merger.mergeDto(existing, schema).getOrThrow()
 
     assertEquals(existing, result)
   }
@@ -138,7 +138,7 @@ class DtoMergerTest {
         SchemaDefinition(
             name = "Empty", type = "object", properties = mapOf("name" to SchemaProperty("string")))
 
-    val result = merger.mergeDto(existing, schema)
+    val result = merger.mergeDto(existing, schema).getOrThrow()
 
     assertTrue(
         result.contains(
@@ -165,26 +165,24 @@ class DtoMergerTest {
                     "maybe" to SchemaProperty(types = setOf("string", "null"))),
             required = listOf("id", "maybe"))
 
-    val result = merger.mergeDto(existing, schema)
+    val result = merger.mergeDto(existing, schema).getOrThrow()
 
     assertTrue(result.contains("val maybe: String? = null"))
   }
 
   @Test
-  fun `mergeDto throws when class missing`() {
+  fun `mergeDto returns failure when class missing`() {
     val existing = "data class Other(val id: String)"
 
     val schema =
         SchemaDefinition(
             name = "Missing", type = "object", properties = mapOf("id" to SchemaProperty("string")))
 
-    org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException::class.java) {
-      merger.mergeDto(existing, schema)
-    }
+    assertTrue(merger.mergeDto(existing, schema).isFailure)
   }
 
   @Test
-  fun `mergeDto throws when primary constructor missing`() {
+  fun `mergeDto returns failure when primary constructor missing`() {
     val existing = "class NoPrimary { fun run() {} }"
 
     val schema =
@@ -193,8 +191,6 @@ class DtoMergerTest {
             type = "object",
             properties = mapOf("id" to SchemaProperty("string")))
 
-    org.junit.jupiter.api.Assertions.assertThrows(IllegalStateException::class.java) {
-      merger.mergeDto(existing, schema)
-    }
+    assertTrue(merger.mergeDto(existing, schema).isFailure)
   }
 }

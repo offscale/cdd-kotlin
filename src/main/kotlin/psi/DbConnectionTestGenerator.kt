@@ -1,3 +1,4 @@
+/** Unit test generator for DatabaseConnection configuration and initialization logic. */
 package psi
 
 import domain.SchemaDefinition
@@ -12,43 +13,36 @@ class DbConnectionTestGenerator {
    * @param schemas The list of schemas.
    */
   fun generateDbConnectionTestModule(packageName: String, schemas: List<SchemaDefinition>): String {
-    val sb = StringBuilder()
-    sb.append("package $packageName.db\n\n")
-
-    sb.append("import kotlin.test.*\n")
-    sb.append("import kotlin.test.Test\n\n")
-
-    sb.append("/**\n")
-    sb.append(" * Tests for [DatabaseConnection].\n")
-    sb.append(" */\n")
-    sb.append("class DatabaseConnectionTest {\n")
-    sb.append("    @Test\n")
-    sb.append("    fun `resolveConfig with ephemeral flag true returns ephemeral SQLite`() {\n")
-    sb.append(
-        "        val config = DatabaseConnection.resolveConfig(ephemeralFlag = true, envUrl = \"jdbc:postgresql://localhost/db\")\n")
-    sb.append("        assertTrue(config.isEphemeral)\n")
-    sb.append("        assertEquals(\"org.sqlite.JDBC\", config.driver)\n")
-    sb.append("        assertTrue(config.url.contains(\"sqlite\"))\n")
-    sb.append("    }\n\n")
-
-    sb.append("    @Test\n")
-    sb.append("    fun `resolveConfig with empty envUrl returns ephemeral SQLite`() {\n")
-    sb.append(
-        "        val config = DatabaseConnection.resolveConfig(ephemeralFlag = false, envUrl = \"\")\n")
-    sb.append("        assertTrue(config.isEphemeral)\n")
-    sb.append("        assertEquals(\"org.sqlite.JDBC\", config.driver)\n")
-    sb.append("    }\n\n")
-
-    sb.append("    @Test\n")
-    sb.append("    fun `resolveConfig with postgres envUrl returns postgres config`() {\n")
-    sb.append(
-        "        val config = DatabaseConnection.resolveConfig(ephemeralFlag = false, envUrl = \"jdbc:postgresql://localhost/db\")\n")
-    sb.append("        assertFalse(config.isEphemeral)\n")
-    sb.append("        assertEquals(\"org.postgresql.Driver\", config.driver)\n")
-    sb.append("        assertEquals(\"jdbc:postgresql://localhost/db\", config.url)\n")
-    sb.append("    }\n")
-    sb.append("}\n")
-
-    return sb.toString()
+    return buildKotlinFile("$packageName.db") {
+      import("kotlin.test.*", "kotlin.test.Test")
+      kdoc("Tests for [DatabaseConnection].")
+      block("class DatabaseConnectionTest") {
+        line("@Test")
+        block("fun `resolveConfig with ephemeral flag true returns ephemeral SQLite`()") {
+          line(
+              "val config = DatabaseConnection.resolveConfig(ephemeralFlag = true, envUrl = \"jdbc:postgresql://localhost/db\")")
+          line("assertTrue(config.isEphemeral)")
+          line("assertEquals(\"org.sqlite.JDBC\", config.driver)")
+          line("assertTrue(config.url.contains(\"sqlite\"))")
+        }
+        line()
+        line("@Test")
+        block("fun `resolveConfig with empty envUrl returns ephemeral SQLite`()") {
+          line(
+              "val config = DatabaseConnection.resolveConfig(ephemeralFlag = false, envUrl = \"\")")
+          line("assertTrue(config.isEphemeral)")
+          line("assertEquals(\"org.sqlite.JDBC\", config.driver)")
+        }
+        line()
+        line("@Test")
+        block("fun `resolveConfig with postgres envUrl returns postgres config`()") {
+          line(
+              "val config = DatabaseConnection.resolveConfig(ephemeralFlag = false, envUrl = \"jdbc:postgresql://localhost/db\")")
+          line("assertFalse(config.isEphemeral)")
+          line("assertEquals(\"org.postgresql.Driver\", config.driver)")
+          line("assertEquals(\"jdbc:postgresql://localhost/db\", config.url)")
+        }
+      }
+    }
   }
 }

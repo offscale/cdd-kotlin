@@ -5,7 +5,9 @@ import domain.EndpointDefinition
 import domain.EndpointParameter
 import domain.HttpMethod
 import domain.Info
+import domain.OpenApiBoolean
 import domain.OpenApiDefinition
+import domain.OpenApiString
 import domain.ParameterLocation
 import domain.PathItem
 import domain.SchemaDefinition
@@ -79,10 +81,12 @@ class OpenApiAssemblerTest {
         OpenApiAssembler()
             .assemble(
                 info = Info("Extensions API", "1.0"),
-                extensions = mapOf("x-trace" to true, "x-owner" to "core-team"))
+                extensions =
+                    mapOf(
+                        "x-trace" to OpenApiBoolean(true), "x-owner" to OpenApiString("core-team")))
 
-    assertEquals(true, definition.extensions["x-trace"])
-    assertEquals("core-team", definition.extensions["x-owner"])
+    assertEquals(OpenApiBoolean(true), definition.extensions["x-trace"])
+    assertEquals(OpenApiString("core-team"), definition.extensions["x-owner"])
   }
 
   @Test
@@ -105,8 +109,9 @@ class OpenApiAssemblerTest {
                                 location = ParameterLocation.QUERY,
                                 isRequired = false)),
                     servers = listOf(Server(url = "https://pets.example.com")),
-                    extensions = mapOf("x-path" to true)),
-            "/other" to PathItem(summary = "Other", extensions = mapOf("x-other" to true)))
+                    extensions = mapOf("x-path" to OpenApiBoolean(true))),
+            "/other" to
+                PathItem(summary = "Other", extensions = mapOf("x-other" to OpenApiBoolean(true))))
 
     val definition =
         OpenApiAssembler()
@@ -119,7 +124,7 @@ class OpenApiAssemblerTest {
     assertEquals(1, item?.parameters?.size)
     assertEquals("limit", item?.parameters?.first()?.name)
     assertEquals("https://pets.example.com", item?.servers?.first()?.url)
-    assertEquals(true, item?.extensions?.get("x-path"))
+    assertEquals(OpenApiBoolean(true), item?.extensions?.get("x-path"))
     assertEquals("listPets", item?.get?.operationId)
 
     val otherItem = definition.paths["/other"]
@@ -158,8 +163,10 @@ class OpenApiAssemblerTest {
                     listOf(
                         EndpointDefinition(
                             path = "/pets", method = HttpMethod.GET, operationId = "listPets")),
-                pathItems = mapOf("/pets" to PathItem(extensions = mapOf("x-new" to "value"))))
+                pathItems =
+                    mapOf(
+                        "/pets" to PathItem(extensions = mapOf("x-new" to OpenApiString("value")))))
     assertNotNull(definitions.paths["/pets"])
-    assertEquals("value", definitions.paths["/pets"]?.extensions?.get("x-new"))
+    assertEquals(OpenApiString("value"), definitions.paths["/pets"]?.extensions?.get("x-new"))
   }
 }

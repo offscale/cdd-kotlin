@@ -1,6 +1,8 @@
 package openapi
 
 import domain.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class OpenApiValidatorCoverageTest {
@@ -14,15 +16,16 @@ class OpenApiValidatorCoverageTest {
             ref = "#/components/links/SomeLink",
             operationId = "opId",
             operationRef = "#/components/links/Other",
-            parameters = mapOf("a" to "b"),
-            requestBody = "{\$url}",
+            parameters = mapOf("a" to OpenApiString("b")),
+            requestBody = OpenApiString("{\$url}"),
             server = Server("http://a.b"))
 
     val invalidLink =
         Link(
             requestBody =
-                "{invalid} {\$request.body#invalid~x} {\$request.query.} {\$request.header.} { } {}",
-            parameters = mapOf("a" to "{\$request.header.b}"))
+                OpenApiString(
+                    "{invalid} {\$request.body#invalid~x} {\$request.query.} {\$request.header.} { } {}"),
+            parameters = mapOf("a" to OpenApiString("{\$request.header.b}")))
 
     val megaDef =
         OpenApiDefinition(
@@ -146,18 +149,57 @@ class OpenApiValidatorCoverageTest {
                                             ref = ("#/components/schemas/Missing"))))),
             security = listOf(mapOf("S2" to emptyList(), "MissingS" to emptyList())))
 
-    validator.validate(megaDef)
+    val megaIssues = validator.validate(megaDef)
+    assertTrue(megaIssues.isNotEmpty())
+    assertTrue(
+        megaIssues.any {
+          it.severity == OpenApiIssueSeverity.WARNING &&
+              it.path.contains("links") &&
+              it.message.contains("should not define other fields")
+        })
+    assertTrue(
+        megaIssues.any {
+          it.severity == OpenApiIssueSeverity.ERROR &&
+              it.path.contains("links") &&
+              it.message.contains("either operationId or operationRef")
+        })
+    assertTrue(
+        megaIssues.any {
+          it.severity == OpenApiIssueSeverity.ERROR &&
+              it.path.contains("BadRef") &&
+              it.message.contains("valid URI")
+        })
+    assertTrue(
+        megaIssues.any {
+          it.severity == OpenApiIssueSeverity.ERROR &&
+              it.path.contains("security") &&
+              it.message.contains("MissingS")
+        })
 
     // Invalid openapi versions / dialects
-    validator.validate(OpenApiDefinition(openapi = "2.0", info = info))
-    validator.validate(OpenApiDefinition(openapi = "3.1.0", info = info))
-    validator.validate(
-        OpenApiDefinition(
-            openapi = "3.1.0",
-            info = info,
-            paths = emptyMap(),
-            jsonSchemaDialect = "unknown",
-            components = Components()))
+    val oas2Issues = validator.validate(OpenApiDefinition(openapi = "2.0", info = info))
+    assertTrue(oas2Issues.isEmpty())
+    val emptyRootIssues = validator.validate(OpenApiDefinition(openapi = "3.1.0", info = info))
+    assertTrue(
+        emptyRootIssues.any {
+          it.severity == OpenApiIssueSeverity.ERROR &&
+              it.path == "$.openapi" &&
+              it.message.contains("at least one of: paths, webhooks, or components")
+        })
+    val dialectIssues =
+        validator.validate(
+            OpenApiDefinition(
+                openapi = "3.1.0",
+                info = info,
+                paths = emptyMap(),
+                jsonSchemaDialect = "unknown",
+                components = Components()))
+    assertTrue(
+        dialectIssues.any {
+          it.path == "$.jsonSchemaDialect" &&
+              (it.severity == OpenApiIssueSeverity.WARNING ||
+                  it.severity == OpenApiIssueSeverity.ERROR)
+        })
 
     // Extra coverage for specific branches
     val extraDef =
@@ -264,6 +306,186 @@ class OpenApiValidatorCoverageTest {
                                     location = ParameterLocation.QUERY,
                                     type = "string")),
                     headers = mapOf("H3" to Header(type = "string"))))
-    validator.validate(extraDef)
+    val extraIssues = validator.validate(extraDef)
+    assertTrue(
+        extraIssues.any {
+          it.severity == OpenApiIssueSeverity.ERROR &&
+              it.path.contains("headers") &&
+              it.message.contains("Missing")
+        })
+    assertEquals(true, extraIssues.all { it.path.startsWith("$") })
+
+    val minimalContactLicenseDef =
+        OpenApiDefinition(
+            info =
+                Info(
+                    title = "T",
+                    version = "1.0",
+                    contact = Contact(name = "OnlyName"),
+                    license = License(name = "MIT")),
+            servers = listOf(Server(url = "https://example.com", name = "uniqueProd")),
+            paths =
+                mapOf(
+                    "/items/{id}" to
+                        PathItem(
+                            parameters =
+                                listOf(
+                                    EndpointParameter(
+                                        name = "q",
+                                        type = "String",
+                                        location = ParameterLocation.QUERY,
+                                        schema = SchemaProperty(types = setOf("string"))),
+                                    EndpointParameter(
+                                        name = "id",
+                                        type = "String",
+                                        location = ParameterLocation.PATH,
+                                        isRequired = true,
+                                        schema = SchemaProperty(types = setOf("string")))),
+                            get =
+                                EndpointDefinition(
+                                    path = "/items/{id}",
+                                    method = HttpMethod.GET,
+                                    operationId = "getItem",
+                                    responses =
+                                        mapOf(
+                                            "200" to
+                                                EndpointResponse(
+                                                    statusCode = "200", description = "ok"))))))
+    assertTrue(
+        validator.validate(minimalContactLicenseDef).none {
+          it.severity == OpenApiIssueSeverity.ERROR
+        })
+
+    assertEquals(
+        "https://abs.com/a.json",
+        openapi.validator.ValidationCommon.resolveSelfBase(
+            "https://abs.com/a.json", "https://base.com/b.json"))
+    assertEquals(
+        null,
+        openapi.validator.ReferenceAndLinkValidator.extractComponentRefInfo(
+            "#/components/schemas/", "schemas", null))
+    assertEquals(
+        "https://abs.com/spec.json",
+        openapi.validator.ReferenceAndLinkValidator.extractComponentRefInfo(
+                "https://abs.com/spec.json#/components/schemas/Pet",
+                "schemas",
+                "https://base.com/spec.json")
+            ?.base)
+    assertEquals(
+        null,
+        openapi.validator.ReferenceAndLinkValidator.resolveCallbackRef(
+            "#/components/callbacks/Cb", null))
+    assertEquals(
+        null,
+        openapi.validator.ReferenceAndLinkValidator.resolveCallbackRef(
+            "#/components/callbacks/", Components()))
+    assertEquals(
+        null,
+        openapi.validator.ReferenceAndLinkValidator.resolveCallbackRef(
+            "#/components/callbacks/a/b", Components()))
+
+    val remainingBranchDef =
+        OpenApiDefinition(
+            self = null,
+            info = Info(title = "T", version = "1.0"),
+            components =
+                Components(
+                    schemas =
+                        mapOf(
+                            "DialectDef" to
+                                SchemaDefinition(
+                                    name = "DialectDef",
+                                    schemaDialect = "https://json-schema.org/draft/2020-12/schema",
+                                    examples = mapOf("e" to OpenApiString("v")),
+                                    extensions = mapOf("x-ext" to OpenApiString("v")),
+                                    customKeywords = emptyMap())),
+                    mediaTypes =
+                        mapOf(
+                            "RefMedia" to
+                                MediaTypeObject(
+                                    reference = ReferenceObject("#/components/mediaTypes/Other")),
+                            "ItemEncMedia" to
+                                MediaTypeObject(
+                                    schema =
+                                        SchemaProperty(
+                                            types = setOf("array"),
+                                            minContains = 1,
+                                            contains = SchemaProperty(types = setOf("string")),
+                                            ref = "#/\$defs/",
+                                            xml = Xml(nodeType = "text", name = null)),
+                                    itemEncoding =
+                                        EncodingObject(
+                                            contentType = "text/plain",
+                                            encoding = mapOf("sub" to EncodingObject()))),
+                            "BoolSchemaEncMedia" to
+                                MediaTypeObject(
+                                    schema = SchemaProperty(booleanSchema = true),
+                                    encoding = mapOf("a" to EncodingObject()))),
+                    links =
+                        mapOf(
+                            "RefLinkObj" to
+                                Link(reference = ReferenceObject("#/components/links/Other")),
+                            "ExtOpRefLink" to
+                                Link(
+                                    operationRef = "https://self.com/spec.json#/paths/~1a/get",
+                                    parameters = mapOf("p" to OpenApiInt(1)))),
+                    securitySchemes =
+                        mapOf(
+                            "OAuthNoCode" to
+                                SecurityScheme(
+                                    type = "oauth2",
+                                    flows =
+                                        OAuthFlows(
+                                            authorizationCode = null,
+                                            deviceAuthorization =
+                                                OAuthFlow(
+                                                    deviceAuthorizationUrl = "https://a.b",
+                                                    tokenUrl = "https://a.b"))))),
+            paths =
+                mapOf(
+                    "/a" to
+                        PathItem(
+                            get =
+                                EndpointDefinition(
+                                    path = "/a",
+                                    method = HttpMethod.GET,
+                                    operationId = "getA",
+                                    responses =
+                                        mapOf(
+                                            "200" to
+                                                EndpointResponse(
+                                                    statusCode = "200",
+                                                    description = "ok",
+                                                    links =
+                                                        mapOf(
+                                                            "RefLinkObj" to
+                                                                Link(
+                                                                    reference =
+                                                                        ReferenceObject(
+                                                                            "#/components/links/Other")),
+                                                            "BodyLink" to
+                                                                Link(
+                                                                    operationId = "getA",
+                                                                    parameters =
+                                                                        mapOf(
+                                                                            "p" to OpenApiInt(1),
+                                                                            "b" to
+                                                                                OpenApiString(
+                                                                                    "\$request.body")))),
+                                                    content =
+                                                        mapOf(
+                                                            "application/json" to
+                                                                MediaTypeObject(
+                                                                    itemEncoding =
+                                                                        EncodingObject(
+                                                                            contentType =
+                                                                                "text/plain")))))))))
+    assertTrue(validator.validate(remainingBranchDef).isNotEmpty())
+    assertTrue(
+        validator
+            .validate(
+                remainingBranchDef.copy(self = "https://other.com/spec.json"),
+                baseUri = "https://other.com/spec.json")
+            .isNotEmpty())
   }
 }

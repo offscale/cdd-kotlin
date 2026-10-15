@@ -4,7 +4,10 @@ import com.fasterxml.jackson.core.JsonFactory
 import com.fasterxml.jackson.databind.ObjectMapper
 import domain.Components
 import domain.Info
+import domain.OpenApiArray
 import domain.OpenApiDefinition
+import domain.OpenApiInt
+import domain.OpenApiString
 import domain.SchemaDefinition
 import domain.SchemaProperty
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -94,7 +97,7 @@ class OpenApiSchemaKeywordsTest {
     assertEquals("Advanced schema comment", schema?.comment)
     assertEquals("#/components/schemas/Base", schema?.dynamicRef)
     assertEquals("integer", schema?.defs?.get("PositiveInt")?.type)
-    assertEquals("US", schema?.ifSchema?.properties?.get("country")?.constValue)
+    assertEquals(OpenApiString("US"), schema?.ifSchema?.properties?.get("country")?.constValue)
     assertEquals("state", schema?.thenSchema?.required?.first())
     assertEquals("province", schema?.elseSchema?.required?.first())
     assertEquals("#/components/schemas/Other", schema?.properties?.get("dynamic")?.dynamicRef)
@@ -121,7 +124,10 @@ class OpenApiSchemaKeywordsTest {
             ifSchema =
                 SchemaProperty(
                     types = setOf("object"),
-                    properties = mapOf("country" to SchemaProperty("string", constValue = "US"))),
+                    properties =
+                        mapOf(
+                            "country" to
+                                SchemaProperty("string", constValue = OpenApiString("US")))),
             thenSchema =
                 SchemaProperty(
                     types = setOf("object"),
@@ -222,11 +228,13 @@ class OpenApiSchemaKeywordsTest {
     val definition = parser.parseString(json, OpenApiParser.Format.JSON)
     val schema = definition.components?.schemas?.get("Custom")
     assertNotNull(schema)
-    assertEquals("alpha", schema?.customKeywords?.get("vendorKeyword"))
-    assertEquals(3, (schema?.customKeywords?.get("threshold") as? Number)?.toInt())
-    assertEquals("keep", schema?.extensions?.get("x-ext"))
+    assertEquals(OpenApiString("alpha"), schema?.customKeywords?.get("vendorKeyword"))
+    assertEquals(OpenApiInt(3L), schema?.customKeywords?.get("threshold"))
+    assertEquals(OpenApiString("keep"), schema?.extensions?.get("x-ext"))
     val nameProp = schema?.properties?.get("name")
-    assertEquals(listOf("a", "b"), nameProp?.customKeywords?.get("custom"))
+    assertEquals(
+        OpenApiArray(listOf(OpenApiString("a"), OpenApiString("b"))),
+        nameProp?.customKeywords?.get("custom"))
   }
 
   @Test
@@ -235,13 +243,19 @@ class OpenApiSchemaKeywordsTest {
         SchemaDefinition(
             name = "Custom",
             type = "object",
-            customKeywords = mapOf("vendorKeyword" to "alpha", "threshold" to 3),
+            customKeywords =
+                mapOf("vendorKeyword" to OpenApiString("alpha"), "threshold" to OpenApiInt(3L)),
             properties =
                 mapOf(
                     "name" to
                         SchemaProperty(
-                            type = "string", customKeywords = mapOf("custom" to listOf("a", "b")))),
-            extensions = mapOf("x-ext" to "keep"))
+                            type = "string",
+                            customKeywords =
+                                mapOf(
+                                    "custom" to
+                                        OpenApiArray(
+                                            listOf(OpenApiString("a"), OpenApiString("b")))))),
+            extensions = mapOf("x-ext" to OpenApiString("keep")))
 
     val definition =
         OpenApiDefinition(

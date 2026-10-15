@@ -260,5 +260,157 @@ class OpenApiPathFlattenerTest {
     assertEquals(2, endpoints.size)
     assertTrue(endpoints.any { it.operationId == "listPets" && it.path == "/pets" })
     assertTrue(endpoints.any { it.operationId == "onPetDeleted" && it.path == "pet.deleted" })
+
+    // Direct flattenPathItem call with default args
+    val direct =
+        OpenApiPathFlattener.flattenPathItem(
+            "/direct",
+            PathItem(
+                get =
+                    EndpointDefinition(
+                        path = "/direct", method = HttpMethod.GET, operationId = "directOp")))
+    assertEquals(1, direct.size)
+
+    // Component pathItem ref with extension merging and chained ref
+    val baseTarget =
+        PathItem(
+            extensions = mapOf("x-base" to OpenApiInt(1L)),
+            get =
+                EndpointDefinition(path = "/x", method = HttpMethod.GET, operationId = "chainedOp"))
+    val midTarget =
+        PathItem(ref = "#/components/pathItems/Base", extensions = mapOf("x-mid" to OpenApiInt(2L)))
+    val leafItem =
+        PathItem(ref = "#/components/pathItems/Mid", extensions = mapOf("x-leaf" to OpenApiInt(3L)))
+    val chainedComp =
+        Components(
+            pathItems =
+                mapOf(
+                    "Base" to baseTarget,
+                    "Mid" to midTarget,
+                    "NoExt" to PathItem(get = baseTarget.get)))
+    val chainedEndpoints =
+        OpenApiPathFlattener.flattenPaths(
+            mapOf(
+                "/chained" to leafItem,
+                "/overOnly" to
+                    PathItem(
+                        ref = "#/components/pathItems/NoExt",
+                        extensions = mapOf("x-over" to OpenApiInt(9L)))),
+            components = chainedComp)
+    assertEquals(2, chainedEndpoints.size)
+
+    // Component pathItem ref with matching selfBase falling back to refResolver
+    val fallbackEndpoints =
+        OpenApiPathFlattener.flattenPaths(
+            paths =
+                mapOf(
+                    "/ext" to
+                        PathItem(ref = "https://example.com/spec#/components/pathItems/Remote")),
+            components = Components(),
+            self = "https://example.com/spec",
+            refResolver =
+                PathItemRefResolver { _, key ->
+                  if (key == "Remote") PathItemResolution(baseTarget) else null
+                })
+    assertEquals(1, fallbackEndpoints.size)
+
+    // Whitespace in base / ref
+    val wsEndpoints =
+        OpenApiPathFlattener.flattenPaths(
+            paths =
+                mapOf("/ws" to PathItem(ref = "http://bad base/spec#/components/pathItems/Remote")),
+            components = Components(),
+            self = "http://bad self/spec",
+            refResolver = PathItemRefResolver { _, _ -> null })
+    assertTrue(wsEndpoints.isEmpty())
+
+    // Empty flattenAll and empty paths with non-empty webhooks
+    assertTrue(OpenApiPathFlattener.flattenAll(emptyMap(), emptyMap()).isEmpty())
+    assertEquals(1, OpenApiPathFlattener.flattenAll(emptyMap(), webhooks).size)
+    assertEquals(1, OpenApiPathFlattener.flattenAll(paths, emptyMap()).size)
+
+    // Cyclic pathItem ref and overriding parameters, servers, description
+    val cycA =
+        PathItem(
+            ref = "#/components/pathItems/CycB",
+            summary = "SumA",
+            description = "DescA",
+            parameters = listOf(EndpointParameter("p", "String", ParameterLocation.QUERY)),
+            servers = listOf(Server("https://a.example.com")))
+    val cycB = PathItem(ref = "#/components/pathItems/CycA")
+    val cycComp = Components(pathItems = mapOf("CycA" to cycA, "CycB" to cycB))
+    assertTrue(
+        OpenApiPathFlattener.flattenPaths(mapOf("/cyc" to cycA), components = cycComp).isEmpty())
+
+    // Non-component ref and blank key ref
+    assertTrue(
+        OpenApiPathFlattener.flattenPaths(mapOf("/nonComp" to PathItem(ref = "./other.yaml")))
+            .isEmpty())
+    assertTrue(
+        OpenApiPathFlattener.flattenPaths(
+                mapOf("/blankKey" to PathItem(ref = "#/components/pathItems/   ")))
+            .isEmpty())
+
+    // Missing local ref without base (base == null && refResolver != null)
+    assertTrue(
+        OpenApiPathFlattener.flattenPaths(
+                paths = mapOf("/missingLocal" to PathItem(ref = "#/components/pathItems/Missing")),
+                components = Components(),
+                refResolver = PathItemRefResolver { _, _ -> null })
+            .isEmpty())
+
+    // Missing local ref with base but refResolver == null
+    assertTrue(
+        OpenApiPathFlattener.flattenPaths(
+                paths =
+                    mapOf(
+                        "/missingLocalWithBase" to
+                            PathItem(
+                                ref = "https://example.com/spec#/components/pathItems/Missing")),
+                components = Components(),
+                self = "https://example.com/spec",
+                refResolver = null)
+            .isEmpty())
+
+    // Blank self base and whitespace only in ref (valid base)
+    assertTrue(
+        OpenApiPathFlattener.flattenPaths(
+                paths =
+                    mapOf(
+                        "/wsRefOnly" to
+                            PathItem(ref = "http://bad ref/spec#/components/pathItems/Remote")),
+                components = Components(),
+                self = "https://valid.example.com/spec",
+                refResolver = PathItemRefResolver { _, _ -> null })
+            .isEmpty())
+    assertTrue(
+        OpenApiPathFlattener.flattenPaths(
+                paths = mapOf("/blankSelf" to PathItem(ref = "#/components/pathItems/Missing")),
+                components = Components(),
+                self = "   ")
+            .isEmpty())
+
+    // Additional operation with op-level summary, description, and servers
+    val customOpItem =
+        PathItem(
+            summary = "ItemSum",
+            description = "ItemDesc",
+            servers = listOf(Server("https://item.example.com")),
+            additionalOperations =
+                mapOf(
+                    "LOCK" to
+                        EndpointDefinition(
+                            path = "/lock",
+                            method = HttpMethod.CUSTOM,
+                            customMethod = "LOCK",
+                            operationId = "lockOp",
+                            summary = "OpSum",
+                            description = "OpDesc",
+                            servers = listOf(Server("https://op.example.com")))))
+    val lockEndpoints = OpenApiPathFlattener.flattenPaths(mapOf("/lock" to customOpItem))
+    assertEquals(1, lockEndpoints.size)
+    assertEquals("OpSum", lockEndpoints.first().summary)
+    assertEquals("OpDesc", lockEndpoints.first().description)
+    assertEquals("https://op.example.com", lockEndpoints.first().servers.first().url)
   }
 }

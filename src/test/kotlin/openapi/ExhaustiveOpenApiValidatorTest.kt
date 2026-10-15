@@ -1,9 +1,13 @@
 package openapi
 
 import domain.*
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
+/**
+ * Exhaustive permutation tests for [OpenApiValidator] verifying exact [OpenApiIssue] paths,
+ * messages, and severities across schema constraints, operations, and server variables.
+ */
 class ExhaustiveOpenApiValidatorTest {
   private val validator = OpenApiValidator()
 
@@ -44,7 +48,18 @@ class ExhaustiveOpenApiValidatorTest {
                                   SchemaDefinition(
                                       name = "TestSchema", properties = mapOf("prop" to prop)))))
       val issues = validator.validate(def)
-      assertNotNull(issues)
+      assertTrue(issues.isNotEmpty())
+      assertTrue(issues.all { it.path.isNotBlank() && it.message.isNotBlank() })
+      if (i % 2 == 0) {
+        assertTrue(
+            issues.any {
+              it.severity == OpenApiIssueSeverity.ERROR &&
+                  it.path.contains("components.schemas.TestSchema.properties.prop")
+            })
+      }
+      if (i % 5 == 0) {
+        assertTrue(issues.any { it.message.contains("Invalid") || it.path.contains("${"$"}ref") })
+      }
     }
   }
 
@@ -55,7 +70,7 @@ class ExhaustiveOpenApiValidatorTest {
           EndpointDefinition(
               path = "/pets",
               method = HttpMethod.GET,
-              operationId = "testOp${i}",
+              operationId = "testOp$i",
               responses =
                   if (i % 2 == 0) emptyMap()
                   else
@@ -67,7 +82,7 @@ class ExhaustiveOpenApiValidatorTest {
               parameters =
                   listOf(
                       EndpointParameter(
-                          name = "param${i}",
+                          name = "param$i",
                           type = "string",
                           location =
                               if (i % 2 == 0) ParameterLocation.QUERY else ParameterLocation.PATH,
@@ -90,7 +105,17 @@ class ExhaustiveOpenApiValidatorTest {
       val def =
           OpenApiDefinition(
               info = Info("Test", "1.0"), paths = mapOf("/pets" to PathItem(get = op)))
-      validator.validate(def)
+      val issues = validator.validate(def)
+      assertTrue(issues.isNotEmpty())
+      if (i % 2 != 0) {
+        assertTrue(
+            issues.any {
+              it.severity == OpenApiIssueSeverity.ERROR && it.path.contains("responses")
+            })
+      } else {
+        assertTrue(
+            issues.any { it.path.contains("security") && it.message.contains("invalidScheme") })
+      }
     }
   }
 
@@ -120,7 +145,15 @@ class ExhaustiveOpenApiValidatorTest {
                       termsOfService = "invalid-url",
                       contact = Contact(url = "invalid-url", email = "invalid-email")),
               servers = listOf(server, server))
-      validator.validate(def)
+      val issues = validator.validate(def)
+      assertTrue(issues.isNotEmpty())
+      assertTrue(
+          issues.any {
+            it.severity == OpenApiIssueSeverity.ERROR &&
+                it.path == "$.info.contact.email" &&
+                it.message.contains("email")
+          })
+      assertTrue(issues.any { it.path.startsWith("$.servers") })
     }
   }
 }

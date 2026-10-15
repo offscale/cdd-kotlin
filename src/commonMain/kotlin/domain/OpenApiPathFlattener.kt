@@ -1,39 +1,50 @@
+/**
+ * Flattens OpenAPI 3.2 Paths, PathItems, and Webhooks into flat [EndpointDefinition] lists.
+ *
+ * Inverse of [OpenApiPathBuilder]; supports `$ref` PathItem resolution and `$self`-aware base URI
+ * matching across all Kotlin Multiplatform targets.
+ */
 package domain
 
-import java.net.URI
+import openapi.decodeJsonPointerToken
+import openapi.resolveUri
 
 /**
- * Utility to flatten OpenAPI Paths/PathItems into a list of EndpointDefinitions.
+ * Resolved Path Item metadata returned by [PathItemRefResolver].
  *
- * This is useful for code generation that expects flat endpoint lists while still modeling the
- * OpenAPI `paths` object correctly with PathItem objects.
+ * @property item The resolved [PathItem].
+ * @property components Optional [Components] from the target document.
+ * @property selfBase Optional normalized `$self` base URI of the target document.
  */
-/** Resolved Path Item metadata returned by [PathItemRefResolver]. */
 data class PathItemResolution(
     val item: PathItem,
     val components: Components? = null,
     val selfBase: String? = null
 )
 
-/** Resolves external Path Item $ref targets (e.g. external `#/components/pathItems/{name}`). */
+/** Resolves external Path Item `$ref` targets (e.g. external `#/components/pathItems/{name}`). */
 fun interface PathItemRefResolver {
-  /** Resolves the target PathItem by base URI and component key. */
+  /**
+   * Resolves the target [PathItem] by base URI and component key.
+   *
+   * @param baseUri Base URI of the referenced document.
+   * @param key Component key under `components/pathItems`.
+   * @return The resolved [PathItemResolution], or `null` if not found.
+   */
   fun resolve(baseUri: String?, key: String): PathItemResolution?
 }
 
-/** Local helper doc */
+/** Utility to flatten OpenAPI Paths/PathItems into a list of [EndpointDefinition]s. */
 object OpenApiPathFlattener {
 
   /**
-   * Flattens an OpenAPI Paths map into a list of EndpointDefinitions.
+   * Flattens an OpenAPI Paths map into a list of [EndpointDefinition]s.
    *
-   * If [components] contains `pathItems`, `$ref` Path Items are resolved when they point to
-   * `#/components/pathItems/{name}`.
-   *
-   * When [self] is provided, component pathItem refs are resolved only if the ref base matches the
-   * `$self` base (or the ref is fragment-only).
-   *
-   * External component refs can be resolved via [refResolver] when provided.
+   * @param paths Map of path templates to [PathItem] objects.
+   * @param components Optional [Components] for resolving local `pathItems` references.
+   * @param self Optional `$self` URI of the current document.
+   * @param refResolver Optional external [PathItemRefResolver].
+   * @return Ordered list of flattened [EndpointDefinition]s.
    */
   fun flattenPaths(
       paths: Map<String, PathItem>,
@@ -49,11 +60,13 @@ object OpenApiPathFlattener {
   }
 
   /**
-   * Flattens a Webhooks map into EndpointDefinitions.
+   * Flattens a Webhooks map into [EndpointDefinition]s.
    *
-   * Webhook keys are free-form identifiers, so they are used as the path value for the generated
-   * endpoints. The same Path Item resolution rules apply (including component pathItems refs and
-   * `$self`-aware matching), with optional external resolution via [refResolver].
+   * @param webhooks Map of webhook names to [PathItem] objects.
+   * @param components Optional [Components] for resolving local `pathItems` references.
+   * @param self Optional `$self` URI of the current document.
+   * @param refResolver Optional external [PathItemRefResolver].
+   * @return Ordered list of flattened [EndpointDefinition]s.
    */
   fun flattenWebhooks(
       webhooks: Map<String, PathItem>,
@@ -65,8 +78,14 @@ object OpenApiPathFlattener {
   }
 
   /**
-   * Flattens both Paths and Webhooks into a single EndpointDefinitions list. External component
-   * refs can be resolved via [refResolver] when provided.
+   * Flattens both Paths and Webhooks into a single [EndpointDefinition] list.
+   *
+   * @param paths Map of path templates to [PathItem] objects.
+   * @param webhooks Map of webhook names to [PathItem] objects.
+   * @param components Optional [Components] for resolving local `pathItems` references.
+   * @param self Optional `$self` URI of the current document.
+   * @param refResolver Optional external [PathItemRefResolver].
+   * @return Combined list of flattened [EndpointDefinition]s.
    */
   fun flattenAll(
       paths: Map<String, PathItem>,
@@ -83,15 +102,14 @@ object OpenApiPathFlattener {
   }
 
   /**
-   * Flattens a single PathItem into EndpointDefinitions for each defined operation.
+   * Flattens a single [PathItem] into [EndpointDefinition]s for each defined operation.
    *
-   * If [components] contains `pathItems`, `$ref` Path Items are resolved when they point to
-   * `#/components/pathItems/{name}`.
-   *
-   * When [selfBase] is provided, component pathItem refs are resolved only if the ref base matches
-   * the `$self` base (or the ref is fragment-only).
-   *
-   * External component refs can be resolved via [refResolver] when provided.
+   * @param path Path template or webhook identifier.
+   * @param item The [PathItem] to flatten.
+   * @param components Optional [Components] for resolving local `pathItems` references.
+   * @param selfBase Optional normalized `$self` base URI.
+   * @param refResolver Optional external [PathItemRefResolver].
+   * @return Flattened [EndpointDefinition]s for this path item.
    */
   fun flattenPathItem(
       path: String,
@@ -125,28 +143,30 @@ object OpenApiPathFlattener {
       selfBase: String?,
       refResolver: PathItemRefResolver?
   ): PathItem? {
-    if (item.ref == null) return item
+    val ref = item.ref ?: return item
     val baseComponents = components ?: Components()
     val visited = mutableSetOf<String>()
-    return resolvePathItemRef(item, baseComponents, visited, selfBase, refResolver)
+    return resolvePathItemRef(item, ref, baseComponents, visited, selfBase, refResolver)
   }
 
   private fun resolvePathItemRef(
       item: PathItem,
+      ref: String,
       components: Components,
       visited: MutableSet<String>,
       selfBase: String?,
       refResolver: PathItemRefResolver?
   ): PathItem? {
-    val ref = item.ref ?: return item
     if (!visited.add(ref)) return null
     val resolution = resolveComponentPathItem(ref, components, selfBase, refResolver) ?: return null
     val target = resolution.item
     val targetComponents = resolution.components ?: components
     val targetSelfBase = resolution.selfBase ?: selfBase
+    val targetRef = target.ref
     val resolvedTarget =
-        if (target.ref != null) {
-          resolvePathItemRef(target, targetComponents, visited, targetSelfBase, refResolver)
+        if (targetRef != null) {
+          resolvePathItemRef(
+              target, targetRef, targetComponents, visited, targetSelfBase, refResolver)
         } else {
           target
         }
@@ -173,10 +193,7 @@ object OpenApiPathFlattener {
       if (local != null) {
         return PathItemResolution(local, components, selfBase)
       }
-      if (base != null && refResolver != null) {
-        return refResolver.resolve(base, key)
-      }
-      return null
+      return if (base != null && refResolver != null) refResolver.resolve(base, key) else null
     }
     return refResolver?.resolve(base, key)
   }
@@ -194,7 +211,7 @@ object OpenApiPathFlattener {
     val refBase = ref.substring(0, index)
     val raw = ref.substring(index + marker.length)
     if (raw.isBlank() || raw.contains("/")) return null
-    val key = decodeJsonPointer(raw)
+    val key = decodeJsonPointerToken(raw)
     val base = resolveReferenceBase(refBase, selfBase)
     return ComponentRef(base = base, key = key)
   }
@@ -206,71 +223,32 @@ object OpenApiPathFlattener {
   }
 
   private fun resolveReferenceBase(refBase: String, contextBase: String?): String? {
-    val normalized = normalizeSelfBase(refBase)
-    if (normalized.isNullOrBlank()) {
-      return normalizeSelfBase(contextBase) ?: contextBase
-    }
-    val resolved = contextBase?.let { resolveAgainstBase(it, normalized) } ?: normalized
-    return normalizeSelfBase(resolved) ?: resolved
+    val normalized = normalizeSelfBase(refBase) ?: return contextBase
+    val resolved =
+        if (contextBase != null) resolveAgainstBase(contextBase, normalized) else normalized
+    return normalizeSelfBase(resolved)
   }
 
   private fun resolveAgainstBase(base: String, ref: String): String {
-    return try {
-      URI(base).resolve(ref).toString()
-    } catch (_: Exception) {
-      ref
+    if (base.any { it.isWhitespace() } || ref.any { it.isWhitespace() }) {
+      return ref
     }
+    return resolveUri(base, ref)
   }
 
   private fun isSelfBaseMatch(refBase: String, selfBase: String?): Boolean {
     val normalizedSelf = selfBase?.trimEnd('#').orEmpty()
     if (normalizedSelf.isBlank()) return true
-    if (refBase.isBlank()) return true
     return refBase.trimEnd('#') == normalizedSelf
   }
 
-  private fun decodeJsonPointer(value: String): String {
-    val token = value.split("/").lastOrNull()?.replace("~1", "/")?.replace("~0", "~") ?: value
-    return percentDecode(token)
-  }
-
-  private fun percentDecode(value: String): String {
-    if (!value.contains("%")) return value
-    val bytes = ByteArray(value.length)
-    var byteCount = 0
-    var i = 0
-    while (i < value.length) {
-      val ch = value[i]
-      if (ch == '%' && i + 2 < value.length) {
-        val hi = hexToInt(value[i + 1])
-        val lo = hexToInt(value[i + 2])
-        if (hi >= 0 && lo >= 0) {
-          bytes[byteCount++] = ((hi shl 4) + lo).toByte()
-          i += 3
-          continue
-        }
-      }
-      bytes[byteCount++] = ch.code.toByte()
-      i += 1
-    }
-    return bytes.copyOf(byteCount).decodeToString()
-  }
-
-  private fun hexToInt(ch: Char): Int {
-    return when (ch) {
-      in '0'..'9' -> ch.code - '0'.code
-      in 'a'..'f' -> ch.code - 'a'.code + 10
-      in 'A'..'F' -> ch.code - 'A'.code + 10
-      else -> -1
-    }
-  }
-
   private fun mergeExtensions(
-      base: Map<String, Any?>,
-      overrides: Map<String, Any?>
-  ): Map<String, Any?> {
-    if (base.isEmpty() && overrides.isEmpty()) return emptyMap()
-    val merged = LinkedHashMap<String, Any?>()
+      base: Map<String, OpenApiValue>,
+      overrides: Map<String, OpenApiValue>
+  ): Map<String, OpenApiValue> {
+    if (overrides.isEmpty()) return base
+    if (base.isEmpty()) return overrides
+    val merged = LinkedHashMap<String, OpenApiValue>()
     merged.putAll(base)
     merged.putAll(overrides)
     return merged

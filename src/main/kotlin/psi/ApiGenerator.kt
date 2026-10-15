@@ -1,17 +1,28 @@
+/** OpenAPI specification generator from parsed Kotlin PSI source files. */
 package psi
 
+import domain.CddError
 import domain.Info
+import domain.toFailure
 import java.io.File
 import openapi.OpenApiAssembler
 import openapi.OpenApiWriter
+import writeToFile
 
 /** Generator for producing OpenAPI specifications from Kotlin source. */
 object ApiGenerator {
-  /** Parses all Kotlin files in [inputDir] and generates an OpenAPI JSON to [outputFile]. */
-  fun generateToOpenApi(inputDir: String, outputFile: String) {
+  /**
+   * Parses all Kotlin files in [inputDir] and generates an OpenAPI JSON to [outputFile].
+   *
+   * @param inputDir The directory containing Kotlin source code.
+   * @param outputFile The destination path for the generated OpenAPI specification.
+   * @return A [Result] indicating success or a [CddError].
+   */
+  fun generateToOpenApi(inputDir: String, outputFile: String): Result<Unit> {
     val dir = File(inputDir)
     if (!dir.exists() || !dir.isDirectory) {
-      throw IllegalArgumentException("Input must be a directory: $inputDir")
+      return CddError.InvalidDirectoryError(inputDir, "Input must be a directory: $inputDir")
+          .toFailure()
     }
 
     val ktFiles = dir.walk().toList().filter { it.isFile && it.extension == "kt" }
@@ -62,6 +73,6 @@ object ApiGenerator {
 
     val writer = OpenApiWriter()
     val json = writer.writeJson(definition)
-    File(outputFile).writeText(json)
+    return writeToFile(outputFile, json)
   }
 }

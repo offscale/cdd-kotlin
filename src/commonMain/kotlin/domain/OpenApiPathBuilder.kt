@@ -1,3 +1,4 @@
+/** OpenAPI Paths and PathItems assembly from flattened endpoint lists. */
 package domain
 
 /**

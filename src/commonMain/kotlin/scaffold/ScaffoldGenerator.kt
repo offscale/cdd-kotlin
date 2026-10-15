@@ -1,3 +1,4 @@
+/** Multiplatform project scaffold generator for Ktor and Gradle builds. */
 package scaffold
 
 import domain.Info
@@ -5,7 +6,17 @@ import writeToFile
 
 /** Generator for scaffold project. */
 class ScaffoldGenerator {
-  /** Generates the scaffold project in the given directory. */
+  /**
+   * Generates the scaffold project in the given directory.
+   *
+   * @param outputDirectory Target root directory.
+   * @param projectName Gradle project name.
+   * @param packageName Base Kotlin package name.
+   * @param info Optional OpenAPI [Info] metadata.
+   * @param isServer Whether to scaffold a Ktor server module instead of a client module.
+   * @param withTests Whether to include test dependencies and tasks.
+   * @return A [Result] indicating success or a [domain.CddError.FileIoError].
+   */
   fun generate(
       outputDirectory: String,
       projectName: String,
@@ -13,43 +24,38 @@ class ScaffoldGenerator {
       info: Info? = null,
       isServer: Boolean = false,
       withTests: Boolean = false
-  ) {
-    writeFile(outputDirectory, "build.gradle.kts", ScaffoldTemplates.createRootBuildGradle(info))
-    writeFile(
-        outputDirectory,
-        "settings.gradle.kts",
-        ScaffoldTemplates.createSettingsGradle(projectName, isServer))
-    writeFile(outputDirectory, "gradle.properties", ScaffoldTemplates.createGradleProperties())
-
-    val gradleFolder = "$outputDirectory/gradle"
-    writeFile(gradleFolder, "libs.versions.toml", ScaffoldTemplates.createVersionCatalog(isServer))
+  ): Result<Unit> {
+    val files =
+        mutableListOf(
+            "$outputDirectory/build.gradle.kts" to ScaffoldTemplates.createRootBuildGradle(info),
+            "$outputDirectory/settings.gradle.kts" to
+                ScaffoldTemplates.createSettingsGradle(projectName, isServer),
+            "$outputDirectory/gradle.properties" to ScaffoldTemplates.createGradleProperties(),
+            "$outputDirectory/gradle/libs.versions.toml" to
+                ScaffoldTemplates.createVersionCatalog(isServer))
 
     if (isServer) {
-      val serverDir = "$outputDirectory/server"
-      writeFile(
-          serverDir,
-          "build.gradle.kts",
-          ScaffoldTemplates.createServerBuildGradle(packageName, info, withTests))
+      files.add(
+          "$outputDirectory/server/build.gradle.kts" to
+              ScaffoldTemplates.createServerBuildGradle(packageName, info, withTests))
     } else {
       val appDir = "$outputDirectory/composeApp"
-      writeFile(
-          appDir, "build.gradle.kts", ScaffoldTemplates.createAppBuildGradle(packageName, info))
-      generateSourceSets(appDir, packageName)
+      val packagePath = packageName.replace('.', '/')
+      val srcDir = "$appDir/src"
+      files.add(
+          "$appDir/build.gradle.kts" to ScaffoldTemplates.createAppBuildGradle(packageName, info))
+      files.add(
+          "$srcDir/commonMain/kotlin/$packagePath/App.kt" to
+              ScaffoldTemplates.createCommonAppKt(packageName))
+      files.add(
+          "$srcDir/androidMain/AndroidManifest.xml" to ScaffoldTemplates.createAndroidManifest())
     }
-  }
 
-  private fun generateSourceSets(appModuleDir: String, packageName: String) {
-    val packagePath = packageName.replace('.', '/')
-    val srcDir = "$appModuleDir/src"
-
-    val commonMainPath = "$srcDir/commonMain/kotlin/$packagePath"
-    writeFile(commonMainPath, "App.kt", ScaffoldTemplates.createCommonAppKt(packageName))
-
-    val androidMainDir = "$srcDir/androidMain"
-    writeFile(androidMainDir, "AndroidManifest.xml", ScaffoldTemplates.createAndroidManifest())
-  }
-
-  private fun writeFile(directory: String, fileName: String, content: String) {
-    writeToFile("$directory/$fileName", content)
+    for ((path, content) in files) {
+      writeToFile(path, content).getOrElse {
+        return Result.failure(it)
+      }
+    }
+    return Result.success(Unit)
   }
 }

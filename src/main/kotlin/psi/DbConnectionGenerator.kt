@@ -1,3 +1,4 @@
+/** Database connection configuration and initialization generator. */
 package psi
 
 import domain.SchemaDefinition
@@ -12,93 +13,68 @@ class DbConnectionGenerator {
    * @param schemas The schemas to register for migrations.
    */
   fun generateDbConnectionModule(packageName: String, schemas: List<SchemaDefinition>): String {
-    val sb = StringBuilder()
-    sb.append("package $packageName.db\n\n")
-
-    sb.append("import $packageName.dao.*\n")
-    sb.append("import org.jetbrains.exposed.sql.Database\n")
-    sb.append("import org.jetbrains.exposed.sql.SchemaUtils\n")
-    sb.append("import org.jetbrains.exposed.sql.transactions.transaction\n")
-    sb.append("import java.sql.Connection\n\n")
-
-    sb.append("/**\n")
-    sb.append(" * Configuration for the Database connection.\n")
-    sb.append(" * \n")
-    sb.append(" * @property url The JDBC connection URL.\n")
-    sb.append(" * @property driver The JDBC driver class name.\n")
-    sb.append(" * @property isEphemeral Whether this is a throwaway database.\n")
-    sb.append(" */\n")
-    sb.append("data class DbConfig(\n")
-    sb.append("    val url: String,\n")
-    sb.append("    val driver: String,\n")
-    sb.append("    val isEphemeral: Boolean\n")
-    sb.append(")\n\n")
-
-    sb.append("/**\n")
-    sb.append(" * Connection factory for database initialization.\n")
-    sb.append(" */\n")
-    sb.append("object DatabaseConnection {\n")
-    sb.append("    /**\n")
-    sb.append(
-        "     * Resolves the database configuration based on environment variables and flags.\n")
-    sb.append("     * \n")
-    sb.append("     * @param ephemeralFlag If true, forces an ephemeral SQLite connection.\n")
-    sb.append("     * @param envUrl The DATABASE_URL environment variable.\n")
-    sb.append("     */\n")
-    sb.append("    fun resolveConfig(ephemeralFlag: Boolean, envUrl: String?): DbConfig {\n")
-    sb.append("        if (ephemeralFlag || envUrl == null || envUrl.isBlank()) {\n")
-    sb.append(
-        "            return DbConfig(\"jdbc:sqlite:ephemeral.db\", \"org.sqlite.JDBC\", true)\n")
-    sb.append("        }\n")
-    sb.append("        // Extract driver from URL roughly\n")
-    sb.append("        val driver = when {\n")
-    sb.append("            envUrl.startsWith(\"jdbc:postgresql:\") -> \"org.postgresql.Driver\"\n")
-    sb.append("            envUrl.startsWith(\"jdbc:sqlite:\") -> \"org.sqlite.JDBC\"\n")
-    sb.append("            else -> \"org.postgresql.Driver\"\n")
-    sb.append("        }\n")
-    sb.append("        return DbConfig(envUrl, driver, false)\n")
-    sb.append("    }\n\n")
-
-    sb.append("    /**\n")
-    sb.append("     * Connects to the database and runs schema migrations if necessary.\n")
-    sb.append("     * \n")
-    sb.append("     * @param config The database configuration to use.\n")
-    sb.append("     */\n")
-    sb.append("    fun initialize(config: DbConfig): Database {\n")
-    sb.append("        val db = Database.connect(config.url, driver = config.driver)\n")
-
-    val modelSchemas =
-        schemas.filter {
-          it.type == "object" &&
-              it.enumValues == null &&
-              it.anyOf.isEmpty() &&
-              it.oneOf.isEmpty() &&
-              it.anyOfSchemas.isEmpty() &&
-              it.oneOfSchemas.isEmpty() &&
-              !it.safeName.contains("ExternalAccount") &&
-              !it.safeName.contains("PaymentSource")
+    val modelSchemas = filterModelSchemas(schemas)
+    return buildKotlinFile("$packageName.db") {
+      import(
+          "$packageName.dao.*",
+          "org.jetbrains.exposed.sql.Database",
+          "org.jetbrains.exposed.sql.SchemaUtils",
+          "org.jetbrains.exposed.sql.transactions.transaction",
+          "java.sql.Connection")
+      kdoc(
+          "Configuration for the Database connection.",
+          "",
+          "@property url The JDBC connection URL.",
+          "@property driver The JDBC driver class name.",
+          "@property isEphemeral Whether this is a throwaway database.")
+      line("data class DbConfig(")
+      line("    val url: String,")
+      line("    val driver: String,")
+      line("    val isEphemeral: Boolean")
+      line(")")
+      line()
+      kdoc("Connection factory for database initialization.")
+      block("object DatabaseConnection") {
+        kdoc(
+            "Resolves the database configuration based on environment variables and flags.",
+            "",
+            "@param ephemeralFlag If true, forces an ephemeral SQLite connection.",
+            "@param envUrl The DATABASE_URL environment variable.")
+        block("fun resolveConfig(ephemeralFlag: Boolean, envUrl: String?): DbConfig") {
+          block("if (ephemeralFlag || envUrl == null || envUrl.isBlank())") {
+            line("return DbConfig(\"jdbc:sqlite:ephemeral.db\", \"org.sqlite.JDBC\", true)")
+          }
+          line("// Extract driver from URL roughly")
+          block("val driver = when") {
+            line("envUrl.startsWith(\"jdbc:postgresql:\") -> \"org.postgresql.Driver\"")
+            line("envUrl.startsWith(\"jdbc:sqlite:\") -> \"org.sqlite.JDBC\"")
+            line("else -> \"org.postgresql.Driver\"")
+          }
+          line("return DbConfig(envUrl, driver, false)")
         }
-    if (modelSchemas.isNotEmpty()) {
-      sb.append("        transaction(db) {\n")
-      val tables =
-          modelSchemas.map { "${it.safeName.replaceFirstChar { c -> c.uppercase() }}Table" }
-      val chunkedTables = tables.chunked(100)
-      for (chunk in chunkedTables) {
-        sb.append("            SchemaUtils.create(\n")
-        for (i in chunk.indices) {
-          sb.append("                ${chunk[i]}")
-          if (i < chunk.size - 1) sb.append(",")
-          sb.append("\n")
+        line()
+        kdoc(
+            "Connects to the database and runs schema migrations if necessary.",
+            "",
+            "@param config The database configuration to use.")
+        block("fun initialize(config: DbConfig): Database") {
+          line("val db = Database.connect(config.url, driver = config.driver)")
+          if (modelSchemas.isNotEmpty()) {
+            block("transaction(db)") {
+              val tables = modelSchemas.map { "${capitalizeName(it.safeName)}Table" }
+              for (chunk in tables.chunked(100)) {
+                line("SchemaUtils.create(")
+                for (i in chunk.indices) {
+                  val suffix = if (i < chunk.size - 1) "," else ""
+                  line("    ${chunk[i]}$suffix")
+                }
+                line(")")
+              }
+            }
+          }
+          line("return db")
         }
-        sb.append("            )\n")
       }
-      sb.append("        }\n")
     }
-
-    sb.append("        return db\n")
-    sb.append("    }\n")
-    sb.append("}\n")
-
-    return sb.toString()
   }
 }

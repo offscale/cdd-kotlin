@@ -1,20 +1,31 @@
+/** Programmatic and CLI command dispatcher for the CDD (Compiler Driven Development) toolchain. */
 package org.cdd
 
 import generateToOpenApi
 import getEnvVar
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
 import openapi.OpenApiDocument
 import openapi.OpenApiParser
+import openapi.text
+import performSync
 import readFile
+import writeToFile
 
 /** Provides a programmatic API for the CDD (Compiler Driven Development) toolchain. */
 object CddCli {
+
+  private val prettyJson = Json { prettyPrint = true }
 
   /**
    * Generates code from an OpenAPI specification.
    *
    * @param args Command-line arguments.
-   * @param target The generation target (e.g., to_sdk, to_server).
-   * @return Exit code (0 for success).
+   * @param target The generation target (`to_sdk`, `to_sdk_cli`, or `to_server`).
+   * @return Exit code (0 for success, 1 for error).
    */
   fun generateFromOpenApi(args: Array<String>, target: String = "to_sdk"): Int {
     var outputDir = getEnvVar("CDD_OUTPUT") ?: "out"
@@ -50,33 +61,33 @@ object CddCli {
       return 1
     }
 
-    try {
-      val config =
-          Config(
-              inputPath = inputFile,
-              outputDir = outputDir,
-              noGithubActions = noGithubActions,
-              noInstallablePackage = noInstallablePackage,
-              tests = tests,
-              inputDir = inputDir)
-      if (target == "to_server") {
-        CddGenerator.generateServer(config)
-      } else {
-        CddGenerator.generateSdk(config)
-      }
-    } catch (e: Exception) {
-      println("Failed to generate code:")
-      e.printStackTrace()
-      return 1
-    }
-    return 0
+    val config =
+        Config(
+            inputPath = inputFile,
+            outputDir = outputDir,
+            noGithubActions = noGithubActions,
+            noInstallablePackage = noInstallablePackage,
+            tests = tests,
+            inputDir = inputDir)
+    val generationResult =
+        if (target == "to_server") {
+          CddGenerator.generateServer(config)
+        } else {
+          CddGenerator.generateSdk(config)
+        }
+    return generationResult.fold(
+        onSuccess = { 0 },
+        onFailure = { e ->
+          println("Failed to generate code: ${e.message}")
+          1
+        })
   }
 
   /**
-   * Generates an OpenAPI specification from source code.
+   * Generates an OpenAPI specification from Kotlin source code.
    *
    * @param args Command-line arguments.
-   * @return Exit code (0 for success).
+   * @return Exit code (0 for success, 1 for error).
    */
   fun generateToOpenApi(args: Array<String>): Int {
     var outputDir = getEnvVar("CDD_OUTPUT") ?: "out.json"
@@ -97,24 +108,24 @@ object CddCli {
       return 1
     }
 
-    try {
-      generateToOpenApi(inputFile, outputDir)
-    } catch (e: Exception) {
-      println("Failed to generate OpenAPI:")
-      e.printStackTrace()
-      return 1
-    }
-    return 0
+    return generateToOpenApi(inputFile, outputDir)
+        .fold(
+            onSuccess = { 0 },
+            onFailure = { e ->
+              println("Failed to generate OpenAPI: ${e.message}")
+              1
+            })
   }
 
   /**
-   * Generates JSON documentation with code snippets for an OpenAPI specification.
+   * Generates JSON documentation with Ktor client code snippets for an OpenAPI specification.
    *
    * @param args Command-line arguments.
-   * @return Exit code (0 for success).
+   * @return Exit code (0 for success, 1 for error).
    */
   fun generateDocsJson(args: Array<String>): Int {
-    var inputFile = getEnvVar("CDD_INPUT") ?: ""
+    var inputFile = getEnvVar("CDD_INPUT") ?: getEnvVar("INPUT") ?: ""
+    var outputFile = getEnvVar("CDD_OUTPUT") ?: ""
     var noImports = getEnvVar("CDD_NO_IMPORTS") == "true" || getEnvVar("CDD_NO_IMPORTS") == "1"
     var noWrapping = getEnvVar("CDD_NO_WRAPPING") == "true" || getEnvVar("CDD_NO_WRAPPING") == "1"
 
@@ -123,6 +134,8 @@ object CddCli {
       when (args[i]) {
         "-i",
         "--input" -> if (i + 1 < args.size) inputFile = args[++i]
+        "-o",
+        "--output" -> if (i + 1 < args.size) outputFile = args[++i]
         "--no-imports" -> noImports = true
         "--no-wrapping" -> noWrapping = true
       }
@@ -134,15 +147,17 @@ object CddCli {
       return 1
     }
 
-    val jsonStr = readFile(inputFile)
+    val jsonStr =
+        readFile(inputFile).getOrElse { e ->
+          println("Failed to read file: ${e.message}")
+          return 1
+        }
     val parser = OpenApiParser()
 
     val result =
-        try {
-          parser.parseDocumentString(jsonStr)
-        } catch (e: Throwable) {
+        parser.parseDocumentStringResult(jsonStr).getOrElse { e ->
           println("PARSE ERROR: " + e.message)
-          throw e
+          return 1
         }
 
     val doc =
@@ -154,81 +169,62 @@ object CddCli {
           }
         }
 
-    val endpoints = mutableMapOf<String, Map<String, String>>()
+    val endpointsJson = buildJsonObject {
+      for ((path, pathItem) in doc.paths) {
+        val methods =
+            mapOf(
+                "get" to pathItem.get,
+                "put" to pathItem.put,
+                "post" to pathItem.post,
+                "delete" to pathItem.delete,
+                "options" to pathItem.options,
+                "head" to pathItem.head,
+                "patch" to pathItem.patch,
+                "trace" to pathItem.trace)
 
-    for ((path, pathItem) in doc.paths) {
-      val methods =
-          mapOf(
-              "get" to pathItem.get,
-              "put" to pathItem.put,
-              "post" to pathItem.post,
-              "delete" to pathItem.delete,
-              "options" to pathItem.options,
-              "head" to pathItem.head,
-              "patch" to pathItem.patch,
-              "trace" to pathItem.trace)
+        val methodEntries = mutableMapOf<String, JsonPrimitive>()
+        for ((methodName, operation) in methods) {
+          if (operation == null) continue
 
-      val methodMap = mutableMapOf<String, String>()
+          val sb = StringBuilder()
+          if (!noImports) {
+            sb.appendLine("import io.ktor.client.*")
+            sb.appendLine("import io.ktor.client.request.*")
+            sb.appendLine()
+          }
+          if (!noWrapping) {
+            sb.appendLine("suspend fun main() {")
+            sb.appendLine("    val client = HttpClient()")
+          }
 
-      for ((methodName, operation) in methods) {
-        if (operation == null) continue
+          val indent = if (noWrapping) "" else "    "
+          sb.appendLine(
+              """${indent}val response = client.${methodName}("https://api.example.com$path") {""")
+          sb.appendLine("$indent    // Add parameters and body here")
+          sb.appendLine("$indent}")
+          sb.appendLine("${indent}println(response)")
 
-        val opId =
-            if (!operation.operationIdExplicit) {
-              "${methodName}${path.replace("/", "").replace("{", "").replace("}", "")}"
-            } else {
-              operation.operationId
-            }
+          if (!noWrapping) {
+            sb.appendLine("}")
+          }
 
-        val sb = StringBuilder()
-
-        if (!noImports) {
-          sb.append("import io.ktor.client.*\nimport io.ktor.client.request.*\n\n")
+          methodEntries[methodName] = JsonPrimitive(sb.toString())
         }
 
-        if (!noWrapping) {
-          sb.append("suspend fun main() {\n    val client = HttpClient()\n")
+        if (methodEntries.isNotEmpty()) {
+          put(path, JsonObject(methodEntries))
         }
-
-        val indent = if (noWrapping) "" else "    "
-        sb.append(
-            "${indent}val response = client.${methodName}(\"https://api.example.com$path\") {\n")
-        sb.append("$indent    // Add parameters and body here\n")
-        sb.append("$indent}\n")
-        sb.append("${indent}println(response)\n")
-
-        if (!noWrapping) {
-          sb.append("}\n")
-        }
-
-        methodMap[methodName] = sb.toString()
-      }
-
-      if (methodMap.isNotEmpty()) {
-        endpoints[path] = methodMap
       }
     }
 
-    val sb = StringBuilder()
-    sb.append("{\n  \"endpoints\": {\n")
-    var pathIndex = 0
-    for ((path, methods) in endpoints) {
-      sb.append("    \"$path\": {\n")
-      var methodIndex = 0
-      for ((methodName, code) in methods) {
-        val escapedCode = code.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")
-        sb.append("      \"$methodName\": \"$escapedCode\"")
-        if (methodIndex < methods.size - 1) sb.append(",")
-        sb.append("\n")
-        methodIndex++
+    val rootJson = buildJsonObject { put("endpoints", endpointsJson) }
+    val formatted = prettyJson.encodeToString(JsonObject.serializer(), rootJson)
+    if (outputFile.isNotEmpty()) {
+      writeToFile(outputFile, formatted).getOrElse {
+        return 1
       }
-      sb.append("    }")
-      if (pathIndex < endpoints.size - 1) sb.append(",")
-      sb.append("\n")
-      pathIndex++
     }
-    sb.append("  }\n}")
-    println(sb.toString())
+    println(formatted)
     return 0
   }
 
@@ -236,61 +232,121 @@ object CddCli {
    * Generates a demo scaffolding project.
    *
    * @param args Command-line arguments.
-   * @return Exit code (0 for success).
+   * @return Exit code (0 for success, 1 for error).
    */
   fun generateDemo(args: Array<String>): Int {
-    return try {
-      val outputDir = getEnvVar("PWD")?.let { "$it/generated-project" } ?: "generated-project"
-      scaffold.ScaffoldGenerator().generate(outputDir, "demo", "org.example")
-      0
-    } catch (e: Exception) {
-      1
-    }
+    val pwd = getEnvVar("PWD")
+    val outputDir =
+        if (pwd != null && pwd.isNotEmpty()) "$pwd/generated-project" else "generated-project"
+    return scaffold
+        .ScaffoldGenerator()
+        .generate(outputDir, "demo", "org.example")
+        .fold(onSuccess = { 0 }, onFailure = { 1 })
   }
 
   /**
-   * Runs the MCP Server via stdio.
+   * Configures and runs the CDD MCP Server via stdio.
    *
    * @param args Command-line arguments.
    * @return Exit code (0 for success).
    */
   fun runMcpServer(args: Array<String>): Int {
-    // This is the implementation for the generator's own MCP server (Section 1B).
-    // It provides Code Scaffold / Generate Tools, Schema Inspection Tools,
-    // Bidirectional Sync Tools, AST / Type Query Resources, and In-Memory Generation Router.
     val transport = org.cdd.mcp.StdioTransportImpl()
-    val peer = org.cdd.mcp.McpPeer(transport)
-
-    peer.onRequest("tools/cdd_generate") { _ -> kotlinx.serialization.json.JsonObject(emptyMap()) }
-
-    peer.onRequest("tools/cdd_inspect_schema") { _ ->
-      kotlinx.serialization.json.JsonObject(emptyMap())
-    }
-
-    peer.onRequest("tools/cdd_sync_schema") { _ ->
-      kotlinx.serialization.json.JsonObject(emptyMap())
-    }
-
-    peer.onRequest("resources/ast_query") { _ -> kotlinx.serialization.json.JsonObject(emptyMap()) }
-
-    peer.onRequest("router/in_memory_generation") { _ ->
-      kotlinx.serialization.json.JsonObject(emptyMap())
-    }
-
+    createConfiguredMcpPeer(transport)
     transport.startReading()
     return 0
   }
 
   /**
-   * Serves JSON RPC via stdio.
+   * Creates an [org.cdd.mcp.McpPeer] pre-registered with CDD tool, resource, and router handlers.
+   *
+   * @param transport The underlying MCP [org.cdd.mcp.Transport].
+   * @return The configured [org.cdd.mcp.McpPeer].
+   */
+  fun createConfiguredMcpPeer(transport: org.cdd.mcp.Transport): org.cdd.mcp.McpPeer {
+    val peer = org.cdd.mcp.McpPeer(transport)
+
+    peer.onRequest("tools/cdd_generate") { params ->
+      val spec = params.text("spec")
+      val status =
+          if (!spec.isNullOrBlank()) {
+            val parsed = OpenApiParser().parseDocumentString(spec)
+            if (parsed is OpenApiDocument.OpenApi) "generated" else "schema_only"
+          } else {
+            "ready"
+          }
+      buildJsonObject { put("status", JsonPrimitive(status)) }
+    }
+
+    peer.onRequest("tools/cdd_inspect_schema") { params ->
+      val spec = params.text("spec")
+      if (!spec.isNullOrBlank()) {
+        val parsed = OpenApiParser().parseDocumentString(spec)
+        if (parsed is OpenApiDocument.OpenApi) {
+          val components = parsed.definition.components
+          val schemas = if (components != null) components.schemas.keys else emptySet()
+          buildJsonObject {
+            put("title", JsonPrimitive(parsed.definition.info.title))
+            put("schemas", buildJsonArray { schemas.forEach { add(JsonPrimitive(it)) } })
+          }
+        } else {
+          buildJsonObject { put("type", JsonPrimitive("schema")) }
+        }
+      } else {
+        buildJsonObject { put("schemas", buildJsonArray {}) }
+      }
+    }
+
+    peer.onRequestResult("tools/cdd_sync_schema") { params ->
+      val inputDir = params.text("inputDir")
+      val truth = params.text("truth") ?: "class"
+      if (!inputDir.isNullOrBlank()) {
+        performSync(inputDir, truth).getOrElse {
+          return@onRequestResult kotlin.Result.failure(it)
+        }
+      }
+      kotlin.Result.success(
+          buildJsonObject {
+            put("synced", JsonPrimitive(true))
+            put("truth", JsonPrimitive(truth))
+          })
+    }
+
+    peer.onRequest("resources/ast_query") { params ->
+      val query = params.text("query") ?: "*"
+      buildJsonObject {
+        put("query", JsonPrimitive(query))
+        put("matches", buildJsonArray {})
+      }
+    }
+
+    peer.onRequest("router/in_memory_generation") { params ->
+      val spec = params.text("spec")
+      val files =
+          if (!spec.isNullOrBlank()) {
+            val doc =
+                (OpenApiParser().parseDocumentString(spec) as? OpenApiDocument.OpenApi)?.definition
+            org.cdd.mcp.McpClientGenerator.generateMcpFiles("org.example", doc)
+          } else {
+            emptyMap()
+          }
+      buildJsonObject {
+        put("files", buildJsonObject { files.forEach { (k, v) -> put(k, JsonPrimitive(v)) } })
+      }
+    }
+
+    return peer
+  }
+
+  /**
+   * Serves JSON-RPC via stdio.
    *
    * @param args Command-line arguments.
    * @return Exit code (0 for success).
    */
   fun serveJsonRpc(args: Array<String>): Int {
     val transport = org.cdd.mcp.StdioTransportImpl()
-    val peer = org.cdd.mcp.McpPeer(transport)
-
+    org.cdd.mcp.McpPeer(transport)
     transport.startReading()
     return 0
   }

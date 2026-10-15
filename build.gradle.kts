@@ -15,6 +15,10 @@ repositories { mavenCentral() }
 
 kotlin {
   jvmToolchain(21)
+  compilerOptions {
+    allWarningsAsErrors.set(true)
+    freeCompilerArgs.add("-Xexpect-actual-classes")
+  }
   jvm()
   wasmWasi {
     nodejs()
@@ -59,7 +63,8 @@ tasks.withType<Test>().configureEach { useJUnitPlatform() }
 
 tasks.register("checkDocCoverage") {
   group = "verification"
-  description = "Fails if public classes or functions lack KDoc."
+  description =
+      "Fails if public/expect/actual classes, interfaces, objects, enums, typealiases, or functions lack KDoc."
 
   doLast {
     val sourceFiles =
@@ -68,9 +73,17 @@ tasks.register("checkDocCoverage") {
             fileTree("src/wasmMain/kotlin") { include("**/*.kt") }
 
     val missing = mutableListOf<String>()
+    var coveredCount = 0
 
     sourceFiles.forEach { file ->
       val lines = file.readLines()
+      val firstContentLine =
+          lines.firstOrNull { it.trim().isNotEmpty() && !it.trim().startsWith("@file:") }?.trim()
+      if (firstContentLine != null && firstContentLine.startsWith("/**")) {
+        coveredCount++
+      } else {
+        missing.add("${file.path}:1: missing file-level KDoc header")
+      }
       var inRawString = false
       var inKDoc = false
       var lastKDocEnd = -1
@@ -106,16 +119,21 @@ tasks.register("checkDocCoverage") {
         if (trimmed.isEmpty()) return@forEachIndexed
 
         val isPublicFunction =
-            Regex("""^\s*(public\s+)?fun\s+""").containsMatchIn(line) &&
-                !Regex("""^\s*(private|internal|protected)\s+fun\s+""").containsMatchIn(line)
+            Regex("""^\s*(public\s+)?((expect|actual|suspend|inline|operator)\s+)*fun\s+""")
+                .containsMatchIn(line) &&
+                !Regex("""^\s*(private|internal|protected|override)\s+""").containsMatchIn(line)
 
-        val isPublicClass =
-            Regex("""^\s*(public\s+)?(data\s+)?(class|interface|object|enum\s+class)\s+""")
+        val isPublicClassOrTypealias =
+            Regex(
+                    """^\s*(public\s+)?((expect|actual|data|sealed|value|enum|annotation)\s+)*(class|interface|object|typealias)\s+""")
                 .containsMatchIn(line) &&
                 !Regex("""^\s*(private|internal|protected)\s+""").containsMatchIn(line)
 
-        if (isPublicFunction || isPublicClass) {
-          if (line.contains("/**")) return@forEachIndexed
+        if (isPublicFunction || isPublicClassOrTypealias) {
+          if (line.contains("/**")) {
+            coveredCount++
+            return@forEachIndexed
+          }
 
           var j = index - 1
           while (j >= 0) {
@@ -125,6 +143,7 @@ tasks.register("checkDocCoverage") {
               continue
             }
             if (j == lastKDocEnd) {
+              coveredCount++
               return@forEachIndexed
             }
             break
@@ -135,55 +154,30 @@ tasks.register("checkDocCoverage") {
       }
     }
 
+    val total = coveredCount + missing.size
+    val pct = if (total > 0) (coveredCount * 100) / total else 100
+    val reportDir = file("build/reports/doc-coverage")
+    reportDir.mkdirs()
+    file("build/reports/doc-coverage/summary.txt")
+        .writeText("covered=$coveredCount\nmissed=${missing.size}\npercentage=$pct\n")
+
     if (missing.isNotEmpty()) {
       throw GradleException(
-          "KDoc coverage is below 100%. Missing documentation:\n" + missing.joinToString("\n"))
+          "KDoc coverage is below 100% ($pct%). Missing documentation:\n" +
+              missing.joinToString("\n"))
     }
   }
 }
 
 kover {
   reports {
-    filters {
-      excludes {
-        classes(
-            "MainKt*",
-            "PlatformJvmKt*",
-            "domain.OpenApiPathFlattener*",
-            "openapi.JsonNodeExtKt*",
-            "openapi.OpenApiDocumentRegistryKt*",
-            "openapi.OpenApiParser*",
-            "openapi.OpenApiValidator*",
-            "openapi.OpenApiWriter*",
-            "org.cdd.CddCli*",
-            "org.cdd.SyncCli*",
-            "org.cdd.mcp.McpPeer*",
-            "org.cdd.mcp.StdioTransportImpl*",
-            "psi.DaoTestGenerator*",
-            "psi.DtoGenerator*",
-            "psi.DtoMerger*",
-            "psi.DtoParser*",
-            "psi.NetworkGenerator*",
-            "psi.NetworkParser*",
-            "psi.OpenApiMetadataKt*",
-            "psi.ReferenceResolver*",
-            "psi.SeederGenerator*",
-            "psi.SyncGenerator*",
-            "scaffold.ScaffoldTemplates*",
-            "psi.UiGenerator*",
-            "psi.DaoGenerator*",
-            "psi.SeederTestGenerator*",
-            "psi.ServerMainGenerator*",
-            "psi.ServerMainTestGenerator*",
-            "psi.DbConnectionGenerator*",
-            "psi.PsiInfrastructureKt*",
-            "org.cdd.mcp.*",
-            "domain.SchemaDynamicResolutionKt*",
-            "domain.OpenApiPathBuilderKt*",
-            "psi.TypeMappersKt*")
+    verify {
+      rule {
+        minBound(100, kotlinx.kover.gradle.plugin.dsl.CoverageUnit.LINE)
+        minBound(100, kotlinx.kover.gradle.plugin.dsl.CoverageUnit.INSTRUCTION)
+        minBound(100, kotlinx.kover.gradle.plugin.dsl.CoverageUnit.BRANCH)
       }
     }
-    verify { rule { bound { minValue = 100 } } }
   }
 }
 

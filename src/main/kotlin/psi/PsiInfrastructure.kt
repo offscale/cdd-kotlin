@@ -1,3 +1,4 @@
+/** Headless Kotlin compiler PSI environment and factory initialization utilities. */
 package psi
 
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
@@ -14,6 +15,7 @@ import org.jetbrains.kotlin.psi.KtPsiFactory
  * Singleton infrastructure helper to initialize the Kotlin compiler environment. Handles lifecycle
  * to ensure tests can run independently without killing the shared Application.
  */
+@OptIn(org.jetbrains.kotlin.K1Deprecation::class)
 object PsiInfrastructure {
 
   private var _disposable: Disposable? = null
@@ -29,7 +31,7 @@ object PsiInfrastructure {
   val project: Project
     get() {
       synchronized(this) {
-        if (_environment == null || _disposable == null || _isDisposed) {
+        if (_isDisposed) {
           initialize()
         }
         return _environment!!.project
@@ -61,14 +63,12 @@ object PsiInfrastructure {
   /** Helper to manually dispose if needed. */
   fun dispose() {
     synchronized(this) {
-      _disposable?.let {
-        if (!_isDisposed) {
-          Disposer.dispose(it)
-        }
+      if (!_isDisposed) {
+        Disposer.dispose(_disposable!!)
+        _disposable = null
+        _environment = null
+        _isDisposed = true
       }
-      _disposable = null
-      _environment = null
-      _isDisposed = true
     }
   }
 }

@@ -49,9 +49,23 @@ class SyncGeneratorTest {
   }
 
   @Test
-  fun `synchronize throws on invalid directory`() {
-    assertThrows(IllegalArgumentException::class.java) {
-      SyncGenerator.synchronize("/nonexistent_directory_sync_123", "class")
+  fun `synchronize returns failure on invalid directory`() {
+    assertTrue(SyncGenerator.synchronize("/nonexistent_directory_sync_123", "class").isFailure)
+    val tempFile = Files.createTempFile("sync-file", ".txt").toFile()
+    try {
+      assertTrue(SyncGenerator.synchronize(tempFile.absolutePath, "class").isFailure)
+    } finally {
+      tempFile.delete()
+    }
+
+    val tempDir = Files.createTempDirectory("sync-other-truths").toFile()
+    try {
+      File(tempDir, "README.md").writeText("# ignore non-kt file")
+      assertTrue(SyncGenerator.synchronize(tempDir.absolutePath, "sqlalchemy").isSuccess)
+      assertTrue(SyncGenerator.synchronize(tempDir.absolutePath, "unknown_truth").isSuccess)
+      assertTrue(File(tempDir, "openapi_sync.json").exists())
+    } finally {
+      tempDir.deleteRecursively()
     }
   }
 }

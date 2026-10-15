@@ -1,6 +1,9 @@
+/** Non-destructive PSI merger for updating Kotlin data class DTOs from OpenAPI schemas. */
 package psi
 
+import domain.CddError
 import domain.SchemaDefinition
+import domain.toFailure
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 import org.jetbrains.kotlin.psi.psiUtil.startOffset
@@ -13,32 +16,32 @@ import org.jetbrains.kotlin.psi.psiUtil.startOffset
 class DtoMerger {
 
   /**
-   * Merges missing schema properties into an existing Kotlin data class source.
+   * Merges missing schema properties into an existing Kotlin data class source wrapped in a
+   * [Result].
    *
    * @param existingCode Kotlin source containing the target class.
    * @param schema The schema definition to reconcile against the class.
-   * @return Updated source code with any missing fields injected.
-   * @throws IllegalArgumentException if the target class cannot be located.
-   * @throws IllegalStateException if the class lacks a usable primary constructor.
+   * @return A [Result] containing updated source code with any missing fields injected, or a
+   *   [CddError.PsiMergeError].
    */
-  fun mergeDto(existingCode: String, schema: SchemaDefinition): String {
+  fun mergeDto(existingCode: String, schema: SchemaDefinition): Result<String> {
     val psiFactory = PsiInfrastructure.createPsiFactory()
     val file = psiFactory.createFile("Fragment.kt", existingCode)
 
     // Find the target class
     val targetClass =
         file.collectDescendantsOfType<KtClass>().firstOrNull { it.name == schema.safeName }
-            ?: throw IllegalArgumentException("Class ${schema.safeName} not found in provided code")
+            ?: return CddError.PsiMergeError(
+                    schema.safeName, "Class ${schema.safeName} not found in provided code")
+                .toFailure()
 
     // Validate structure
     val primaryConstructor =
         targetClass.primaryConstructor
-            ?: throw IllegalStateException(
-                "Class ${schema.safeName} must have a primary constructor")
-
-    val parameterList =
-        primaryConstructor.valueParameterList
-            ?: throw IllegalStateException("Class ${schema.safeName} constructor config error")
+            ?: return CddError.PsiMergeError(
+                    schema.safeName, "Class ${schema.safeName} must have a primary constructor")
+                .toFailure()
+    val parameterList = primaryConstructor.valueParameterList!!
 
     // Identify existing properties
     val existingNames = parameterList.parameters.mapNotNull { it.name }.toSet()
@@ -47,7 +50,7 @@ class DtoMerger {
     val missingProperties = schema.properties.filterKeys { !existingNames.contains(it) }
 
     if (missingProperties.isEmpty()) {
-      return existingCode
+      return Result.success(existingCode)
     }
 
     // Generate the new code block
@@ -83,8 +86,7 @@ class DtoMerger {
 
     // Calculate insertion point: The start of the closing parenthesis ')'
     // parameterList.lastChild is the closing parenthesis
-    val closingParenthesis =
-        parameterList.lastChild ?: throw IllegalStateException("Invalid parameter list structure")
+    val closingParenthesis = parameterList.lastChild
 
     val insertionOffset = closingParenthesis.startOffset
 
@@ -92,6 +94,6 @@ class DtoMerger {
     val fileSource = StringBuilder(existingCode)
     fileSource.insert(insertionOffset, sb.toString())
 
-    return fileSource.toString()
+    return Result.success(fileSource.toString())
   }
 }

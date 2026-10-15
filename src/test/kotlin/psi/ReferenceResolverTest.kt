@@ -67,5 +67,15 @@ class ReferenceResolverTest {
   @Test
   fun `resolveRefToType falls back on empty path`() {
     assertEquals("Unknown", ReferenceResolver.resolveRefToType("#"))
+    assertEquals("Unknown", ReferenceResolver.resolveRefToType("#/"))
+    assertEquals("User", ReferenceResolver.resolveRefToType("User.json#/"))
+    assertEquals("Unknown", ReferenceResolver.resolveRefToType("models/"))
+    assertEquals("Unknown", ReferenceResolver.resolveRefToType(""))
+    assertEquals("Unknown", ReferenceResolver.sanitizeTypeName("___"))
+    assertEquals("Type123Abc", ReferenceResolver.sanitizeTypeName("123_abc"))
+    val veryLong =
+        ReferenceResolver.sanitizeTypeName(
+            "AVeryLongTypeNameThatExceedsFiftyCharactersInLengthForTestingHashTruncation")
+    org.junit.jupiter.api.Assertions.assertTrue(veryLong.length <= 50)
   }
 }

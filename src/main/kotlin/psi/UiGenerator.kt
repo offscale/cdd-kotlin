@@ -1,3 +1,4 @@
+/** Jetpack Compose / Compose Multiplatform form, grid, and screen controller generator. */
 package psi
 
 import domain.SchemaDefinition
@@ -134,7 +135,7 @@ class UiGenerator {
 
     val headerCells =
         validProps.keys.joinToString("\n                        ") { name ->
-          val label = name.replaceFirstChar { it.uppercase() }
+          val label = capitalizeName(name)
           """ 
             Text( 
                 text = "$label", 
@@ -264,13 +265,16 @@ class UiGenerator {
                 
                 // Fetch Data Effect
                 LaunchedEffect(Unit) { 
-                    try { 
-                        items = api.$listOperationId() 
-                        isLoading = false
-                    } catch (e: Exception) { 
-                        error = e.message ?: "Unknown error" 
-                        isLoading = false
-                    } 
+                    api.$listOperationId().fold(
+                        onSuccess = { 
+                            items = it
+                            isLoading = false
+                        },
+                        onFailure = { e -> 
+                            error = e.message ?: "Unknown error" 
+                            isLoading = false
+                        }
+                    )
                 } 
             
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { 
@@ -306,7 +310,7 @@ class UiGenerator {
   }
 
   private fun generateInput(name: String, prop: SchemaProperty, isRequired: Boolean): String {
-    val label = name.replaceFirstChar { it.uppercase() }
+    val label = capitalizeName(name)
     val modifier = "Modifier.fillMaxWidth()"
 
     return when {

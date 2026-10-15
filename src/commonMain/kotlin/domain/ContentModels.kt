@@ -1,3 +1,10 @@
+/**
+ * Content, media-type, encoding, example, reference, request-body, and callback OpenAPI domain
+ * models.
+ *
+ * Defines [ReferenceObject], [ExampleObject], [EncodingObject], [MediaTypeObject], [RequestBody],
+ * and [Callback].
+ */
 package domain
 
 /**
@@ -11,7 +18,9 @@ data class ReferenceObject(
     /** A short summary which by default SHOULD override that of the referenced component. */
     val summary: String? = null,
     /** A description which by default SHOULD override that of the referenced component. */
-    val description: String? = null
+    val description: String? = null,
+    /** Specification extensions (keys starting with `x-`). */
+    val extensions: Map<String, OpenApiValue> = emptyMap()
 )
 
 /**
@@ -34,7 +43,7 @@ data class ExampleObject(
      * An example of the data structure that MUST be valid according to the relevant Schema Object.
      * If present, `value` MUST be absent.
      */
-    val dataValue: Any? = null,
+    val dataValue: OpenApiValue? = null,
     /**
      * An example of the serialized form of the value, including encoding and escaping. If present,
      * `value` and `externalValue` MUST be absent.
@@ -50,11 +59,23 @@ data class ExampleObject(
      *
      * **Deprecated for non-JSON serialization targets.**
      */
-    val value: Any? = null,
+    val value: OpenApiValue? = null,
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
-)
+    val extensions: Map<String, OpenApiValue> = emptyMap()
+) {
+  /** Strongly-typed [OpenApiValue] view of [dataValue], or `null` if absent. */
+  val typedDataValue: OpenApiValue?
+    get() = dataValue
+
+  /** Strongly-typed [OpenApiValue] view of [value], or `null` if absent. */
+  val typedValue: OpenApiValue?
+    get() = value
+
+  /** Strongly-typed [OpenApiValue] map view of [extensions]. */
+  val typedExtensions: Map<String, OpenApiValue>
+    get() = extensions
+}
 
 /**
  * A single encoding definition applied to a single value, with the mapping determined by the Media
@@ -93,7 +114,7 @@ data class EncodingObject(
     val itemEncoding: EncodingObject? = null,
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
+    val extensions: Map<String, OpenApiValue> = emptyMap()
 )
 
 /**
@@ -129,7 +150,7 @@ data class MediaTypeObject(
     val itemEncoding: EncodingObject? = null,
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
+    val extensions: Map<String, OpenApiValue> = emptyMap()
 )
 
 /**
@@ -159,7 +180,7 @@ data class RequestBody(
     val reference: ReferenceObject? = null,
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
+    val extensions: Map<String, OpenApiValue> = emptyMap()
 )
 
 /**
@@ -178,7 +199,7 @@ sealed interface Callback {
    */
   data class Inline(
       val expressions: Map<String, PathItem> = emptyMap(),
-      val extensions: Map<String, Any?> = emptyMap(),
+      val extensions: Map<String, OpenApiValue> = emptyMap(),
       /**
        * Reference metadata when this inline callback was resolved from a `$ref`. When present,
        * serializers SHOULD emit the `$ref` and ignore [expressions] for round-trip fidelity.

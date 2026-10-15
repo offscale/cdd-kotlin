@@ -1,6 +1,7 @@
 package psi
 
 import domain.SchemaDefinition
+import domain.cddErrorOrNull
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
@@ -9,21 +10,22 @@ class DtoMergerCoverageTest {
   private val merger = DtoMerger()
 
   @Test
-  fun `mergeDto throws IllegalArgumentException when class not found`() {
+  fun `mergeDto returns failure when class not found`() {
     val existing = "class WrongClass {}"
     val schema = SchemaDefinition(name = "TargetClass")
 
-    val ex =
-        assertThrows(IllegalArgumentException::class.java) { merger.mergeDto(existing, schema) }
-    assertTrue(ex.message!!.contains("Class TargetClass not found"))
+    val res = merger.mergeDto(existing, schema)
+    assertTrue(res.isFailure)
+    assertTrue(res.cddErrorOrNull()!!.message.contains("Class TargetClass not found"))
   }
 
   @Test
-  fun `mergeDto throws IllegalStateException when primary constructor is missing`() {
+  fun `mergeDto returns failure when primary constructor is missing`() {
     val existing = "class TargetClass { }"
     val schema = SchemaDefinition(name = "TargetClass")
 
-    val ex = assertThrows(IllegalStateException::class.java) { merger.mergeDto(existing, schema) }
-    assertTrue(ex.message!!.contains("primary constructor"))
+    val res = merger.mergeDto(existing, schema)
+    assertTrue(res.isFailure)
+    assertTrue(res.cddErrorOrNull()!!.message.contains("primary constructor"))
   }
 }

@@ -1,7 +1,9 @@
+/** JSON-RPC 2.0 error codes and message parsing/formatting utilities for MCP. */
 package org.cdd.mcp
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import openapi.parseJsonElementResult
 
 /** Standard JSON-RPC 2.0 error codes. */
 object JsonRpcErrorCodes {
@@ -17,7 +19,13 @@ object JsonRpcErrorCodes {
   const val INTERNAL_ERROR = -32603
 }
 
-/** Exception for JSON-RPC errors. */
+/**
+ * Non-thrown [Exception] carrier representing a JSON-RPC 2.0 error for use inside [kotlin.Result].
+ *
+ * @property code The JSON-RPC 2.0 error code.
+ * @property message The human-readable error message.
+ * @property data Optional structured error data.
+ */
 class JsonRpcException(
     /** The error code */
     val code: Int,
@@ -35,16 +43,27 @@ object JsonRpcParser {
     encodeDefaults = true
   }
 
-  /** Parses a message string into a JsonElement. */
-  fun parseMessage(string: String): JsonElement {
-    return try {
-      json.parseToJsonElement(string)
-    } catch (e: Exception) {
-      throw JsonRpcException(JsonRpcErrorCodes.PARSE_ERROR, "Parse error")
-    }
+  /**
+   * Parses a message string into a [JsonElement] wrapped in a [kotlin.Result].
+   *
+   * @param string Raw JSON-RPC message string.
+   * @return A [kotlin.Result] containing the parsed [JsonElement] or a [JsonRpcException] failure.
+   */
+  fun parseMessage(string: String): kotlin.Result<JsonElement> {
+    return parseJsonElementResult(string)
+        .fold(
+            onSuccess = { kotlin.Result.success(it) },
+            onFailure = {
+              kotlin.Result.failure(JsonRpcException(JsonRpcErrorCodes.PARSE_ERROR, "Parse error"))
+            })
   }
 
-  /** Serializes a JsonElement into a string. */
+  /**
+   * Serializes a [JsonElement] into a JSON string.
+   *
+   * @param element The [JsonElement] to serialize.
+   * @return Compact JSON string.
+   */
   fun serializeMessage(element: JsonElement): String {
     return json.encodeToString(JsonElement.serializer(), element)
   }

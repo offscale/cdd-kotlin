@@ -4,8 +4,15 @@ import com.fasterxml.jackson.core.JsonFactory
 import com.fasterxml.jackson.databind.ObjectMapper
 import domain.Callback
 import domain.HttpMethod
+import domain.OpenApiArray
+import domain.OpenApiBoolean
+import domain.OpenApiInt
+import domain.OpenApiNull
+import domain.OpenApiObject
+import domain.OpenApiString
 import domain.ParameterLocation
 import domain.ParameterStyle
+import domain.doubleOrNull
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -451,8 +458,8 @@ class OpenApiParserTest {
     assertEquals("3.2.0", root.openapi)
     assertEquals("https://example.com/api/openapi", root.self)
     assertEquals("Pet API", root.info.title)
-    assertEquals("root-ext", root.extensions["x-root"])
-    assertEquals("info-ext", root.info.extensions["x-info"])
+    assertEquals(OpenApiString("root-ext"), root.extensions["x-root"])
+    assertEquals(OpenApiString("info-ext"), root.info.extensions["x-info"])
     assertEquals("https://spec.openapis.org/oas/3.1/dialect/base", root.jsonSchemaDialect)
     assertEquals("https://api.example.com/{version}", root.servers.first().url)
     assertEquals("v1", root.servers.first().variables?.get("version")?.default)
@@ -460,14 +467,14 @@ class OpenApiParserTest {
     val pathItem = root.paths["/users/{id}"]
     assertNotNull(pathItem)
     assertEquals("User path", pathItem?.summary)
-    assertEquals(true, pathItem?.extensions?.get("x-path"))
+    assertEquals(OpenApiBoolean(true), pathItem?.extensions?.get("x-path"))
 
     val getOp = pathItem?.get
     assertEquals("getUser", getOp?.operationId)
     assertEquals(HttpMethod.GET, getOp?.method)
     assertTrue(getOp?.deprecated == true)
-    val opExt = getOp?.extensions?.get("x-op") as? Map<*, *>
-    assertEquals(true, opExt?.get("flag"))
+    val opExt = getOp?.extensions?.get("x-op") as? OpenApiObject
+    assertEquals(OpenApiBoolean(true), opExt?.properties?.get("flag"))
     assertTrue(
         getOp?.parameters?.any { it.name == "limit" && it.location == ParameterLocation.QUERY } ==
             true)
@@ -504,9 +511,9 @@ class OpenApiParserTest {
         refPath?.parameters?.any {
           it.name == "refParam" && it.location == ParameterLocation.QUERY
         } == true)
-    assertEquals("paths-ext", root.pathsExtensions["x-paths"])
+    assertEquals(OpenApiString("paths-ext"), root.pathsExtensions["x-paths"])
     assertTrue(root.paths.containsKey("x-paths") == false)
-    assertEquals("hook-ext", root.webhooksExtensions["x-webhooks"])
+    assertEquals(OpenApiString("hook-ext"), root.webhooksExtensions["x-webhooks"])
     assertTrue(root.webhooks.containsKey("x-webhooks") == false)
 
     val userSchema = root.components?.schemas?.get("User")
@@ -515,15 +522,18 @@ class OpenApiParserTest {
     assertEquals("https://json-schema.org/draft/2020-12/schema", userSchema?.schemaDialect)
     assertEquals("user", userSchema?.anchor)
     assertEquals("userDyn", userSchema?.dynamicAnchor)
-    assertEquals(7, userSchema?.extensions?.get("x-schema"))
+    assertEquals(OpenApiInt(7L), userSchema?.extensions?.get("x-schema"))
     assertEquals(1, userSchema?.minProperties)
     assertEquals(4, userSchema?.maxProperties)
     assertTrue(userSchema?.properties?.get("name")?.types?.contains("null") == true)
     assertEquals(20, userSchema?.properties?.get("name")?.maxLength)
     assertEquals("#/components/schemas/User", userSchema?.properties?.get("address")?.ref)
-    assertEquals("prop-ext", userSchema?.properties?.get("id")?.extensions?.get("x-prop"))
+    assertEquals(
+        OpenApiString("prop-ext"), userSchema?.properties?.get("id")?.extensions?.get("x-prop"))
     assertTrue(userSchema?.properties?.get("xmlAttr")?.xml?.attribute == true)
-    assertEquals(listOf("active", "disabled"), userSchema?.properties?.get("status")?.enumValues)
+    assertEquals(
+        listOf(OpenApiString("active"), OpenApiString("disabled")),
+        userSchema?.properties?.get("status")?.enumValues)
     assertEquals(2, userSchema?.properties?.get("pet")?.oneOf?.size)
     val profile = userSchema?.properties?.get("profile")
     assertEquals("https://docs.example.com/profile", profile?.externalDocs?.url)
@@ -535,7 +545,9 @@ class OpenApiParserTest {
     assertEquals(listOf("timezone"), settingsSchema?.required)
     assertEquals("string", settingsSchema?.properties?.get("timezone")?.types?.firstOrNull())
     assertTrue(settingsSchema?.not?.types?.contains("null") == true)
-    assertEquals(listOf("alpha", "beta"), userSchema?.properties?.get("tags")?.examples)
+    assertEquals(
+        listOf(OpenApiString("alpha"), OpenApiString("beta")),
+        userSchema?.properties?.get("tags")?.examples)
 
     val petSchema = root.components?.schemas?.get("Pet")
     assertEquals(listOf("#/components/schemas/User"), petSchema?.oneOf)
@@ -557,8 +569,8 @@ class OpenApiParserTest {
     assertEquals(2, tupleSchema?.maxContains)
 
     val flags = root.components?.schemas?.get("Flags")
-    assertEquals("a", flags?.examples?.get("example1"))
-    assertEquals(listOf("a", "b"), flags?.examplesList)
+    assertEquals(OpenApiString("a"), flags?.examples?.get("example1"))
+    assertEquals(listOf(OpenApiString("a"), OpenApiString("b")), flags?.examplesList)
     assertTrue(flags?.uniqueItems == true)
 
     val anyMap = root.components?.schemas?.get("AnyMap")
@@ -571,15 +583,15 @@ class OpenApiParserTest {
     assertNull(weird?.additionalProperties)
 
     val exampleMap = root.components?.schemas?.get("ExampleMap")
-    assertEquals(1, exampleMap?.examples?.get("first"))
+    assertEquals(OpenApiInt(1L), exampleMap?.examples?.get("first"))
 
     val noTypeEnum = root.components?.schemas?.get("NoTypeEnum")
-    assertEquals(7, noTypeEnum?.defaultValue)
-    assertEquals(true, noTypeEnum?.constValue)
+    assertEquals(OpenApiInt(7L), noTypeEnum?.defaultValue)
+    assertEquals(OpenApiBoolean(true), noTypeEnum?.constValue)
 
     val noTypeDefault = root.components?.schemas?.get("NoTypeDefault")
-    val noTypeExample = noTypeDefault?.example as? Map<*, *>
-    assertEquals(1, noTypeExample?.get("x"))
+    val noTypeExample = noTypeDefault?.example as? OpenApiObject
+    assertEquals(OpenApiInt(1L), noTypeExample?.properties?.get("x"))
 
     val apiKey = root.components?.securitySchemes?.get("api_key")
     assertTrue(apiKey?.deprecated == true)
@@ -601,13 +613,13 @@ class OpenApiParserTest {
     assertEquals("https://example.com/example.json", refExample?.ref)
 
     val simpleExample = root.components?.examples?.get("SimpleExample")
-    assertEquals("raw-string", simpleExample?.value)
+    assertEquals(OpenApiString("raw-string"), simpleExample?.value)
 
     val nullExample = root.components?.examples?.get("NullExample")
-    assertTrue(nullExample?.dataValue == null)
+    assertEquals(OpenApiNull, nullExample?.dataValue)
 
     val onEventCallback = root.components?.callbacks?.get("OnEvent") as? Callback.Inline
-    assertEquals("cb-ext", onEventCallback?.extensions?.get("x-cb"))
+    assertEquals(OpenApiString("cb-ext"), onEventCallback?.extensions?.get("x-cb"))
     assertTrue(onEventCallback?.expressions?.containsKey("\$request.body#/url") == true)
     val refCallback = root.components?.callbacks?.get("RefCallback") as? Callback.Inline
     assertEquals("#/components/callbacks/OnEvent", refCallback?.reference?.ref)
@@ -637,11 +649,14 @@ class OpenApiParserTest {
     assertEquals("String", response200?.headers?.get("X-Missing")?.type)
     val userLink = response200?.links?.get("UserLink")
     assertEquals("getUser", userLink?.operationId)
-    assertEquals("\$response.body#/id", userLink?.parameters?.get("userId"))
-    assertEquals(3, userLink?.parameters?.get("priority"))
-    assertEquals(listOf(true, false), userLink?.parameters?.get("flags"))
-    assertEquals(mapOf("source" to "test"), userLink?.parameters?.get("meta"))
-    assertEquals(mapOf("id" to 1), userLink?.requestBody)
+    assertEquals(OpenApiString("\$response.body#/id"), userLink?.parameters?.get("userId"))
+    assertEquals(OpenApiInt(3L), userLink?.parameters?.get("priority"))
+    assertEquals(
+        OpenApiArray(listOf(OpenApiBoolean(true), OpenApiBoolean(false))),
+        userLink?.parameters?.get("flags"))
+    assertEquals(
+        OpenApiObject(mapOf("source" to OpenApiString("test"))), userLink?.parameters?.get("meta"))
+    assertEquals(OpenApiObject(mapOf("id" to OpenApiInt(1L))), userLink?.requestBody)
 
     val altLink = response200?.links?.get("AltLink")
     assertEquals("#/components/links/UserLink", altLink?.ref)
@@ -716,14 +731,15 @@ class OpenApiParserTest {
         """
             .trimIndent()
     val root = parser.parseString(json)
-    val ext = root.extensions["x-ext"] as Map<*, *>
-    assertEquals(null, ext["nullVal"])
-    assertEquals(42, (ext["intVal"] as Number).toInt())
-    assertEquals(3.14, (ext["floatVal"] as Number).toDouble())
-    assertEquals(true, ext["boolVal"])
-    assertEquals("hello", ext["stringVal"])
-    assertEquals(listOf(1, 2, 3), ext["arrVal"])
-    assertEquals(mapOf("k" to "v"), ext["objVal"])
+    val ext = (root.extensions["x-ext"] as OpenApiObject).properties
+    assertEquals(OpenApiNull, ext["nullVal"])
+    assertEquals(OpenApiInt(42L), ext["intVal"])
+    assertEquals(3.14, ext["floatVal"].doubleOrNull())
+    assertEquals(OpenApiBoolean(true), ext["boolVal"])
+    assertEquals(OpenApiString("hello"), ext["stringVal"])
+    assertEquals(
+        OpenApiArray(listOf(OpenApiInt(1L), OpenApiInt(2L), OpenApiInt(3L))), ext["arrVal"])
+    assertEquals(OpenApiObject(mapOf("k" to OpenApiString("v"))), ext["objVal"])
   }
 
   @Test
@@ -1043,15 +1059,11 @@ class OpenApiParserTest {
   }
 
   @Test
-  fun `parseSchemaString throws when document is OpenAPI`() {
+  fun `parseSchemaStringResult fails when document is OpenAPI`() {
     val openapiJson = """{ "openapi": "3.2.0", "info": { "title": "X", "version": "1" } }"""
-    try {
-      parser.parseSchemaString(openapiJson, OpenApiParser.Format.JSON)
-    } catch (ex: IllegalArgumentException) {
-      assertTrue(ex.message?.contains("OpenAPI Object") == true)
-      return
-    }
-    throw AssertionError("Expected IllegalArgumentException for OpenAPI document")
+    val res = parser.parseSchemaStringResult(openapiJson, OpenApiParser.Format.JSON)
+    assertTrue(res.isFailure)
+    assertTrue(res.exceptionOrNull()?.message?.contains("OpenAPI Object") == true)
   }
 
   @Test
@@ -1246,15 +1258,23 @@ class OpenApiParserTest {
     val parsed = parser.parseString(json, OpenApiParser.Format.JSON)
     val components = parsed.components?.schemas
 
-    assertEquals(listOf(1, 2, 3), components?.get("IntEnum")?.enumValues)
-    assertEquals(listOf(true, false), components?.get("BoolEnum")?.enumValues)
     assertEquals(
-        listOf(mapOf("k" to "v1"), mapOf("k" to "v2")), components?.get("ObjEnum")?.enumValues)
+        listOf(OpenApiInt(1L), OpenApiInt(2L), OpenApiInt(3L)),
+        components?.get("IntEnum")?.enumValues)
+    assertEquals(
+        listOf(OpenApiBoolean(true), OpenApiBoolean(false)),
+        components?.get("BoolEnum")?.enumValues)
+    assertEquals(
+        listOf(
+            OpenApiObject(mapOf("k" to OpenApiString("v1"))),
+            OpenApiObject(mapOf("k" to OpenApiString("v2")))),
+        components?.get("ObjEnum")?.enumValues)
 
     val wrapper = components?.get("Wrapper")
-    assertEquals(listOf("fast", "slow"), wrapper?.properties?.get("mode")?.enumValues)
-    val levelEnums =
-        wrapper?.properties?.get("level")?.enumValues?.map { (it as Number).toDouble() }
+    assertEquals(
+        listOf(OpenApiString("fast"), OpenApiString("slow")),
+        wrapper?.properties?.get("mode")?.enumValues)
+    val levelEnums = wrapper?.properties?.get("level")?.enumValues?.mapNotNull { it.doubleOrNull() }
     assertEquals(listOf(0.1, 0.5), levelEnums)
   }
 
@@ -1557,7 +1577,7 @@ class OpenApiParserTest {
 
     assertNotNull(example)
     assertEquals("override summary", example?.summary)
-    assertEquals("abc-123", example?.dataValue)
+    assertEquals(OpenApiString("abc-123"), example?.dataValue)
     assertEquals("#/components/examples/IdExample", example?.ref)
   }
 
@@ -1636,7 +1656,7 @@ class OpenApiParserTest {
 
     val exampleRef = components?.examples?.get("RefExample")
     assertEquals("#/components/examples/BaseExample", exampleRef?.ref)
-    assertEquals("base", exampleRef?.dataValue)
+    assertEquals(OpenApiString("base"), exampleRef?.dataValue)
     assertEquals("override", exampleRef?.summary)
 
     val mediaRef = components?.mediaTypes?.get("JsonRef")
@@ -1669,5 +1689,382 @@ class OpenApiParserTest {
     assertNotNull(operation)
     assertFalse(operation!!.operationIdExplicit)
     assertEquals("get_pets", operation.operationId)
+  }
+
+  @Test
+  fun `parse covers component ref resolution, media type inference, and Swagger 2_0 edge cases`() {
+    // 1. parseSchemaString default args and invalid root
+    val boolSchema = parser.parseSchemaString("true")
+    assertEquals(true, boolSchema.booleanSchema)
+    assertEquals(true, parser.parseSchemaStringResult("true").getOrThrow().booleanSchema)
+    val yamlDoc = parser.parseString("openapi: \"3.2.0\"\ninfo:\n  title: \"Y\"\n  version: \"1\"")
+    assertEquals("Y", yamlDoc.info.title)
+    assertEquals(
+        "Y",
+        parser
+            .parseStringResult("openapi: \"3.2.0\"\ninfo:\n  title: \"Y\"\n  version: \"1\"")
+            .getOrThrow()
+            .info
+            .title)
+    assertTrue(parser.parseSchemaStringResult("123", OpenApiParser.Format.JSON).isFailure)
+    assertTrue(
+        parser
+            .parseSchemaStringResult("""{"openapi":"3.2.0"}""", OpenApiParser.Format.JSON)
+            .isFailure)
+    assertTrue(parser.parseStringResult("[1, 2]", OpenApiParser.Format.JSON).isFailure)
+    assertTrue(parser.parseStringResult("{unclosed", OpenApiParser.Format.JSON).isFailure)
+    assertTrue(parser.parseDocumentStringResult("{unclosed", OpenApiParser.Format.JSON).isFailure)
+    assertTrue(parser.parseDocumentStringResult("123", OpenApiParser.Format.JSON).isFailure)
+    assertTrue(
+        parser
+            .parseDocumentStringResult(
+                "openapi: \"3.2.0\"\ninfo:\n  title: \"Y\"\n  version: \"1\"",
+                OpenApiParser.Format.YAML)
+            .isSuccess)
+    assertNotNull(parser.parseDocumentString("{unquotedKey: 1}"))
+    assertTrue(parser.parseSchemaStringResult("{unclosed", OpenApiParser.Format.JSON).isFailure)
+
+    // 2. Swagger 2.0 with empty components and with only securityDefinitions & response examples
+    val swagEmpty =
+        parser.parseString("""{"swagger":"2.0","info":{"title":"S","version":"1"},"paths":{}}""")
+    assertNull(swagEmpty.components)
+
+    val swagSec =
+        parser.parseString(
+            """
+            {
+              "swagger": "2.0",
+              "info": {"title": "S", "version": "1"},
+              "securityDefinitions": {
+                "Basic": {"type": "basic", "scopes": {"r": "read", "arr": []}}
+              },
+              "paths": {
+                "/x": {
+                  "get": {
+                    "responses": {
+                      "200": {
+                        "description": "ok",
+                        "examples": {"application/json": {"k": "v"}}
+                      }
+                    }
+                  }
+                }
+              }
+            }
+            """
+                .trimIndent())
+    assertNotNull(swagSec.components)
+    assertEquals(
+        OpenApiObject(mapOf("k" to OpenApiString("v"))),
+        swagSec.paths["/x"]?.get?.responses?.get("200")?.examples?.get("application/json")?.value)
+
+    // 3. Component Header, Link, Callback refs, extension merging, mediaType scoring/inference,
+    // styles, enums
+    val richJson =
+        """
+        {
+          "openapi": "3.2.0",
+          "info": {"title": "Rich", "version": "1.0"},
+          "tags": [{"name": "t1"}, "invalidTag"],
+          "paths": {
+            "/test": {
+              "get": {
+                "parameters": [
+                  {"name": "p1", "in": "query", "style": "spaceDelimited"},
+                  {"name": "p2", "in": "query", "style": "pipeDelimited"},
+                  {"name": "p3", "in": "query", "style": "deepObject"},
+                  {"name": "p4", "in": "querystring", "style": "unknownStyle"},
+                  {"name": "p5", "in": "body"},
+                  {"name": "p6", "in": "formdata"}
+                ],
+                "responses": {
+                  "200": {
+                    "description": "ok",
+                    "links": {
+                      "LInline": {"operationId": "op", "parameters": {"id": "${'$'}request.path.id"}}
+                    },
+                    "content": {
+                      "text/html": {},
+                      "text/yaml": {},
+                      "invalid_media": {},
+                      "*/*": {},
+                      "text/*+json": {}
+                    }
+                  },
+                  "201": {
+                    "description": "bin",
+                    "content": {
+                      "application/octet-stream": {}
+                    }
+                  },
+                  "202": {
+                    "description": "refMedia",
+                    "content": {
+                      "application/json": {"${'$'}ref": "#/components/mediaTypes/ItemMedia"}
+                    }
+                  },
+                  "203": {
+                    "description": "unresolvedMedia",
+                    "content": {
+                      "application/json": {"${'$'}ref": "#/components/mediaTypes/MissingMedia"}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "components": {
+            "headers": {
+              "BaseH": {"schema": {"type": "string"}, "description": "base", "x-base": 1},
+              "RefH": {"${'$'}ref": "#/components/headers/BaseH", "x-over": 2}
+            },
+            "links": {
+              "BaseL": {"operationId": "op1", "description": "baseL", "x-base": 1},
+              "RefL": {"${'$'}ref": "#/components/links/BaseL", "x-over": 2}
+            },
+            "callbacks": {
+              "BaseCb": {"http://example.com": {"post": {"responses": {"200": {"description": "ok"}}}}},
+              "RefCb": {"${'$'}ref": "#/components/callbacks/BaseCb"},
+              "DanglingCb1": {"${'$'}ref": "#/components/callbacks/DanglingCb2"},
+              "DanglingCb2": {"${'$'}ref": "#/components/callbacks/MissingCb"}
+            },
+            "mediaTypes": {
+              "ItemMedia": {"itemSchema": {"type": "string"}}
+            },
+            "securitySchemes": {
+              "BadScheme": 123,
+              "OAuth": {
+                "type": "oauth2",
+                "flows": {
+                  "implicit": {
+                    "authorizationUrl": "https://example.com",
+                    "scopes": {"read": "desc", "arr": []}
+                  },
+                  "password": {
+                    "tokenUrl": "https://example.com/token"
+                  }
+                }
+              }
+            },
+            "schemas": {
+              "EnumObj": {"enum": [{"a": 1}, [1, 2]], "examples": 123},
+              "DiscSchema": {
+                "type": 123,
+                "discriminator": {"propertyName": "t", "mapping": {"a": []}}
+              },
+              "DiscNoMap": {
+                "minimum": 1,
+                "discriminator": {"propertyName": "t"}
+              },
+              "InferredStr": {
+                "minLength": 1
+              }
+            }
+          }
+        }
+        """
+            .trimIndent()
+    val richDef = parser.parseString(richJson)
+    assertEquals("base", richDef.components?.headers?.get("RefH")?.description)
+    assertEquals("baseL", richDef.components?.links?.get("RefL")?.description)
+    assertTrue(richDef.components?.callbacks?.get("RefCb") is domain.Callback.Inline)
+
+    // 4. Direct calls to decomposed sub-parsers with default parameters and edge cases
+    val emptyInfoDef = parser.parseString("""{"openapi":"3.2.0","info":{}}""")
+    assertEquals("Unknown", emptyInfoDef.info.title)
+    assertEquals("0.0.0", emptyInfoDef.info.version)
+    val swagWithArrays =
+        parser.parseString(
+            """{"swagger":"2.0","info":{"title":"T","version":"1"},"schemes":["https",{}],"consumes":["application/json"],"produces":["application/json"]}""")
+    assertEquals(listOf("https"), swagWithArrays.schemes)
+    val swagRoot =
+        kotlinx.serialization.json.Json.parseToJsonElement(
+            """{"definitions":{"Pet":{"type":"object"}}}""")
+    assertNotNull(openapi.parser.Swagger2Upgrader.parseSwagger2Components(swagRoot))
+    assertNull(openapi.parser.ComponentParser.parseComponents(null))
+    val compNode =
+        kotlinx.serialization.json.Json.parseToJsonElement(
+            """{"schemas":{"Pet":{"type":"object"}}}""")
+    val parsedComps = openapi.parser.ComponentParser.parseComponents(compNode)
+    assertNotNull(parsedComps)
+    assertNotNull(openapi.parser.ComponentParser.resolveComponentRefs(parsedComps!!))
+    assertEquals(
+        domain.Callback.Inline(),
+        openapi.parser.ComponentParser.resolveCallbackComponentRef(
+            domain.Callback.Inline(), parsedComps))
+    assertNull(
+        openapi.parser.ComponentParser.resolveParameterRef("#/components/parameters/P", null))
+    assertNull(
+        openapi.parser.ComponentParser.resolveMediaTypeRef("#/components/mediaTypes/M", null))
+    assertNull(openapi.parser.ComponentParser.resolveResponseRef("#/components/responses/R", null))
+    assertNull(
+        openapi.parser.ComponentParser.resolveRequestBodyRef("#/components/requestBodies/B", null))
+    assertNull(openapi.parser.ComponentParser.resolveHeaderRef("#/components/headers/H", null))
+    assertNull(openapi.parser.ComponentParser.resolveLinkRef("#/components/links/L", null))
+    assertNull(openapi.parser.ComponentParser.resolveExampleRef("#/components/examples/E", null))
+    assertTrue(openapi.parser.ComponentParser.parseComponentResponses(null).isEmpty())
+    assertTrue(openapi.parser.ComponentParser.parseComponentParameters(null).isEmpty())
+    assertTrue(openapi.parser.ComponentParser.parseComponentRequestBodies(null).isEmpty())
+    assertTrue(openapi.parser.ComponentParser.parseComponentHeaders(null).isEmpty())
+
+    // Exercise resolveComponentRefs when reference is null vs present
+    val compsWithNullRefs =
+        domain.Components(
+            parameters =
+                mapOf(
+                    "P1" to domain.EndpointParameter("p", "String", domain.ParameterLocation.QUERY),
+                    "P2" to
+                        domain.EndpointParameter(
+                            "p2",
+                            "String",
+                            domain.ParameterLocation.QUERY,
+                            reference = domain.ReferenceObject("#/components/parameters/P1"))),
+            responses =
+                mapOf(
+                    "R1" to domain.EndpointResponse("200", description = "ok"),
+                    "R2" to
+                        domain.EndpointResponse(
+                            "200",
+                            reference = domain.ReferenceObject("#/components/responses/R1"))),
+            requestBodies =
+                mapOf(
+                    "B1" to domain.RequestBody(description = "b"),
+                    "B2" to
+                        domain.RequestBody(
+                            reference = domain.ReferenceObject("#/components/requestBodies/B1"))),
+            headers =
+                mapOf(
+                    "H1" to domain.Header("String"),
+                    "H2" to
+                        domain.Header(
+                            "String",
+                            reference = domain.ReferenceObject("#/components/headers/H1"))),
+            links =
+                mapOf(
+                    "L1" to domain.Link(operationId = "op"),
+                    "L2" to domain.Link(ref = "#/components/links/L1")),
+            examples =
+                mapOf(
+                    "E1" to domain.ExampleObject(summary = "s"),
+                    "E2" to domain.ExampleObject(ref = "#/components/examples/E1")),
+            mediaTypes =
+                mapOf(
+                    "M1" to domain.MediaTypeObject(),
+                    "M2" to domain.MediaTypeObject(ref = "#/components/mediaTypes/M1")),
+            securitySchemes =
+                mapOf(
+                    "S1" to domain.SecurityScheme(type = "apiKey"),
+                    "S2" to
+                        domain.SecurityScheme(
+                            reference = domain.ReferenceObject("#/components/securitySchemes/S1"))))
+    val resolvedRefs =
+        openapi.parser.ComponentParser.resolveComponentRefs(
+            compsWithNullRefs, "https://example.com/openapi.json")
+    assertEquals("b", resolvedRefs.requestBodies["B2"]?.description)
+
+    // PathAndOperationParser default parameter calls
+    assertTrue(openapi.parser.PathAndOperationParser.parsePaths(null, null).items.isEmpty())
+    val emptyObj = kotlinx.serialization.json.Json.parseToJsonElement("{}")
+    assertNotNull(openapi.parser.PathAndOperationParser.parsePathItem("/a", emptyObj, null))
+    assertNotNull(
+        openapi.parser.PathAndOperationParser.parseOperation(
+            "/a", "get", domain.HttpMethod.GET, emptyObj, null))
+    assertTrue(openapi.parser.PathAndOperationParser.parseCallbacks(null, null).isEmpty())
+    assertTrue(openapi.parser.PathAndOperationParser.parseParameters(null, null).isEmpty())
+    assertNotNull(openapi.parser.PathAndOperationParser.parseParameter(emptyObj, null))
+    assertNull(openapi.parser.PathAndOperationParser.parseRequestBody(null, null))
+    assertTrue(openapi.parser.PathAndOperationParser.parseResponses(null, null).isEmpty())
+    assertNotNull(openapi.parser.PathAndOperationParser.parseResponse("200", emptyObj, null))
+    assertTrue(openapi.parser.PathAndOperationParser.parseHeaders(null, null).isEmpty())
+    assertNotNull(openapi.parser.PathAndOperationParser.parseHeader(emptyObj, null))
+    assertTrue(openapi.parser.PathAndOperationParser.parseLinks(null, null).isEmpty())
+    assertNotNull(openapi.parser.PathAndOperationParser.parseLink(emptyObj, null))
+    assertTrue(openapi.parser.PathAndOperationParser.parseContentMap(null, null).isEmpty())
+    assertNotNull(openapi.parser.PathAndOperationParser.parseMediaTypeObject(emptyObj, null))
+    assertTrue(openapi.parser.PathAndOperationParser.parseExampleMap(null, null).isEmpty())
+    assertNotNull(openapi.parser.PathAndOperationParser.parseExampleObject(emptyObj, null))
+    assertTrue(openapi.parser.PathAndOperationParser.parsePathItems(null).isEmpty())
+
+    // 5. Remaining branches in ComponentParser, PathAndOperationParser, and SchemaNodeParser
+    val edgeCaseSpec =
+        """
+        {
+          "openapi": "3.2.0",
+          "info": {"title": "T", "version": "1"},
+          "servers": [123, {"variables": {"v": {}}}],
+          "tags": [{}],
+          "security": [123],
+          "components": {
+            "schemas": {
+              "NullOnly": {"type": "null", "readOnly": true, "writeOnly": true, "discriminator": {}},
+              "NumEnum": {"enum": [1, 2]},
+              "BoolEnum": {"enum": [true, false]},
+              "NullEnum": {"enum": [null]}
+            },
+            "parameters": {
+              "NoName": {},
+              "CycleP": {"${'$'}ref": "#/components/parameters/CycleP"}
+            },
+            "requestBodies": {
+              "BadBody": 123
+            },
+            "headers": {
+              "DeprH": {"deprecated": true, "example": "ex"}
+            },
+            "securitySchemes": {
+              "NoType": {}
+            },
+            "examples": {
+              "ExRef": {"${'$'}ref": "#/components/examples/ExRef", "description": "d"}
+            }
+          }
+        }
+        """
+            .trimIndent()
+    assertNotNull(parser.parseString(edgeCaseSpec))
+    assertNotNull(
+        openapi.parser.SchemaNodeParser.parseSchemaProperty(
+            kotlinx.serialization.json.JsonPrimitive(1)))
+    assertEquals(
+        "https://abs.com/a.json",
+        openapi.parser.ComponentParser.resolveSelfBase(
+            "https://abs.com/a.json", "https://base.com/b.json"))
+    assertNull(
+        openapi.parser.SchemaNodeParser.selectSchema(
+            mapOf("*/*" to domain.MediaTypeObject()), null))
+    assertNull(
+        openapi.parser.SchemaNodeParser.selectSchema(
+            mapOf("invalid" to domain.MediaTypeObject()), null))
+    assertNotNull(
+        openapi.parser.SchemaNodeParser.selectSchema(
+            mapOf(
+                "application/json" to
+                    domain.MediaTypeObject(
+                        reference = domain.ReferenceObject("#/components/mediaTypes/M"))),
+            null))
+    val resolvedComp =
+        openapi.parser.ComponentParser.resolveComponentRefs(
+            domain.Components(
+                responses =
+                    mapOf(
+                        "R1" to
+                            domain.EndpointResponse(
+                                statusCode = "200",
+                                description = null,
+                                reference = domain.ReferenceObject("#/components/responses/R2")),
+                        "R2" to domain.EndpointResponse(statusCode = "200", description = "ok")),
+                links =
+                    mapOf(
+                        "L1" to
+                            domain.Link(
+                                reference = domain.ReferenceObject("#/components/links/L2")),
+                        "L2" to domain.Link(operationId = "op")),
+                mediaTypes =
+                    mapOf(
+                        "M1" to
+                            domain.MediaTypeObject(
+                                reference = domain.ReferenceObject("#/components/mediaTypes/M2")),
+                        "M2" to domain.MediaTypeObject())))
+    assertNotNull(resolvedComp)
   }
 }

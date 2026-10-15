@@ -1,3 +1,10 @@
+/**
+ * Root OpenAPI 3.2 and Swagger 2.0 specification domain models.
+ *
+ * Defines [OpenApiDefinition], [Components], [Info], [Contact], [License], [Server],
+ * [ServerVariable], [SecurityScheme], [SecuritySchemeType], [ApiKeyLocation], [OAuthFlows],
+ * [OAuthFlow], [SecurityRequirement], [Tag], and [ExternalDocumentation].
+ */
 package domain
 
 /**
@@ -67,7 +74,7 @@ data class OpenApiDefinition(
      * Specification extensions applied to the Paths Object (keys starting with `x-`). These are
      * siblings of path entries under the `paths` object.
      */
-    val pathsExtensions: Map<String, Any?> = emptyMap(),
+    val pathsExtensions: Map<String, OpenApiValue> = emptyMap(),
 
     /**
      * When true, serialize an explicit empty Paths Object (`paths: {}`). This preserves ACL-style
@@ -88,7 +95,7 @@ data class OpenApiDefinition(
      * Specification extensions applied to the Webhooks Object (keys starting with `x-`). These are
      * siblings of webhook entries under the `webhooks` object.
      */
-    val webhooksExtensions: Map<String, Any?> = emptyMap(),
+    val webhooksExtensions: Map<String, OpenApiValue> = emptyMap(),
 
     /**
      * When true, serialize an explicit empty Webhooks Object (`webhooks: {}`). This preserves
@@ -129,7 +136,7 @@ data class OpenApiDefinition(
     val self: String? = null,
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
+    val extensions: Map<String, OpenApiValue> = emptyMap()
 )
 
 /**
@@ -174,7 +181,7 @@ data class Components(
     val mediaTypes: Map<String, MediaTypeObject> = emptyMap(),
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
+    val extensions: Map<String, OpenApiValue> = emptyMap()
 )
 
 /**
@@ -210,7 +217,7 @@ data class Info(
     val license: License? = null,
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
+    val extensions: Map<String, OpenApiValue> = emptyMap()
 )
 
 /**
@@ -232,7 +239,7 @@ data class Contact(
     val email: String? = null,
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
+    val extensions: Map<String, OpenApiValue> = emptyMap()
 )
 
 /**
@@ -257,7 +264,7 @@ data class License(
     val url: String? = null,
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
+    val extensions: Map<String, OpenApiValue> = emptyMap()
 )
 
 /**
@@ -289,7 +296,7 @@ data class Server(
     val name: String? = null,
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
+    val extensions: Map<String, OpenApiValue> = emptyMap()
 )
 
 /**
@@ -317,8 +324,63 @@ data class ServerVariable(
     val description: String? = null,
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
+    val extensions: Map<String, OpenApiValue> = emptyMap()
 )
+
+/**
+ * Strongly-typed enumeration of OpenAPI 3.2 Security Scheme types.
+ *
+ * @property wireName The wire string representation (`apiKey`, `http`, `mutualTLS`, `oauth2`,
+ *   `openIdConnect`).
+ */
+enum class SecuritySchemeType(val wireName: String) {
+  /** API Key authentication (`apiKey`). */
+  API_KEY("apiKey"),
+  /** HTTP authentication scheme (`http`). */
+  HTTP("http"),
+  /** Mutual TLS certificate authentication (`mutualTLS`). */
+  MUTUAL_TLS("mutualTLS"),
+  /** OAuth 2.0 authentication (`oauth2`). */
+  OAUTH2("oauth2"),
+  /** OpenID Connect Discovery authentication (`openIdConnect`). */
+  OPEN_ID_CONNECT("openIdConnect");
+
+  companion object {
+    /**
+     * Resolves a [SecuritySchemeType] from its wire name, or `null` if unrecognized.
+     *
+     * @param value The raw security scheme type string.
+     * @return The matching [SecuritySchemeType] or `null`.
+     */
+    fun fromWireName(value: String): SecuritySchemeType? =
+        entries.firstOrNull { it.wireName.equals(value, ignoreCase = true) }
+  }
+}
+
+/**
+ * Strongly-typed enumeration of API Key locations for `apiKey` security schemes.
+ *
+ * @property wireName The lowercase location wire string (`query`, `header`, `cookie`).
+ */
+enum class ApiKeyLocation(val wireName: String) {
+  /** API key passed as a query parameter (`query`). */
+  QUERY("query"),
+  /** API key passed as an HTTP header (`header`). */
+  HEADER("header"),
+  /** API key passed as an HTTP cookie (`cookie`). */
+  COOKIE("cookie");
+
+  companion object {
+    /**
+     * Resolves an [ApiKeyLocation] from its wire name, or `null` if unrecognized.
+     *
+     * @param value The raw `in` location string.
+     * @return The matching [ApiKeyLocation] or `null`.
+     */
+    fun fromWireName(value: String): ApiKeyLocation? =
+        entries.firstOrNull { it.wireName.equals(value, ignoreCase = true) }
+  }
+}
 
 /**
  * Defines a security scheme that can be used by the operations.
@@ -399,8 +461,16 @@ data class SecurityScheme(
     val reference: ReferenceObject? = null,
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
-)
+    val extensions: Map<String, OpenApiValue> = emptyMap()
+) {
+  /** Strongly-typed [SecuritySchemeType] parsed from [type], or `null` if custom/invalid. */
+  val parsedType: SecuritySchemeType?
+    get() = SecuritySchemeType.fromWireName(type)
+
+  /** Strongly-typed [ApiKeyLocation] parsed from [`in`], or `null` if absent/invalid. */
+  val parsedLocation: ApiKeyLocation?
+    get() = `in`?.let { ApiKeyLocation.fromWireName(it) }
+}
 
 /**
  * Allows configuration of the supported OAuth Flows.
@@ -420,7 +490,7 @@ data class OAuthFlows(
     val deviceAuthorization: OAuthFlow? = null,
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
+    val extensions: Map<String, OpenApiValue> = emptyMap()
 )
 
 /**
@@ -456,7 +526,7 @@ data class OAuthFlow(
     val deviceAuthorizationUrl: String? = null,
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
+    val extensions: Map<String, OpenApiValue> = emptyMap()
 )
 
 /**
@@ -504,7 +574,7 @@ data class Tag(
     val kind: String? = null,
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
+    val extensions: Map<String, OpenApiValue> = emptyMap()
 )
 
 /**
@@ -524,5 +594,5 @@ data class ExternalDocumentation(
     val url: String,
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
+    val extensions: Map<String, OpenApiValue> = emptyMap()
 )

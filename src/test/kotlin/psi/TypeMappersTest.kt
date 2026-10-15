@@ -1,5 +1,12 @@
 package psi
 
+import domain.OpenApiArray
+import domain.OpenApiBoolean
+import domain.OpenApiInt
+import domain.OpenApiNull
+import domain.OpenApiNumber
+import domain.OpenApiObject
+import domain.OpenApiString
 import domain.SchemaProperty
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -59,10 +66,11 @@ class TypeMappersTest {
     val numericProp = SchemaProperty(minimum = 1.0)
     assertEquals("Double", TypeMappers.mapType(numericProp))
 
-    val enumBoolProp = SchemaProperty(enumValues = listOf(true, false))
+    val enumBoolProp =
+        SchemaProperty(enumValues = listOf(OpenApiBoolean(true), OpenApiBoolean(false)))
     assertEquals("Boolean", TypeMappers.mapType(enumBoolProp))
 
-    val constStringProp = SchemaProperty(constValue = "fixed")
+    val constStringProp = SchemaProperty(constValue = OpenApiString("fixed"))
     assertEquals("String", TypeMappers.mapType(constStringProp))
   }
 
@@ -117,12 +125,18 @@ class TypeMappersTest {
     val floatProp = SchemaProperty(type = "number", format = "float")
     assertEquals("Float", TypeMappers.mapType(floatProp))
 
-    // constValue = unknown class
-    val unknownConstProp = SchemaProperty(constValue = UnknownType())
-    assertEquals("String", TypeMappers.mapType(unknownConstProp))
+    // constValue = null
+    val nullConstProp = SchemaProperty(constValue = OpenApiNull)
+    assertEquals("kotlinx.serialization.json.JsonElement", TypeMappers.mapType(nullConstProp))
+
+    val intConstProp = SchemaProperty(constValue = OpenApiInt(10L))
+    assertEquals("Int", TypeMappers.mapType(intConstProp))
+
+    val numConstProp = SchemaProperty(constValue = OpenApiNumber(3.14))
+    assertEquals("Double", TypeMappers.mapType(numConstProp))
 
     // enum mixed
-    val mixedEnumProp = SchemaProperty(enumValues = listOf("string", 1))
+    val mixedEnumProp = SchemaProperty(enumValues = listOf(OpenApiString("string"), OpenApiInt(1L)))
     assertEquals("String", TypeMappers.mapType(mixedEnumProp))
 
     // string fallback based on minLength etc
@@ -136,26 +150,31 @@ class TypeMappersTest {
     assertEquals("ByteArray", TypeMappers.mapType(contentEncodingProp))
 
     // empty enum
-    val emptyEnumProp = SchemaProperty(enumValues = emptyList<Any>())
+    val emptyEnumProp = SchemaProperty(enumValues = emptyList())
     assertEquals("String", TypeMappers.mapType(emptyEnumProp))
 
-    // enum all unknown
-    val unknownEnumProp = SchemaProperty(enumValues = listOf(UnknownType()))
-    assertEquals("String", TypeMappers.mapType(unknownEnumProp))
+    // enum all null
+    val nullOnlyEnumProp = SchemaProperty(enumValues = listOf(OpenApiNull))
+    assertEquals("kotlinx.serialization.json.JsonElement", TypeMappers.mapType(nullOnlyEnumProp))
+
+    // enum with 3 distinct types (including null)
+    val threeTypesEnumProp =
+        SchemaProperty(enumValues = listOf(OpenApiString("a"), OpenApiInt(1L), OpenApiNull))
+    assertEquals("String", TypeMappers.mapType(threeTypesEnumProp))
 
     // enum with null
-    val nullEnumProp = SchemaProperty(enumValues = listOf("test", null))
+    val nullEnumProp = SchemaProperty(enumValues = listOf(OpenApiString("test"), OpenApiNull))
     assertEquals(
         "String",
         TypeMappers.mapType(
             nullEnumProp)) // actually it should be nullable string but mapType just maps type
 
     // map const
-    val mapConstProp = SchemaProperty(constValue = mapOf("a" to 1))
+    val mapConstProp = SchemaProperty(constValue = OpenApiObject(mapOf("a" to OpenApiInt(1L))))
     assertEquals("kotlinx.serialization.json.JsonElement", TypeMappers.mapType(mapConstProp))
 
     // list const
-    val listConstProp = SchemaProperty(constValue = listOf(1))
+    val listConstProp = SchemaProperty(constValue = OpenApiArray(listOf(OpenApiInt(1L))))
     assertEquals("List<kotlinx.serialization.json.JsonElement>", TypeMappers.mapType(listConstProp))
 
     // Map with 1 arg
@@ -176,5 +195,74 @@ class TypeMappersTest {
     // splitTopLevelArgs inner logic
     val nestedMap = TypeMappers.kotlinToSchemaProperty("Map<String, Map<String, Int>>")
     assertEquals("object", nestedMap.additionalProperties?.type)
+    val emptyArgsMap = TypeMappers.kotlinToSchemaProperty("Map<>")
+    assertEquals(true, emptyArgsMap.additionalProperties?.booleanSchema)
+    val mutableMap = TypeMappers.kotlinToSchemaProperty("MutableMap<String, Int>")
+    assertEquals("integer", mutableMap.additionalProperties?.type)
+
+    // Cycle detection in mapTypeInternal and dynamicRefResolver returning self
+    val dynProp = SchemaProperty(dynamicRef = "#node")
+    assertEquals("Node", TypeMappers.mapType(dynProp) { p, _ -> p })
+    assertEquals("Node", TypeMappers.mapType(dynProp) { _, _ -> null })
+    val cycleA = SchemaProperty(dynamicRef = "#b")
+    val cycleB = SchemaProperty(dynamicRef = "#a")
+    assertEquals(
+        "kotlinx.serialization.json.JsonElement",
+        TypeMappers.mapType(cycleA) { p, _ -> if (p === cycleA) cycleB else cycleA })
+
+    // mapStringType text/* contentMediaType vs binary contentMediaType
+    assertEquals("String", TypeMappers.mapType(SchemaProperty(contentMediaType = "text/plain")))
+    assertEquals(
+        "ByteArray", TypeMappers.mapType(SchemaProperty(contentMediaType = "application/pdf")))
+
+    // inferTypes all individual branches
+    assertEquals(
+        "List<kotlinx.serialization.json.JsonElement>",
+        TypeMappers.mapType(SchemaProperty(prefixItems = listOf(SchemaProperty("string")))))
+    assertEquals(
+        "List<kotlinx.serialization.json.JsonElement>",
+        TypeMappers.mapType(SchemaProperty(contains = SchemaProperty("string"))))
+    assertEquals(
+        "List<kotlinx.serialization.json.JsonElement>",
+        TypeMappers.mapType(SchemaProperty(minItems = 1)))
+    assertEquals(
+        "List<kotlinx.serialization.json.JsonElement>",
+        TypeMappers.mapType(SchemaProperty(maxItems = 5)))
+    assertEquals(
+        "List<kotlinx.serialization.json.JsonElement>",
+        TypeMappers.mapType(SchemaProperty(uniqueItems = true)))
+
+    assertEquals(
+        "kotlinx.serialization.json.JsonElement",
+        TypeMappers.mapType(
+            SchemaProperty(patternProperties = mapOf("^a" to SchemaProperty("string")))))
+    assertEquals(
+        "kotlinx.serialization.json.JsonElement",
+        TypeMappers.mapType(SchemaProperty(propertyNames = SchemaProperty("string"))))
+    assertEquals(
+        "kotlinx.serialization.json.JsonElement",
+        TypeMappers.mapType(
+            SchemaProperty(dependentSchemas = mapOf("a" to SchemaProperty("string")))))
+    assertEquals(
+        "kotlinx.serialization.json.JsonElement",
+        TypeMappers.mapType(SchemaProperty(minProperties = 1)))
+    assertEquals(
+        "kotlinx.serialization.json.JsonElement",
+        TypeMappers.mapType(SchemaProperty(maxProperties = 5)))
+    assertEquals(
+        "kotlinx.serialization.json.JsonElement",
+        TypeMappers.mapType(SchemaProperty(required = listOf("a"))))
+
+    assertEquals("Double", TypeMappers.mapType(SchemaProperty(maximum = 10.0)))
+    assertEquals("Double", TypeMappers.mapType(SchemaProperty(multipleOf = 2.0)))
+    assertEquals("Double", TypeMappers.mapType(SchemaProperty(exclusiveMinimum = 0.0)))
+    assertEquals("Double", TypeMappers.mapType(SchemaProperty(exclusiveMaximum = 10.0)))
+    assertEquals("LocalDate", TypeMappers.mapType(SchemaProperty(format = "date")))
+
+    // capitalizeName and decapitalizeName empty string branch
+    assertEquals("", capitalizeName(""))
+    assertEquals("Abc", capitalizeName("abc"))
+    assertEquals("", decapitalizeName(""))
+    assertEquals("abc", decapitalizeName("Abc"))
   }
 }

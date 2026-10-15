@@ -1,3 +1,4 @@
+/** Ktor and Clikt mock server entrypoint and routing generator. */
 package psi
 
 import domain.SchemaDefinition
@@ -16,43 +17,34 @@ class ServerMainGenerator {
       schemas: List<SchemaDefinition>
   ): Map<String, String> {
     val results = mutableMapOf<String, String>()
-    val modelSchemas =
-        schemas.filter {
-          it.type == "object" &&
-              it.enumValues == null &&
-              it.anyOf.isEmpty() &&
-              it.oneOf.isEmpty() &&
-              it.anyOfSchemas.isEmpty() &&
-              it.oneOfSchemas.isEmpty() &&
-              !it.safeName.contains("ExternalAccount") &&
-              !it.safeName.contains("PaymentSource")
-        }
+    val modelSchemas = filterModelSchemas(schemas)
 
     // Generate Route files
     for (schema in modelSchemas) {
-      val name = schema.safeName.replaceFirstChar { it.uppercase() }
-      val routeName = schema.safeName.replaceFirstChar { it.lowercase() }
-      val routeSb = StringBuilder()
-      routeSb.append("package $packageName.routes\n\n")
-      routeSb.append("import $packageName.dao.DaoConfiguration\n")
-      routeSb.append("import io.ktor.server.response.respondText\n")
-      routeSb.append("import io.ktor.server.routing.Route\n")
-      routeSb.append("import io.ktor.server.routing.get\n")
-      routeSb.append("import io.ktor.server.application.call\n")
-      routeSb.append("import io.ktor.http.HttpStatusCode\n\n")
-
-      routeSb.append("fun Route.${routeName}Routes(daoConfig: DaoConfiguration) {\n")
-      routeSb.append("    get(\"/${routeName}\") {\n")
-      routeSb.append("        try {\n")
-      routeSb.append("            val items = daoConfig.${routeName}Dao.getAll()\n")
-      routeSb.append("            call.respondText(items.toString())\n")
-      routeSb.append("        } catch (e: NotImplementedError) {\n")
-      routeSb.append(
-          "            call.respondText(\"Not Implemented\", status = HttpStatusCode.NotImplemented)\n")
-      routeSb.append("        }\n")
-      routeSb.append("    }\n")
-      routeSb.append("}\n")
-      results["routes/${name}Routes.kt"] = routeSb.toString()
+      val name = capitalizeName(schema.safeName)
+      val routeName = decapitalizeName(schema.safeName)
+      results["routes/${name}Routes.kt"] =
+          buildKotlinFile("$packageName.routes") {
+            import(
+                "$packageName.dao.DaoConfiguration",
+                "io.ktor.server.response.respondText",
+                "io.ktor.server.routing.Route",
+                "io.ktor.server.routing.get",
+                "io.ktor.server.application.call",
+                "io.ktor.http.HttpStatusCode")
+            block("fun Route.${routeName}Routes(daoConfig: DaoConfiguration)") {
+              block("get(\"/${routeName}\")") {
+                block("if (daoConfig.${routeName}Dao.isStub)") {
+                  line(
+                      "call.respondText(\"Not Implemented\", status = HttpStatusCode.NotImplemented)")
+                }
+                block("else") {
+                  line("val items = daoConfig.${routeName}Dao.getAll()")
+                  line("call.respondText(items.toString())")
+                }
+              }
+            }
+          }
     }
 
     val sb = StringBuilder()
@@ -217,7 +209,7 @@ class ServerMainGenerator {
       sb.append(
           "fun io.ktor.server.routing.Route.routeBatch$index(daoConfig: DaoConfiguration) {\n")
       for (schema in batch) {
-        val routeName = schema.safeName.replaceFirstChar { it.lowercase() }
+        val routeName = decapitalizeName(schema.safeName)
         sb.append("    ${routeName}Routes(daoConfig)\n")
       }
       sb.append("}\n\n")

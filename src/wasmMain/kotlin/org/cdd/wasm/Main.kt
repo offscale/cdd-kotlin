@@ -1,3 +1,4 @@
+/** WebAssembly (WASI) entrypoints and exported C-ABI functions for cdd-kotlin. */
 package org.cdd.wasm
 
 import getEnvVar

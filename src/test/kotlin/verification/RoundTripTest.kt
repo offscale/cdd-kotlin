@@ -84,7 +84,11 @@ class RoundTripTest {
         SchemaDefinition(
             name = "SortDir",
             type = "string",
-            enumValues = listOf("ascending", "descending", "random-shuffle"))
+            enumValues =
+                listOf(
+                    OpenApiString("ascending"),
+                    OpenApiString("descending"),
+                    OpenApiString("random-shuffle")))
     val kotlinFile = dtoGenerator.generateDto("com.test", originalEnum)
     val sourceCode = kotlinFile.text
     val extractedSchemas = dtoParser.parse(sourceCode)
@@ -98,9 +102,12 @@ class RoundTripTest {
         SchemaDefinition(
             name = "MockSample",
             type = "object",
-            example = mapOf("id" to 1),
-            examples = mapOf("valid" to mapOf("id" to 1), "invalid" to emptyMap<String, Any>()),
-            properties = mapOf("id" to SchemaProperty("integer", example = 1)))
+            example = OpenApiObject(mapOf("id" to OpenApiInt(1L))),
+            examples =
+                mapOf(
+                    "valid" to OpenApiObject(mapOf("id" to OpenApiInt(1L))),
+                    "invalid" to OpenApiObject(emptyMap())),
+            properties = mapOf("id" to SchemaProperty("integer", example = OpenApiInt(1L))))
     val kotlinFile = dtoGenerator.generateDto("com.test", originalSchema)
     val sourceCode = kotlinFile.text
     val extractedSchemas = dtoParser.parse(sourceCode)
@@ -164,8 +171,10 @@ class RoundTripTest {
             requestBodyType = null)
 
     val kotlinFile =
-        networkGenerator.generateApi(
-            packageName = "com.test", apiName = "UserApi", endpoints = listOf(originalEndpoint))
+        networkGenerator
+            .generateApi(
+                packageName = "com.test", apiName = "UserApi", endpoints = listOf(originalEndpoint))
+            .getOrThrow()
     val sourceCode = kotlinFile.text
 
     val extractedEndpoints = networkParser.parse(sourceCode)
@@ -208,8 +217,10 @@ class RoundTripTest {
             securityExplicitEmpty = true)
 
     val kotlinFile =
-        networkGenerator.generateApi(
-            packageName = "com.test", apiName = "SecureApi", endpoints = listOf(secured, open))
+        networkGenerator
+            .generateApi(
+                packageName = "com.test", apiName = "SecureApi", endpoints = listOf(secured, open))
+            .getOrThrow()
 
     val extracted = networkParser.parse(kotlinFile.text)
     val securedParsed = extracted.first { it.operationId == "secureCall" }
@@ -236,8 +247,12 @@ class RoundTripTest {
                         EndpointResponse(statusCode = "200", description = "ok", type = "Unit")))
 
     val kotlinFile =
-        networkGenerator.generateApi(
-            packageName = "com.test", apiName = "ServerApi", endpoints = listOf(originalEndpoint))
+        networkGenerator
+            .generateApi(
+                packageName = "com.test",
+                apiName = "ServerApi",
+                endpoints = listOf(originalEndpoint))
+            .getOrThrow()
     val extractedEndpoint = networkParser.parse(kotlinFile.text).first()
 
     assertEquals(1, extractedEndpoint.servers.size)
@@ -272,10 +287,12 @@ class RoundTripTest {
             responses = mapOf("200" to response))
 
     val kotlinFile =
-        networkGenerator.generateApi(
-            packageName = "com.test",
-            apiName = "ResponseMetaApi",
-            endpoints = listOf(originalEndpoint))
+        networkGenerator
+            .generateApi(
+                packageName = "com.test",
+                apiName = "ResponseMetaApi",
+                endpoints = listOf(originalEndpoint))
+            .getOrThrow()
     val extractedEndpoint = networkParser.parse(kotlinFile.text).first()
     val extractedResponse = extractedEndpoint.responses["200"]!!
 

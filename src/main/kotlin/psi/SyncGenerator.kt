@@ -1,6 +1,12 @@
+/**
+ * Bidirectional synchronization engine for Kotlin domain models, DAOs, and OpenAPI specifications.
+ */
 package psi
 
+import domain.CddError
+import domain.toFailure
 import java.io.File
+import writeToFile
 
 /**
  * Handles bi-directional synchronization of domain models, DAOs/ORM constraints, and OpenAPI specs.
@@ -11,11 +17,13 @@ object SyncGenerator {
    *
    * @param inputDir The root directory of the source code.
    * @param truth The designated source of truth ("class", "sqlalchemy" / "dao", "function").
+   * @return A [Result] indicating success or a [CddError].
    */
-  fun synchronize(inputDir: String, truth: String) {
+  fun synchronize(inputDir: String, truth: String): Result<Unit> {
     val dir = File(inputDir)
     if (!dir.exists() || !dir.isDirectory) {
-      throw IllegalArgumentException("Input must be a directory: $inputDir")
+      return CddError.InvalidDirectoryError(inputDir, "Input must be a directory: $inputDir")
+          .toFailure()
     }
 
     println("Parsing source code in ${dir.absolutePath}...")
@@ -36,10 +44,11 @@ object SyncGenerator {
       val newDaosMap = daoGen.generateDaos("org.example", currentSchemas)
 
       // Write each DAO file
-      newDaosMap.forEach { (relativePath, content) ->
+      for ((relativePath, content) in newDaosMap) {
         val daoFile = File(dir, relativePath)
-        daoFile.parentFile.mkdirs()
-        daoFile.writeText(content)
+        writeToFile(daoFile.absolutePath, content).getOrElse {
+          return Result.failure(it)
+        }
         println("Synchronized DAOs in $relativePath")
       }
     } else if (truth == "dao" || truth == "sqlalchemy") {
@@ -53,7 +62,10 @@ object SyncGenerator {
     // As a side-effect, we also update the OpenAPI spec
     println("Re-generating OpenAPI specification to match $truth...")
     val openApiOut = File(dir, "openapi_sync.json")
-    ApiGenerator.generateToOpenApi(inputDir, openApiOut.absolutePath)
+    ApiGenerator.generateToOpenApi(inputDir, openApiOut.absolutePath).getOrElse {
+      return Result.failure(it)
+    }
     println("Synchronization complete. Specs and Code are aligned.")
+    return Result.success(Unit)
   }
 }

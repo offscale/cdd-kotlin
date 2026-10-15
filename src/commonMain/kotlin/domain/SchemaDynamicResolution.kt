@@ -1,21 +1,53 @@
+/**
+ * Multiplatform JSON Schema Draft 2020-12 `$dynamicAnchor` and `$dynamicRef` resolution.
+ *
+ * Uses [IdentityKey] to track object identity across all Kotlin Multiplatform targets (JVM, WASM)
+ * without relying on `java.util.IdentityHashMap`.
+ */
 package domain
 
-import java.util.IdentityHashMap
+import openapi.percentDecode
 
-/** Holds the dynamic anchor state for a single schema resource. */
+/**
+ * Multiplatform identity wrapper that compares and hashes [value] by object reference (`===`)
+ * rather than structural equality (`==`).
+ *
+ * @param T The wrapped reference type.
+ * @property value The underlying object instance.
+ */
+class IdentityKey<T : Any>(val value: T) {
+  override fun equals(other: Any?): Boolean = other is IdentityKey<*> && other.value === value
+
+  override fun hashCode(): Int = value.hashCode()
+}
+
+/**
+ * Holds the dynamic anchor state for a single schema resource.
+ *
+ * @property anchors Map of anchor names to their defining [SchemaProperty] nodes.
+ */
 data class DynamicAnchorResource(val anchors: Map<String, SchemaProperty>)
 
-/** Provides dynamic anchor resolution for schema properties in a document. */
+/**
+ * Provides dynamic anchor resolution for schema properties in a document.
+ *
+ * @property scopeBySchema Map from [IdentityKey] of a [SchemaProperty] to its active stack of
+ *   [DynamicAnchorResource]s.
+ */
 class DynamicAnchorScope(
-    private val scopeBySchema: IdentityHashMap<SchemaProperty, List<DynamicAnchorResource>>
+    private val scopeBySchema: Map<IdentityKey<SchemaProperty>, List<DynamicAnchorResource>>
 ) {
   /**
    * Resolve a `$dynamicRef` using the dynamic anchor stack available to [schema]. Returns the
    * resolved schema when a matching dynamic anchor is found.
+   *
+   * @param schema The context [SchemaProperty] where `$dynamicRef` is evaluated.
+   * @param ref The `$dynamicRef` URI/fragment string.
+   * @return The resolved [SchemaProperty], or `null` if no matching dynamic anchor is in scope.
    */
   fun resolveDynamicRef(schema: SchemaProperty, ref: String): SchemaProperty? {
     val anchorName = extractDynamicAnchorName(ref) ?: return null
-    val resources = scopeBySchema[schema] ?: return null
+    val resources = scopeBySchema[IdentityKey(schema)] ?: return null
     var index = resources.size - 1
     while (index >= 0) {
       val anchor = resources[index].anchors[anchorName]
@@ -26,35 +58,56 @@ class DynamicAnchorScope(
   }
 }
 
-/** Bundles the root schema property with its dynamic anchor scope. */
+/**
+ * Bundles the root schema property with its dynamic anchor scope.
+ *
+ * @property root The root [SchemaProperty].
+ * @property scope The computed [DynamicAnchorScope] for the root.
+ */
 data class DynamicAnchorContext(val root: SchemaProperty, val scope: DynamicAnchorScope)
 
-/** Build a dynamic anchor context for a root schema definition. */
+/**
+ * Build a dynamic anchor context for a root [SchemaDefinition].
+ *
+ * @param definition The root [SchemaDefinition].
+ * @return The constructed [DynamicAnchorContext].
+ */
 fun buildDynamicAnchorContext(definition: SchemaDefinition): DynamicAnchorContext {
   val root = definition.toSchemaProperty()
   val scope = buildDynamicAnchorScope(root)
   return DynamicAnchorContext(root, scope)
 }
 
-/** Build a dynamic anchor context for a root schema property. */
+/**
+ * Build a dynamic anchor context for a root [SchemaProperty].
+ *
+ * @param schema The root [SchemaProperty].
+ * @return The constructed [DynamicAnchorContext].
+ */
 fun buildDynamicAnchorContext(schema: SchemaProperty): DynamicAnchorContext {
   val scope = buildDynamicAnchorScope(schema)
   return DynamicAnchorContext(schema, scope)
 }
 
-/** Build a dynamic anchor scope for a schema resource. */
+/**
+ * Build a dynamic anchor scope for a schema resource tree rooted at [root].
+ *
+ * @param root The root [SchemaProperty] to traverse.
+ * @return The populated [DynamicAnchorScope].
+ */
 fun buildDynamicAnchorScope(root: SchemaProperty): DynamicAnchorScope {
-  val scopeBySchema = IdentityHashMap<SchemaProperty, List<DynamicAnchorResource>>()
-  val resourceCache = IdentityHashMap<SchemaProperty, DynamicAnchorResource>()
+  val scopeBySchema = LinkedHashMap<IdentityKey<SchemaProperty>, List<DynamicAnchorResource>>()
+  val resourceCache = LinkedHashMap<IdentityKey<SchemaProperty>, DynamicAnchorResource>()
 
   /** Local helper doc */
   fun resourceFor(node: SchemaProperty): DynamicAnchorResource {
-    return resourceCache[node]
+    val key = IdentityKey(node)
+    return resourceCache[key]
         ?: run {
           val anchors = LinkedHashMap<String, SchemaProperty>()
           collectResourceAnchors(node, anchors)
           val resource = DynamicAnchorResource(anchors)
-          resourceCache[node] = resource
+          resourceCache[key] = resource
           resource
         }
   }
@@ -62,15 +115,13 @@ fun buildDynamicAnchorScope(root: SchemaProperty): DynamicAnchorScope {
   /** Local helper doc */
   fun traverse(node: SchemaProperty, stack: List<DynamicAnchorResource>) {
     val isNewResource = !node.schemaId.isNullOrBlank()
-    val resource = resourceFor(node)
-    val shouldPush = stack.isEmpty() || isNewResource
     val nextStack =
-        if (shouldPush && (stack.isEmpty() || stack.last() !== resource)) {
-          stack + resource
+        if (stack.isEmpty() || isNewResource) {
+          stack + resourceFor(node)
         } else {
           stack
         }
-    scopeBySchema[node] = nextStack
+    scopeBySchema[IdentityKey(node)] = nextStack
     node.forEachSubschema { child -> traverse(child, nextStack) }
   }
 
@@ -119,41 +170,13 @@ private fun SchemaProperty.forEachSubschema(block: (SchemaProperty) -> Unit) {
  * Extract a dynamic anchor name from a `$dynamicRef`.
  *
  * Dynamic anchors use plain-name fragments (e.g. `#foo`) rather than JSON Pointers.
+ *
+ * @param ref The `$dynamicRef` string.
+ * @return The decoded anchor name, or `null` if [ref] has no plain-name fragment.
  */
 fun extractDynamicAnchorName(ref: String): String? {
   val fragment = ref.substringAfter("#", "")
   if (fragment.isBlank()) return null
   if (fragment.startsWith("/")) return null
   return percentDecode(fragment)
-}
-
-private fun percentDecode(value: String): String {
-  if (!value.contains("%")) return value
-  val bytes = ByteArray(value.length)
-  var byteCount = 0
-  var index = 0
-  while (index < value.length) {
-    val ch = value[index]
-    if (ch == '%' && index + 2 < value.length) {
-      val hi = hexToInt(value[index + 1])
-      val lo = hexToInt(value[index + 2])
-      if (hi >= 0 && lo >= 0) {
-        bytes[byteCount++] = ((hi shl 4) + lo).toByte()
-        index += 3
-        continue
-      }
-    }
-    bytes[byteCount++] = ch.code.toByte()
-    index += 1
-  }
-  return bytes.copyOf(byteCount).decodeToString()
-}
-
-private fun hexToInt(ch: Char): Int {
-  return when (ch) {
-    in '0'..'9' -> ch.code - '0'.code
-    in 'a'..'f' -> ch.code - 'a'.code + 10
-    in 'A'..'F' -> ch.code - 'A'.code + 10
-    else -> -1
-  }
 }

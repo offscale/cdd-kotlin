@@ -1,5 +1,6 @@
 package openapi
 
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class ExhaustiveRealWorldTest {
@@ -10,15 +11,12 @@ class ExhaustiveRealWorldTest {
 
     val content = stream.bufferedReader().use { it.readText() }
     val parser = OpenApiParser()
-    try {
-      val doc = parser.parseDocumentString(content)
-      if (doc is OpenApiDocument.OpenApi) {
-        val validator = OpenApiValidator()
-        validator.validate(doc.definition)
-      }
-    } catch (e: Exception) {
-      e.printStackTrace()
-      throw e
+    val docResult = parser.parseDocumentStringResult(content)
+    assertTrue(docResult.isSuccess)
+    val doc = docResult.getOrThrow()
+    if (doc is OpenApiDocument.OpenApi) {
+      val validator = OpenApiValidator()
+      validator.validate(doc.definition)
     }
   }
 }

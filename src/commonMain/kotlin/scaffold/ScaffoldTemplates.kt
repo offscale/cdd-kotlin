@@ -1,3 +1,4 @@
+/** Project scaffolding string templates for KMP client, server, and CI workflows. */
 package scaffold
 
 import domain.Info
@@ -342,8 +343,6 @@ $serverLibs
    * @param info Optional Info metadata.
    */
   fun createServerBuildGradle(namespace: String, info: Info?, withTests: Boolean = false): String {
-    val versionNameStr = if (info != null && info.version.isNotEmpty()) info.version else "1.0"
-
     val testBlock =
         if (withTests)
             """
@@ -405,5 +404,36 @@ $serverLibs
         }
     """
         .trimIndent()
+  }
+
+  /**
+   * Generates a functional GitHub Actions CI workflow YAML configuration.
+   *
+   * @param isServer Whether the workflow targets a generated server project.
+   * @return The GitHub Actions YAML string.
+   */
+  fun createGithubActionsWorkflow(isServer: Boolean = false): String {
+    val task = if (isServer) "jvmTest" else "allTests"
+    return """
+        name: CI
+        on:
+          push:
+            branches: [ main, master ]
+          pull_request:
+            branches: [ main, master ]
+        jobs:
+          build-and-test:
+            runs-on: ubuntu-latest
+            steps:
+              - uses: actions/checkout@v4
+              - name: Set up JDK 17
+                uses: actions/setup-java@v4
+                with:
+                  java-version: '17'
+                  distribution: 'temurin'
+              - name: Build and Test
+                run: ./gradlew assemble $task
+    """
+        .trimIndent() + "\n"
   }
 }

@@ -47,17 +47,15 @@ class ApiGeneratorTest {
 
   @Test
   fun testGenerateOpenApiInvalidDir() {
-    assertThrows(IllegalArgumentException::class.java) {
-      ApiGenerator.generateToOpenApi("/nonexistent_directory_12345", "out.json")
-    }
+    val res = ApiGenerator.generateToOpenApi("/nonexistent_directory_12345", "out.json")
+    assertTrue(res.isFailure)
   }
 
   @Test
   fun testGenerateOpenApiFileInsteadOfDir() {
     val tempFile = File.createTempFile("api-generator-test-file", ".kt")
-    assertThrows(IllegalArgumentException::class.java) {
-      ApiGenerator.generateToOpenApi(tempFile.absolutePath, "out.json")
-    }
+    val res = ApiGenerator.generateToOpenApi(tempFile.absolutePath, "out.json")
+    assertTrue(res.isFailure)
     tempFile.delete()
   }
 

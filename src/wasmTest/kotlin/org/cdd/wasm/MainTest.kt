@@ -2,7 +2,6 @@ package org.cdd.wasm
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class MainTest {
   @Test
@@ -27,27 +26,11 @@ class MainTest {
 
   @Test
   fun testToSdk() {
-    try {
-      to_sdk()
-    } catch (e: Throwable) {
-      assertTrue(
-          e.message?.contains("preopened") == true ||
-              e.toString().contains("preopened") ||
-              e.message?.contains("No such file") == true,
-          "Expected preopened directory error or similar from WASI")
-    }
+    assertEquals(1, to_sdk())
   }
 
   @Test
   fun testFromOpenApi() {
-    try {
-      from_openapi()
-    } catch (e: Throwable) {
-      assertTrue(
-          e.message?.contains("preopened") == true ||
-              e.toString().contains("preopened") ||
-              e.message?.contains("No such file") == true,
-          "Expected preopened directory error or similar from WASI")
-    }
+    assertEquals(1, from_openapi())
   }
 }

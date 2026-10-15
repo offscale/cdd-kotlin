@@ -2,7 +2,6 @@ package org.cdd.mcp
 
 import kotlinx.serialization.json.JsonNull
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -26,7 +25,8 @@ class JsonRpcTest {
 
   @Test
   fun testParser() {
-    val element = JsonRpcParser.parseMessage("""{"jsonrpc":"2.0","id":1,"method":"test"}""")
+    val element =
+        JsonRpcParser.parseMessage("""{"jsonrpc":"2.0","id":1,"method":"test"}""").getOrThrow()
     assertTrue(element is kotlinx.serialization.json.JsonObject)
     assertEquals(
         "2.0",
@@ -39,7 +39,7 @@ class JsonRpcTest {
           if (it is kotlinx.serialization.json.JsonPrimitive) it.content else null
         })
 
-    assertThrows(JsonRpcException::class.java) { JsonRpcParser.parseMessage("{invalid json}") }
+    assertTrue(JsonRpcParser.parseMessage("{invalid json}").isFailure)
 
     val serialized = JsonRpcParser.serializeMessage(element)
     assertTrue(serialized.contains("test"))

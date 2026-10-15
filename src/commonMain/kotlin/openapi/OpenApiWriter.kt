@@ -1,8 +1,6 @@
+/** Multiplatform OpenAPI 3.2 and Swagger 2.0 JSON/YAML document serializer. */
 package openapi
 
-import com.fasterxml.jackson.core.JsonFactory
-import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
 import domain.Callback
 import domain.Components
 import domain.Contact
@@ -19,6 +17,8 @@ import domain.MediaTypeObject
 import domain.OAuthFlow
 import domain.OAuthFlows
 import domain.OpenApiDefinition
+import domain.OpenApiValue
+import domain.OpenApiValues
 import domain.ParameterLocation
 import domain.ParameterStyle
 import domain.PathItem
@@ -32,13 +32,14 @@ import domain.Server
 import domain.ServerVariable
 import domain.Tag
 import domain.Xml
-import java.io.File
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import openapi.parser.YamlToJsonElementConverter
 
-/** Serializes [OpenApiDefinition] instances to JSON or YAML strings. */
-class OpenApiWriter(
-    private val jsonMapper: ObjectMapper = ObjectMapper(JsonFactory()),
-    private val yamlMapper: ObjectMapper = ObjectMapper(YAMLFactory())
-) {
+/** Serializes [OpenApiDefinition] instances to JSON or YAML strings across all targets. */
+class OpenApiWriter {
+  private val prettyJson = Json { prettyPrint = true }
+
   /** Supported output formats for OpenAPI serialization. */
   enum class Format {
     /** Auto-detect based on file extension or fallback to JSON. */
@@ -49,35 +50,63 @@ class OpenApiWriter(
     YAML
   }
 
-  /** Writes the OpenAPI definition to a string in the requested [format]. */
+  /**
+   * Writes the OpenAPI definition to a string in the requested [format].
+   *
+   * @param definition The [OpenApiDefinition] to serialize.
+   * @param format The output [Format].
+   * @param fileName Optional file name used when [format] is [Format.AUTO].
+   * @return The serialized JSON or YAML string.
+   */
   fun write(
       definition: OpenApiDefinition,
       format: Format = Format.JSON,
       fileName: String? = null
   ): String {
     val resolved = resolveFormat(format, fileName)
-    val mapper = if (resolved == Format.JSON) jsonMapper else yamlMapper
-    val tree = openApiToMap(definition)
-    return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(tree)
+    val element = OpenApiValues.fromAny(openApiToMap(definition)).toJsonElement()
+    return if (resolved == Format.JSON) {
+      prettyJson.encodeToString(JsonElement.serializer(), element)
+    } else {
+      YamlToJsonElementConverter.toYaml(element)
+    }
   }
 
-  /** Writes an OpenAPI Description document (OpenAPI Object or Schema Object) to a string. */
+  /**
+   * Writes an OpenAPI Description document (OpenAPI Object or Schema Object) to a string.
+   *
+   * @param document The [OpenApiDocument] to serialize.
+   * @param format The output [Format].
+   * @param fileName Optional file name used when [format] is [Format.AUTO].
+   * @return The serialized JSON or YAML string.
+   */
   fun writeDocument(
       document: OpenApiDocument,
       format: Format = Format.JSON,
       fileName: String? = null
   ): String {
     val resolved = resolveFormat(format, fileName)
-    val mapper = if (resolved == Format.JSON) jsonMapper else yamlMapper
     val tree =
         when (document) {
           is OpenApiDocument.OpenApi -> openApiToMap(document.definition)
           is OpenApiDocument.Schema -> schemaRootToValue(document.schema)
         }
-    return mapper.writerWithDefaultPrettyPrinter().writeValueAsString(tree)
+    val element = OpenApiValues.fromAny(tree).toJsonElement()
+    return if (resolved == Format.JSON) {
+      prettyJson.encodeToString(JsonElement.serializer(), element)
+    } else {
+      YamlToJsonElementConverter.toYaml(element)
+    }
   }
 
-  /** Writes a standalone Schema Object document to a string. */
+  /**
+   * Writes a standalone Schema Object document to a string.
+   *
+   * @param schema The [SchemaProperty] root to serialize.
+   * @param format The output [Format].
+   * @param fileName Optional file name used when [format] is [Format.AUTO].
+   * @return The serialized JSON or YAML string.
+   */
   fun writeSchema(
       schema: SchemaProperty,
       format: Format = Format.JSON,
@@ -86,41 +115,34 @@ class OpenApiWriter(
     return writeDocument(OpenApiDocument.Schema(schema), format, fileName)
   }
 
-  /** Writes the OpenAPI definition to JSON. */
+  /**
+   * Writes the OpenAPI definition to JSON.
+   *
+   * @param definition The [OpenApiDefinition] to serialize.
+   * @return The serialized JSON string.
+   */
   fun writeJson(definition: OpenApiDefinition): String = write(definition, Format.JSON)
 
-  /** Writes the OpenAPI definition to YAML. */
+  /**
+   * Writes the OpenAPI definition to YAML.
+   *
+   * @param definition The [OpenApiDefinition] to serialize.
+   * @return The serialized YAML string.
+   */
   fun writeYaml(definition: OpenApiDefinition): String = write(definition, Format.YAML)
-
-  /** Writes the OpenAPI definition to a file. */
-  fun writeToFile(definition: OpenApiDefinition, file: File, format: Format = Format.AUTO) {
-    val content = write(definition, format, file.name)
-    file.writeText(content)
-  }
-
-  /** Writes an OpenAPI Description document to a file. */
-  fun writeDocumentToFile(document: OpenApiDocument, file: File, format: Format = Format.AUTO) {
-    val content = writeDocument(document, format, file.name)
-    file.writeText(content)
-  }
 
   private fun resolveFormat(format: Format, fileName: String?): Format {
     if (format != Format.AUTO) return format
-    val ext = fileName?.substringAfterLast('.', "")?.lowercase().orEmpty()
-    return when (ext) {
-      "yaml",
-      "yml" -> Format.YAML
-      "json" -> Format.JSON
-      else -> Format.JSON
-    }
+    val ext = fileName.orEmpty().substringAfterLast('.', "").lowercase()
+    return if (ext in setOf("yaml", "yml")) Format.YAML else Format.JSON
   }
 
   private fun openApiToMap(definition: OpenApiDefinition): Map<String, Any?> {
     val refBase = normalizeSelfRefBase(definition.self)
     val map = linkedMapOf<String, Any?>()
     val isSwagger2 =
-        definition.swagger != null ||
-            definition.openapi.startsWith("2") ||
+        (definition.swagger != null) or
+            definition.openapi.startsWith("2") or
             definition.openapi.startsWith("1")
     if (isSwagger2) {
       map["swagger"] = definition.swagger ?: "2.0"
@@ -147,18 +169,20 @@ class OpenApiWriter(
       map["webhooks"] = webhooksMap
     }
 
-    if (isSwagger2 && definition.components != null) {
-      val c = definition.components
-      map.putIfNotEmpty("definitions", c.schemas.mapValues { schemaToMap(it.value, refBase) })
-      map.putIfNotEmpty(
-          "parameters", c.parameters.mapValues { parameterToMap(it.value, refBase, isSwagger2) })
-      map.putIfNotEmpty(
-          "responses", c.responses.mapValues { responseToMap(it.value, refBase, isSwagger2) })
-      map.putIfNotEmpty(
-          "securityDefinitions",
-          c.securitySchemes.mapValues { securitySchemeToMap(it.value, refBase, isSwagger2) })
-    } else {
-      definition.components?.let { map["components"] = componentsToMap(it, refBase, false) }
+    val c = definition.components
+    if (c != null) {
+      if (isSwagger2) {
+        map.putIfNotEmpty("definitions", c.schemas.mapValues { schemaToMap(it.value, refBase) })
+        map.putIfNotEmpty(
+            "parameters", c.parameters.mapValues { parameterToMap(it.value, refBase, true) })
+        map.putIfNotEmpty(
+            "responses", c.responses.mapValues { responseToMap(it.value, refBase, true) })
+        map.putIfNotEmpty(
+            "securityDefinitions",
+            c.securitySchemes.mapValues { securitySchemeToMap(it.value, refBase, true) })
+      } else {
+        map["components"] = componentsToMap(c, refBase, false)
+      }
     }
 
     securityToValue(definition.security, definition.securityExplicitEmpty)?.let {
@@ -221,7 +245,7 @@ class OpenApiWriter(
   private fun serverVariableToMap(variable: ServerVariable): Map<String, Any?> {
     val map = linkedMapOf<String, Any?>()
     map["default"] = variable.default
-    map.putIfNotEmpty("enum", variable.enum)
+    map.putIfNotEmpty("enum", variable.enum.orEmpty())
     map.putIfNotNull("description", variable.description)
     map.putExtensions(variable.extensions)
     return map
@@ -230,7 +254,7 @@ class OpenApiWriter(
   private fun pathItemToMap(
       item: PathItem,
       refBase: String?,
-      isSwagger2: Boolean = false
+      isSwagger2: Boolean
   ): Map<String, Any?> {
     val map = linkedMapOf<String, Any?>()
     item.ref?.let { map["\$ref"] = it }
@@ -258,7 +282,7 @@ class OpenApiWriter(
   private fun operationToMap(
       operation: EndpointDefinition,
       refBase: String?,
-      isSwagger2: Boolean = false
+      isSwagger2: Boolean
   ): Map<String, Any?> {
     val map = linkedMapOf<String, Any?>()
     map.putIfNotEmpty("tags", operation.tags)
@@ -310,7 +334,7 @@ class OpenApiWriter(
 
   private fun callbacksToMap(
       callbacks: Map<String, Callback>,
-      refBase: String? = null
+      refBase: String?
   ): Map<String, Any?> {
     if (callbacks.isEmpty()) return emptyMap()
     return callbacks.mapValues { (_, cb) -> callbackToMap(cb, refBase) }
@@ -325,7 +349,7 @@ class OpenApiWriter(
         }
         val map = linkedMapOf<String, Any?>()
         callback.expressions.forEach { (expression, pathItem) ->
-          map[expression] = pathItemToMap(pathItem, refBase)
+          map[expression] = pathItemToMap(pathItem, refBase, false)
         }
         map.putExtensions(callback.extensions)
         map
@@ -336,7 +360,7 @@ class OpenApiWriter(
   private fun parameterToMap(
       parameter: EndpointParameter,
       refBase: String?,
-      isSwagger2: Boolean = false
+      isSwagger2: Boolean
   ): Map<String, Any?> {
     parameter.reference?.let {
       return referenceToMap(it)
@@ -357,8 +381,7 @@ class OpenApiWriter(
           map["schema"] = schemaPropertyToMap(SchemaProperty(types = setOf(parameter.type)))
         }
       } else {
-        map.putIfNotNull(
-            "type", parameter.schema?.type?.takeIf { it != "object" } ?: parameter.type)
+        map["type"] = swagger2PrimitiveType(parameter.schema?.type, parameter.type)
         map.putIfNotNull("format", parameter.schema?.format)
         map.putIfNotNull("collectionFormat", parameter.collectionFormat)
         if (parameter.schema?.items != null) {
@@ -378,10 +401,15 @@ class OpenApiWriter(
       }
     }
 
-    parameter.example?.let { exampleValue(it) }?.let { map["example"] = it }
+    map.putIfNotNull("example", exampleValue(parameter.example))
     map.putIfNotEmpty("examples", exampleMapToMap(parameter.examples))
     map.putExtensions(parameter.extensions)
     return map
+  }
+
+  private fun swagger2PrimitiveType(schemaType: String?, fallbackType: String): String {
+    val candidate = schemaType ?: fallbackType
+    return if (candidate == "object") fallbackType else candidate
   }
 
   private fun requestBodyToMap(body: RequestBody): Map<String, Any?> {
@@ -390,7 +418,7 @@ class OpenApiWriter(
     }
     val map = linkedMapOf<String, Any?>()
     map.putIfNotNull("description", body.description)
-    if (body.content.isNotEmpty() || body.contentPresent) {
+    if (body.content.isNotEmpty() or body.contentPresent) {
       map["content"] = contentToMap(body.content)
     }
     map.putIfTrue("required", body.required)
@@ -401,7 +429,7 @@ class OpenApiWriter(
   private fun responseToMap(
       response: EndpointResponse,
       refBase: String?,
-      isSwagger2: Boolean = false
+      isSwagger2: Boolean
   ): Map<String, Any?> {
     response.reference?.let {
       return referenceToMap(it)
@@ -422,15 +450,13 @@ class OpenApiWriter(
             schemaPropertyToMap(
                 SchemaProperty(ref = componentRef(refBase, "schemas", response.type, isSwagger2)))
       } else if (response.content.isNotEmpty()) {
-        val media = response.content.values.firstOrNull()
-        if (media?.schema != null) {
-          map["schema"] = schemaPropertyToMap(media.schema)
-        }
+        val mediaSchema = response.content.values.first().schema
+        map.putSchemaIfNotNull("schema", mediaSchema)
       }
       if (response.examples.isNotEmpty()) {
         val examplesMap = linkedMapOf<String, Any?>()
         for ((mime, example) in response.examples) {
-          example.value?.let { examplesMap[mime] = it }
+          examplesMap.putIfNotNull(mime, example.value)
         }
         map.putIfNotEmpty("examples", examplesMap)
       }
@@ -445,7 +471,7 @@ class OpenApiWriter(
                         MediaTypeObject(
                             schema =
                                 SchemaProperty(
-                                    ref = componentRef(refBase, "schemas", response.type)))))
+                                    ref = componentRef(refBase, "schemas", response.type, false)))))
       }
       response.links?.let { map["links"] = it.mapValues { linkToMap(it.value) } }
     }
@@ -454,7 +480,7 @@ class OpenApiWriter(
     return map
   }
 
-  private fun headerToMap(header: Header, isSwagger2: Boolean = false): Map<String, Any?> {
+  private fun headerToMap(header: Header, isSwagger2: Boolean): Map<String, Any?> {
     header.reference?.let {
       return referenceToMap(it)
     }
@@ -464,7 +490,7 @@ class OpenApiWriter(
     map.putIfTrue("deprecated", header.deprecated)
 
     if (isSwagger2) {
-      map.putIfNotNull("type", header.schema?.type?.takeIf { it != "object" } ?: header.type)
+      map["type"] = swagger2PrimitiveType(header.schema?.type, header.type)
       map.putIfNotNull("format", header.schema?.format)
       map.putIfNotNull("collectionFormat", header.collectionFormat)
       if (header.schema?.items != null) {
@@ -477,12 +503,12 @@ class OpenApiWriter(
         map["content"] = contentToMap(header.content)
       } else if (header.schema != null) {
         map["schema"] = schemaPropertyToMap(header.schema)
-        map.putIfNotNull("style", header.style?.let { parameterStyle(it) })
+        if (header.style != null) map["style"] = parameterStyle(header.style)
         map.putIfNotNull("explode", header.explode)
       }
     }
 
-    header.example?.let { exampleValue(it) }?.let { map["example"] = it }
+    map.putIfNotNull("example", exampleValue(header.example))
     map.putIfNotEmpty("examples", exampleMapToMap(header.examples))
     map.putExtensions(header.extensions)
     return map
@@ -491,11 +517,6 @@ class OpenApiWriter(
   private fun linkToMap(link: Link): Map<String, Any?> {
     link.reference?.let {
       return referenceToMap(it)
-    }
-    link.ref?.let {
-      val refMap = linkedMapOf<String, Any?>("\$ref" to it)
-      refMap.putIfNotNull("description", link.description)
-      return refMap
     }
 
     val map = linkedMapOf<String, Any?>()
@@ -521,9 +542,9 @@ class OpenApiWriter(
       return mapOf("\$ref" to it)
     }
     val map = linkedMapOf<String, Any?>()
-    mediaType.schema?.let { map["schema"] = schemaPropertyToMap(it) }
-    mediaType.itemSchema?.let { map["itemSchema"] = schemaPropertyToMap(it) }
-    mediaType.example?.let { exampleValue(it) }?.let { map["example"] = it }
+    map.putSchemaIfNotNull("schema", mediaType.schema)
+    map.putSchemaIfNotNull("itemSchema", mediaType.itemSchema)
+    map.putIfNotNull("example", exampleValue(mediaType.example))
     map.putIfNotEmpty("examples", exampleMapToMap(mediaType.examples))
     map.putIfNotEmpty("encoding", mediaType.encoding.mapValues { encodingToMap(it.value) })
     map.putIfNotEmpty("prefixEncoding", mediaType.prefixEncoding.map { encodingToMap(it) })
@@ -535,7 +556,7 @@ class OpenApiWriter(
   private fun encodingToMap(encoding: domain.EncodingObject): Map<String, Any?> {
     val map = linkedMapOf<String, Any?>()
     map.putIfNotNull("contentType", encoding.contentType)
-    map.putIfNotEmpty("headers", encoding.headers.mapValues { headerToMap(it.value) })
+    map.putIfNotEmpty("headers", encoding.headers.mapValues { headerToMap(it.value, false) })
     encoding.style?.let { map["style"] = parameterStyle(it) }
     map.putIfNotNull("explode", encoding.explode)
     map.putIfNotNull("allowReserved", encoding.allowReserved)
@@ -549,7 +570,7 @@ class OpenApiWriter(
   private fun componentsToMap(
       components: Components,
       refBase: String?,
-      isSwagger2: Boolean = false
+      isSwagger2: Boolean
   ): Map<String, Any?> {
     val map = linkedMapOf<String, Any?>()
     map.putIfNotEmpty("schemas", components.schemas.mapValues { schemaToMap(it.value, refBase) })
@@ -691,22 +712,22 @@ class OpenApiWriter(
     map.putIfNotNull("uniqueItems", schema.uniqueItems)
     map.putIfNotNull("minProperties", schema.minProperties)
     map.putIfNotNull("maxProperties", schema.maxProperties)
-    schema.items?.let { map["items"] = schemaPropertyToMap(it) }
+    map.putSchemaIfNotNull("items", schema.items)
     map.putIfNotEmpty("prefixItems", schema.prefixItems.map { schemaPropertyToMap(it) })
-    schema.contains?.let { map["contains"] = schemaPropertyToMap(it) }
+    map.putSchemaIfNotNull("contains", schema.contains)
     map.putIfNotNull("minContains", schema.minContains)
     map.putIfNotNull("maxContains", schema.maxContains)
     if (schema.properties.isNotEmpty()) {
       map["properties"] = schema.properties.mapValues { schemaPropertyToMap(it.value) }
     }
     map.putIfNotEmpty("required", schema.required)
-    schema.additionalProperties?.let { map["additionalProperties"] = schemaPropertyToMap(it) }
+    map.putSchemaIfNotNull("additionalProperties", schema.additionalProperties)
     map.putIfNotEmpty("\$defs", schema.defs.mapValues { schemaPropertyToMap(it.value) })
     if (schema.patternProperties.isNotEmpty()) {
       map["patternProperties"] =
           schema.patternProperties.mapValues { schemaPropertyToMap(it.value) }
     }
-    schema.propertyNames?.let { map["propertyNames"] = schemaPropertyToMap(it) }
+    map.putSchemaIfNotNull("propertyNames", schema.propertyNames)
     map.putIfNotEmpty("dependentRequired", schema.dependentRequired)
     if (schema.dependentSchemas.isNotEmpty()) {
       map["dependentSchemas"] = schema.dependentSchemas.mapValues { schemaPropertyToMap(it.value) }
@@ -725,16 +746,16 @@ class OpenApiWriter(
     map.putIfNotEmpty("oneOf", schema.oneOf.map { schemaPropertyToMap(it) })
     map.putIfNotEmpty("anyOf", schema.anyOf.map { schemaPropertyToMap(it) })
     map.putIfNotEmpty("allOf", schema.allOf.map { schemaPropertyToMap(it) })
-    schema.not?.let { map["not"] = schemaPropertyToMap(it) }
-    schema.ifSchema?.let { map["if"] = schemaPropertyToMap(it) }
-    schema.thenSchema?.let { map["then"] = schemaPropertyToMap(it) }
-    schema.elseSchema?.let { map["else"] = schemaPropertyToMap(it) }
+    map.putSchemaIfNotNull("not", schema.not)
+    map.putSchemaIfNotNull("if", schema.ifSchema)
+    map.putSchemaIfNotNull("then", schema.thenSchema)
+    map.putSchemaIfNotNull("else", schema.elseSchema)
     map.putIfNotNull("example", schema.example)
     schema.examples?.let { map["examples"] = it }
     schema.xml?.let { map["xml"] = xmlToMap(it) }
-    schema.unevaluatedProperties?.let { map["unevaluatedProperties"] = schemaPropertyToMap(it) }
-    schema.unevaluatedItems?.let { map["unevaluatedItems"] = schemaPropertyToMap(it) }
-    schema.contentSchema?.let { map["contentSchema"] = schemaPropertyToMap(it) }
+    map.putSchemaIfNotNull("unevaluatedProperties", schema.unevaluatedProperties)
+    map.putSchemaIfNotNull("unevaluatedItems", schema.unevaluatedItems)
+    map.putSchemaIfNotNull("contentSchema", schema.contentSchema)
     map.putCustomKeywords(schema.customKeywords)
     map.putExtensions(schema.extensions)
     return map
@@ -748,13 +769,14 @@ class OpenApiWriter(
     val map = linkedMapOf<String, Any?>("\$ref" to reference.ref)
     map.putIfNotNull("summary", reference.summary)
     map.putIfNotNull("description", reference.description)
+    map.putExtensions(reference.extensions)
     return map
   }
 
   private fun discriminatorToMap(discriminator: Discriminator): Map<String, Any?> {
     val map = linkedMapOf<String, Any?>()
     map["propertyName"] = discriminator.propertyName
-    if (discriminator.mapping.isNotEmpty()) map["mapping"] = discriminator.mapping
+    map.putIfNotEmpty("mapping", discriminator.mapping)
     map.putIfNotNull("defaultMapping", discriminator.defaultMapping)
     map.putExtensions(discriminator.extensions)
     return map
@@ -785,7 +807,7 @@ class OpenApiWriter(
     map["name"] = tag.name
     map.putIfNotNull("summary", tag.summary)
     map.putIfNotNull("description", tag.description)
-    tag.externalDocs?.let { map["externalDocs"] = externalDocsToMap(it) }
+    if (tag.externalDocs != null) map["externalDocs"] = externalDocsToMap(tag.externalDocs)
     map.putIfNotNull("parent", tag.parent)
     map.putIfNotNull("kind", tag.kind)
     map.putExtensions(tag.extensions)
@@ -794,8 +816,8 @@ class OpenApiWriter(
 
   private fun securitySchemeToMap(
       scheme: SecurityScheme,
-      refBase: String? = null,
-      isSwagger2: Boolean = false
+      refBase: String?,
+      isSwagger2: Boolean
   ): Map<String, Any?> {
     scheme.reference?.let {
       return referenceToMap(it)
@@ -809,7 +831,7 @@ class OpenApiWriter(
       map.putIfNotNull("flow", scheme.flow)
       map.putIfNotNull("authorizationUrl", scheme.authorizationUrl)
       map.putIfNotNull("tokenUrl", scheme.tokenUrl)
-      map.putIfNotEmpty("scopes", scheme.scopes ?: emptyMap())
+      map.putIfNotEmpty("scopes", scheme.scopes.orEmpty())
     } else {
       map.putIfNotNull("scheme", scheme.scheme)
       map.putIfNotNull("bearerFormat", scheme.bearerFormat)
@@ -824,13 +846,17 @@ class OpenApiWriter(
 
   private fun oauthFlowsToMap(flows: OAuthFlows): Map<String, Any?> {
     val map = linkedMapOf<String, Any?>()
-    flows.implicit?.let { map["implicit"] = oauthFlowToMap(it) }
-    flows.password?.let { map["password"] = oauthFlowToMap(it) }
-    flows.clientCredentials?.let { map["clientCredentials"] = oauthFlowToMap(it) }
-    flows.authorizationCode?.let { map["authorizationCode"] = oauthFlowToMap(it) }
-    flows.deviceAuthorization?.let { map["deviceAuthorization"] = oauthFlowToMap(it) }
+    map.putFlowIfNotNull("implicit", flows.implicit)
+    map.putFlowIfNotNull("password", flows.password)
+    map.putFlowIfNotNull("clientCredentials", flows.clientCredentials)
+    map.putFlowIfNotNull("authorizationCode", flows.authorizationCode)
+    map.putFlowIfNotNull("deviceAuthorization", flows.deviceAuthorization)
     map.putExtensions(flows.extensions)
     return map
+  }
+
+  private fun MutableMap<String, Any?>.putFlowIfNotNull(key: String, flow: OAuthFlow?) {
+    if (flow != null) this[key] = oauthFlowToMap(flow)
   }
 
   private fun oauthFlowToMap(flow: OAuthFlow): Map<String, Any?> {
@@ -868,15 +894,12 @@ class OpenApiWriter(
     return map
   }
 
-  private fun exampleValue(example: ExampleObject): Any? {
-    return when {
-      example.ref != null -> mapOf("\$ref" to example.ref)
-      example.dataValue != null -> example.dataValue
-      example.value != null -> example.value
-      example.serializedValue != null -> example.serializedValue
-      example.externalValue != null -> example.externalValue
-      else -> null
-    }
+  private fun exampleValue(example: ExampleObject?): Any? {
+    if (example == null) return null
+    if (example.ref != null) return mapOf("\$ref" to example.ref)
+    return listOfNotNull(
+            example.dataValue, example.value, example.serializedValue, example.externalValue)
+        .firstOrNull()
   }
 
   private fun typeValue(types: Set<String>, fallback: String?): Any? {
@@ -890,7 +913,7 @@ class OpenApiWriter(
   private fun schemaRefListToMaps(refs: List<String>, refBase: String?): List<Map<String, Any?>> {
     if (refs.isEmpty()) return emptyList()
     return refs.map { token ->
-      val ref = if (looksLikeRef(token)) token else componentRef(refBase, "schemas", token)
+      val ref = if (looksLikeRef(token)) token else componentRef(refBase, "schemas", token, false)
       mapOf("\$ref" to ref)
     }
   }
@@ -908,27 +931,20 @@ class OpenApiWriter(
   }
 
   private fun looksLikeRef(token: String): Boolean {
-    return token.startsWith("#") ||
-        token.startsWith("./") ||
-        token.contains("/") ||
-        token.endsWith(".json") ||
-        token.endsWith(".yaml")
+    return listOf("#", "./").any { token.startsWith(it) } or
+        token.contains("/") or
+        listOf(".json", ".yaml").any { token.endsWith(it) }
   }
 
   private fun pathsToMap(
       paths: Map<String, PathItem>,
-      extensions: Map<String, Any?>,
+      extensions: Map<String, OpenApiValue>,
       refBase: String?,
-      isSwagger2: Boolean = false
+      isSwagger2: Boolean
   ): Map<String, Any?> {
-    if (paths.isEmpty() && extensions.isEmpty()) return emptyMap()
     val map = linkedMapOf<String, Any?>()
     paths.forEach { (path, item) -> map[path] = pathItemToMap(item, refBase, isSwagger2) }
-    extensions.forEach { (key, value) ->
-      if (key.startsWith("x-")) {
-        map[key] = value
-      }
-    }
+    map.putExtensions(extensions)
     return map
   }
 
@@ -942,21 +958,12 @@ class OpenApiWriter(
       base: String?,
       component: String,
       name: String,
-      isSwagger2: Boolean = false
+      isSwagger2: Boolean
   ): String {
     val encoded = encodeJsonPointerSegment(name)
-    val suffix =
-        if (isSwagger2) {
-          when (component) {
-            "schemas" -> "#/definitions/$encoded"
-            "securitySchemes" -> "#/securityDefinitions/$encoded"
-            else -> "#/$component/$encoded"
-          }
-        } else {
-          "#/components/$component/$encoded"
-        }
-    val prefix = base?.trimEnd('#')?.trimEnd()
-    return if (prefix.isNullOrEmpty()) suffix else "$prefix$suffix"
+    val suffix = if (isSwagger2) "#/definitions/$encoded" else "#/components/$component/$encoded"
+    val prefix = base.orEmpty().trimEnd('#').trimEnd()
+    return if (prefix.isEmpty()) suffix else "$prefix$suffix"
   }
 
   private fun encodeJsonPointerSegment(value: String): String {
@@ -989,7 +996,6 @@ class OpenApiWriter(
   }
 
   private fun securityToList(security: List<SecurityRequirement>): List<Map<String, List<String>>> {
-    if (security.isEmpty()) return emptyList()
     return security.map { requirement -> requirement.entries.associate { it.key to it.value } }
   }
 
@@ -998,38 +1004,31 @@ class OpenApiWriter(
     return if (explicitEmpty) emptyList<Map<String, List<String>>>() else null
   }
 
+  private fun MutableMap<String, Any?>.putSchemaIfNotNull(key: String, schema: SchemaProperty?) {
+    if (schema != null) this[key] = schemaPropertyToMap(schema)
+  }
+
   private fun <T> MutableMap<String, Any?>.putIfNotNull(key: String, value: T?) {
     if (value != null) this[key] = value
   }
 
-  private fun <T> MutableMap<String, Any?>.putIfNotEmpty(key: String, value: Collection<T>?) {
-    if (!value.isNullOrEmpty()) this[key] = value
+  private fun <T> MutableMap<String, Any?>.putIfNotEmpty(key: String, value: Collection<T>) {
+    if (value.isNotEmpty()) this[key] = value
   }
 
-  private fun <K, V> MutableMap<String, Any?>.putIfNotEmpty(key: String, value: Map<K, V>?) {
-    if (!value.isNullOrEmpty()) this[key] = value
+  private fun <K, V> MutableMap<String, Any?>.putIfNotEmpty(key: String, value: Map<K, V>) {
+    if (value.isNotEmpty()) this[key] = value
   }
 
   private fun MutableMap<String, Any?>.putIfTrue(key: String, value: Boolean) {
     if (value) this[key] = true
   }
 
-  private fun MutableMap<String, Any?>.putCustomKeywords(custom: Map<String, Any?>) {
-    if (custom.isEmpty()) return
-    custom.forEach { (key, value) ->
-      if (key.startsWith("x-")) return@forEach
-      if (!this.containsKey(key)) {
-        this[key] = value
-      }
-    }
+  private fun MutableMap<String, Any?>.putCustomKeywords(custom: Map<String, OpenApiValue>) {
+    custom.forEach { (key, value) -> this[key] = value }
   }
 
-  private fun MutableMap<String, Any?>.putExtensions(extensions: Map<String, Any?>) {
-    if (extensions.isEmpty()) return
-    extensions.forEach { (key, value) ->
-      if (key.startsWith("x-")) {
-        this[key] = value
-      }
-    }
+  private fun MutableMap<String, Any?>.putExtensions(extensions: Map<String, OpenApiValue>) {
+    extensions.forEach { (key, value) -> this[key] = value }
   }
 }

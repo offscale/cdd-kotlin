@@ -66,7 +66,11 @@ class UiGeneratorTest {
             name = "Product",
             type = "object",
             properties =
-                mapOf("title" to SchemaProperty("string"), "price" to SchemaProperty("number")),
+                mapOf(
+                    "title" to SchemaProperty("string"),
+                    "optText" to SchemaProperty("string"),
+                    "bigId" to SchemaProperty("integer", format = "int64"),
+                    "price" to SchemaProperty("number")),
             required = listOf("title", "price"))
 
     val text = generator.generateForm("com.ui", schema).text
@@ -75,6 +79,7 @@ class UiGeneratorTest {
     assertTrue(text.contains("onSubmit("))
     assertTrue(text.contains("Product("))
     assertTrue(text.contains("price = price.toDoubleOrNull()"))
+    assertTrue(text.contains("bigId = bigId.toLongOrNull() ?: 0L"))
   }
 
   // --- Grid Tests ---
@@ -89,7 +94,10 @@ class UiGeneratorTest {
                 mapOf(
                     "name" to SchemaProperty("string"),
                     "email" to SchemaProperty("string"),
-                    "isActive" to SchemaProperty("boolean")))
+                    "isActive" to SchemaProperty("boolean"),
+                    "nestedObj" to SchemaProperty("object"),
+                    "refProp" to
+                        SchemaProperty(types = setOf("string"), ref = "#/components/schemas/Ref")))
 
     val file = generator.generateGrid("com.ui", schema)
     val text = file.text
@@ -154,7 +162,8 @@ class UiGeneratorTest {
 
     // API Call
     assertTrue(text.contains("LaunchedEffect(Unit)"))
-    assertTrue(text.contains("items = api.getUsers()"))
+    assertTrue(text.contains("api.getUsers().fold("))
+    assertTrue(text.contains("items = it"))
 
     // UI Logic
     assertTrue(text.contains("CircularProgressIndicator()")) // Loading

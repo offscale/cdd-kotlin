@@ -1,13 +1,29 @@
+import java.io.File
+import java.nio.file.Files
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
+/** Unit tests verifying JVM platform functions (`PlatformJvm.kt`). */
 class PlatformJvmCoverageTest {
+
   @Test
-  fun testPlatformServerCode() {
-    val tempDir = java.nio.file.Files.createTempDirectory("test_gen_server").toFile()
+  fun testPlatformServerCodeWithAndWithoutTests() {
+    val tempDir = Files.createTempDirectory("test_gen_server").toFile()
     try {
-      val json = java.io.File("src/test/resources/mega_spec.json").readText()
+      val json = File("src/test/resources/mega_spec.json").readText()
       generateServerCode(json, tempDir.absolutePath, "com.test", true)
-      org.junit.jupiter.api.Assertions.assertTrue(java.io.File(tempDir, "server").exists())
+      assertTrue(File(tempDir, "server/src/main/kotlin/com/test/Main.kt").exists())
+      assertTrue(File(tempDir, "server/src/test/kotlin/com/test/MainTest.kt").exists())
+
+      val tempDirNoTests = Files.createTempDirectory("test_gen_server_notests").toFile()
+      try {
+        generateServerCode(json, tempDirNoTests.absolutePath, "com.test", false)
+        assertTrue(File(tempDirNoTests, "server/src/main/kotlin/com/test/Main.kt").exists())
+      } finally {
+        tempDirNoTests.deleteRecursively()
+      }
     } finally {
       tempDir.deleteRecursively()
     }
@@ -15,25 +31,34 @@ class PlatformJvmCoverageTest {
 
   @Test
   fun testPlatformPerformSync() {
+    val tempDir = Files.createTempDirectory("test_sync_jvm").toFile()
     try {
-      performSync("src/test/resources/mega_spec.json", "dummy")
-    } catch (e: Exception) {}
+      File(tempDir, "User.kt")
+          .writeText("package com.test; data class User(val id: Int, val name: String)")
+      performSync(tempDir.absolutePath, "class")
+      assertTrue(File(tempDir, "openapi_sync.json").exists())
+    } finally {
+      tempDir.deleteRecursively()
+    }
   }
 
   @Test
-  fun testPlatform() {
-    getEnvVar("PWD")
+  fun testPlatformFileIoAndEnv() {
+    assertNotNull(getEnvVar("PWD"))
+
+    assertTrue(readFile("/nonexistent_dir_12345/nonexistent_file.txt").isFailure)
+
+    val tempDir = Files.createTempDirectory("test_platform_io").toFile()
     try {
-      readFile("nonexistent")
-    } catch (e: Exception) {}
-    try {
-      writeToFile("dummy", "dummy")
-    } catch (e: Exception) {}
-    try {
-      java.io.File("dummy").delete()
-    } catch (e: Exception) {}
-    try {
-      generateToOpenApi("dummy", "dummy")
-    } catch (e: Exception) {}
+      val target = File(tempDir, "nested/file.txt")
+      assertTrue(writeToFile(target.absolutePath, "hello world").isSuccess)
+      assertEquals("hello world", readFile(target.absolutePath).getOrThrow())
+
+      val outSpec = File(tempDir, "openapi.json")
+      assertTrue(generateToOpenApi(tempDir.absolutePath, outSpec.absolutePath).isSuccess)
+      assertTrue(outSpec.exists())
+    } finally {
+      tempDir.deleteRecursively()
+    }
   }
 }

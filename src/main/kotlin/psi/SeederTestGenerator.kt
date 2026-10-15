@@ -1,3 +1,4 @@
+/** Unit test generator for DatabaseSeeder mock data seeding routines. */
 package psi
 
 import domain.SchemaDefinition
@@ -12,66 +13,49 @@ class SeederTestGenerator {
    * @param schemas The list of schemas.
    */
   fun generateSeederTestModule(packageName: String, schemas: List<SchemaDefinition>): String {
-    val sb = StringBuilder()
-    sb.append("package $packageName.seeder\n\n")
-
-    sb.append("import $packageName.dao.*\n")
-    sb.append("import $packageName.db.DatabaseConnection\n")
-    sb.append("import kotlin.test.*\n")
-    sb.append("import kotlin.test.BeforeTest\n")
-    sb.append("import kotlin.test.Test\n")
-    sb.append("import kotlinx.coroutines.runBlocking\n\n")
-
-    sb.append("/**\n")
-    sb.append(
-        " * Tests for [DatabaseSeeder] focusing on referential integrity and batch insertion.\n")
-    sb.append(" */\n")
-    sb.append("class DatabaseSeederTest {\n")
-    sb.append("    private lateinit var daoConfig: DaoConfiguration\n")
-    sb.append("    private lateinit var seeder: DatabaseSeeder\n\n")
-
-    sb.append("    @BeforeTest\n")
-    sb.append("    fun setup() {\n")
-    sb.append(
-        "        val dbConfig = DatabaseConnection.resolveConfig(ephemeralFlag = true, envUrl = \"\")\n")
-    sb.append("        DatabaseConnection.initialize(dbConfig)\n")
-    sb.append("        daoConfig = DaoFactory.create(useConcrete = true)\n")
-    sb.append("        seeder = DatabaseSeeder(daoConfig)\n")
-    sb.append("    }\n\n")
-
-    sb.append("    @Test\n")
-    sb.append(
-        "    fun `seedDatabase populates tables while maintaining referential integrity`() = runBlocking {\n")
-    sb.append("        seeder.seedDatabase()\n")
-
-    val modelSchemas =
-        schemas.filter {
-          it.type == "object" &&
-              it.enumValues == null &&
-              it.anyOf.isEmpty() &&
-              it.oneOf.isEmpty() &&
-              it.anyOfSchemas.isEmpty() &&
-              it.oneOfSchemas.isEmpty() &&
-              !it.safeName.contains("ExternalAccount") &&
-              !it.safeName.contains("PaymentSource")
-        }
-
+    val modelSchemas = filterModelSchemas(schemas)
     val chunkedAsserts = modelSchemas.chunked(100)
-    chunkedAsserts.forEachIndexed { index, _ -> sb.append("        assertBatch$index()\n") }
-    sb.append("    }\n\n")
-
-    chunkedAsserts.forEachIndexed { index, batch ->
-      sb.append("    private suspend fun assertBatch$index() {\n")
-      for (schema in batch) {
-        val name = schema.safeName.replaceFirstChar { it.uppercase() }
-        val lowerName = name.replaceFirstChar { it.lowercase() }
-        sb.append("        val ${lowerName}s = daoConfig.${lowerName}Dao.getAll()\n")
-        sb.append("        assertEquals(10, ${lowerName}s.size)\n")
+    return buildKotlinFile("$packageName.seeder") {
+      import(
+          "$packageName.dao.*",
+          "$packageName.db.DatabaseConnection",
+          "kotlin.test.*",
+          "kotlin.test.BeforeTest",
+          "kotlin.test.Test",
+          "kotlinx.coroutines.runBlocking")
+      kdoc("Tests for [DatabaseSeeder] focusing on referential integrity and batch insertion.")
+      block("class DatabaseSeederTest") {
+        line("private lateinit var daoConfig: DaoConfiguration")
+        line("private lateinit var seeder: DatabaseSeeder")
+        line()
+        line("@BeforeTest")
+        block("fun setup()") {
+          line(
+              "val dbConfig = DatabaseConnection.resolveConfig(ephemeralFlag = true, envUrl = \"\")")
+          line("DatabaseConnection.initialize(dbConfig)")
+          line("daoConfig = DaoFactory.create(useConcrete = true)")
+          line("seeder = DatabaseSeeder(daoConfig)")
+        }
+        line()
+        line("@Test")
+        block(
+            "fun `seedDatabase populates tables while maintaining referential integrity`() = runBlocking") {
+              line("seeder.seedDatabase()")
+              chunkedAsserts.forEachIndexed { index, _ -> line("assertBatch$index()") }
+            }
+        line()
+        chunkedAsserts.forEachIndexed { index, batch ->
+          block("private suspend fun assertBatch$index()") {
+            for (schema in batch) {
+              val name = capitalizeName(schema.safeName)
+              val lowerName = decapitalizeName(name)
+              line("val ${lowerName}s = daoConfig.${lowerName}Dao.getAll()")
+              line("assertEquals(10, ${lowerName}s.size)")
+            }
+          }
+          line()
+        }
       }
-      sb.append("    }\n\n")
     }
-
-    sb.append("}\n")
-    return sb.toString()
   }
 }

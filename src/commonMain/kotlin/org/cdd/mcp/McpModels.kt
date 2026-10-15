@@ -1,12 +1,17 @@
+/**
+ * Model Context Protocol (MCP) 1.0.0 data models, JSON-RPC message envelopes, and request/response
+ * sealed hierarchies.
+ */
 package org.cdd.mcp
 
+import kotlinx.serialization.Required
 import kotlinx.serialization.Serializable
 
 /** Represents the Annotated MCP model. */
 @Serializable
 data class Annotated(
     /** The annotations property. */
-    val annotations: Map<String, String>? = null,
+    @Required val annotations: Map<String, String>? = null,
 )
 
 /** Represents the BlobResourceContents MCP model. */
@@ -27,7 +32,7 @@ data class CallToolRequest(
     val method: String = "tools/call",
     /** The params property. */
     val params: CallToolRequestParams,
-)
+) : ClientRequest
 
 /** Represents the CallToolRequestParams MCP model. */
 @Serializable
@@ -47,7 +52,7 @@ data class CallToolResult(
     val content: List<kotlinx.serialization.json.JsonElement>,
     /** The isError property. */
     val isError: Boolean? = null,
-)
+) : ServerResult
 
 /** Represents the CancelledNotification MCP model. */
 @Serializable
@@ -56,7 +61,7 @@ data class CancelledNotification(
     val method: String = "notifications/cancelled",
     /** The params property. */
     val params: CancelledNotificationParams,
-)
+) : ClientNotification, ServerNotification
 
 /** Represents the CancelledNotificationParams MCP model. */
 @Serializable
@@ -71,7 +76,7 @@ data class CancelledNotificationParams(
 @Serializable
 data class ClientCapabilities(
     /** The experimental property. */
-    val experimental: Map<String, kotlinx.serialization.json.JsonElement>? = null,
+    @Required val experimental: Map<String, kotlinx.serialization.json.JsonElement>? = null,
     /** The roots property. */
     val roots: ClientCapabilitiesRoots? = null,
     /** The sampling property. */
@@ -82,7 +87,7 @@ data class ClientCapabilities(
 @Serializable
 data class ClientCapabilitiesRoots(
     /** The listChanged property. */
-    val listChanged: Boolean? = null,
+    @Required val listChanged: Boolean? = null,
 )
 
 /** Represents the CompleteRequest MCP model. */
@@ -92,7 +97,7 @@ data class CompleteRequest(
     val method: String = "completion/complete",
     /** The params property. */
     val params: CompleteRequestParams,
-)
+) : ClientRequest
 
 /** Represents the CompleteRequestParams MCP model. */
 @Serializable
@@ -128,7 +133,7 @@ data class CompleteResult(
     val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
     /** The completion property. */
     val completion: CompleteResultCompletion,
-)
+) : ServerResult
 
 /** Represents the CompleteResultCompletion MCP model. */
 @Serializable
@@ -148,7 +153,7 @@ data class CreateMessageRequest(
     val method: String = "sampling/createMessage",
     /** The params property. */
     val params: CreateMessageRequestParams,
-)
+) : ServerRequest
 
 /** Represents the CreateMessageRequestParams MCP model. */
 @Serializable
@@ -184,7 +189,7 @@ data class CreateMessageResult(
     val role: Role,
     /** The stopReason property. */
     val stopReason: String? = null,
-)
+) : ClientResult
 
 /** Represents the SamplingMessageContent MCP model. */
 @Serializable
@@ -217,7 +222,7 @@ data class GetPromptRequest(
     val method: String = "prompts/get",
     /** The params property. */
     val params: GetPromptRequestParams,
-)
+) : ClientRequest
 
 /** Represents the GetPromptRequestParams MCP model. */
 @Serializable
@@ -237,7 +242,7 @@ data class GetPromptResult(
     val description: String? = null,
     /** The messages property. */
     val messages: List<PromptMessage>,
-)
+) : ServerResult
 
 /** Represents the ImageContent MCP model. */
 @Serializable
@@ -268,7 +273,7 @@ data class InitializeRequest(
     val method: String = "initialize",
     /** The params property. */
     val params: InitializeRequestParams,
-)
+) : ClientRequest
 
 /** Represents the InitializeRequestParams MCP model. */
 @Serializable
@@ -294,22 +299,22 @@ data class InitializeResult(
     val protocolVersion: String,
     /** The serverInfo property. */
     val serverInfo: Implementation,
-)
+) : ServerResult
 
 /** Represents the InitializedNotification MCP model. */
 @Serializable
 data class InitializedNotification(
     /** The method property. */
-    val method: String = "notifications/initialized",
+    @Required val method: String = "notifications/initialized",
     /** The params property. */
     val params: InitializedNotificationParams? = null,
-)
+) : ClientNotification
 
 /** Represents the InitializedNotificationParams MCP model. */
 @Serializable
 data class InitializedNotificationParams(
     /** The _meta property. */
-    val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
+    @Required val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
 )
 
 /** Represents the JSONRPCError MCP model. */
@@ -321,7 +326,7 @@ data class JSONRPCError(
     val id: String,
     /** The jsonrpc property. */
     val jsonrpc: String = "2.0",
-)
+) : JSONRPCMessage
 
 /** Represents the JSONRPCErrorError MCP model. */
 @Serializable
@@ -343,7 +348,7 @@ data class JSONRPCNotification(
     val method: String,
     /** The params property. */
     val params: kotlinx.serialization.json.JsonElement? = null,
-)
+) : JSONRPCMessage
 
 /** Represents the JSONRPCRequest MCP model. */
 @Serializable
@@ -356,7 +361,7 @@ data class JSONRPCRequest(
     val method: String,
     /** The params property. */
     val params: kotlinx.serialization.json.JsonElement? = null,
-)
+) : JSONRPCMessage
 
 /** Represents the JSONRPCResponse MCP model. */
 @Serializable
@@ -367,22 +372,22 @@ data class JSONRPCResponse(
     val jsonrpc: String = "2.0",
     /** The result property. */
     val result: kotlinx.serialization.json.JsonElement,
-)
+) : JSONRPCMessage
 
 /** Represents the ListPromptsRequest MCP model. */
 @Serializable
 data class ListPromptsRequest(
     /** The method property. */
-    val method: String = "prompts/list",
+    @Required val method: String = "prompts/list",
     /** The params property. */
     val params: ListPromptsRequestParams? = null,
-)
+) : ClientRequest
 
 /** Represents the ListPromptsRequestParams MCP model. */
 @Serializable
 data class ListPromptsRequestParams(
     /** The cursor property. */
-    val cursor: String? = null,
+    @Required val cursor: String? = null,
 )
 
 /** Represents the ListPromptsResult MCP model. */
@@ -394,22 +399,22 @@ data class ListPromptsResult(
     val nextCursor: String? = null,
     /** The prompts property. */
     val prompts: List<Prompt>,
-)
+) : ServerResult
 
 /** Represents the ListResourceTemplatesRequest MCP model. */
 @Serializable
 data class ListResourceTemplatesRequest(
     /** The method property. */
-    val method: String = "resources/templates/list",
+    @Required val method: String = "resources/templates/list",
     /** The params property. */
     val params: ListResourceTemplatesRequestParams? = null,
-)
+) : ClientRequest
 
 /** Represents the ListResourceTemplatesRequestParams MCP model. */
 @Serializable
 data class ListResourceTemplatesRequestParams(
     /** The cursor property. */
-    val cursor: String? = null,
+    @Required val cursor: String? = null,
 )
 
 /** Represents the ListResourceTemplatesResult MCP model. */
@@ -421,22 +426,22 @@ data class ListResourceTemplatesResult(
     val nextCursor: String? = null,
     /** The resourceTemplates property. */
     val resourceTemplates: List<ResourceTemplate>,
-)
+) : ServerResult
 
 /** Represents the ListResourcesRequest MCP model. */
 @Serializable
 data class ListResourcesRequest(
     /** The method property. */
-    val method: String = "resources/list",
+    @Required val method: String = "resources/list",
     /** The params property. */
     val params: ListResourcesRequestParams? = null,
-)
+) : ClientRequest
 
 /** Represents the ListResourcesRequestParams MCP model. */
 @Serializable
 data class ListResourcesRequestParams(
     /** The cursor property. */
-    val cursor: String? = null,
+    @Required val cursor: String? = null,
 )
 
 /** Represents the ListResourcesResult MCP model. */
@@ -448,22 +453,22 @@ data class ListResourcesResult(
     val nextCursor: String? = null,
     /** The resources property. */
     val resources: List<Resource>,
-)
+) : ServerResult
 
 /** Represents the ListRootsRequest MCP model. */
 @Serializable
 data class ListRootsRequest(
     /** The method property. */
-    val method: String = "roots/list",
+    @Required val method: String = "roots/list",
     /** The params property. */
     val params: ListRootsRequestParams? = null,
-)
+) : ServerRequest
 
 /** Represents the ListRootsRequestParams MCP model. */
 @Serializable
 data class ListRootsRequestParams(
     /** The _meta property. */
-    val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
+    @Required val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
 )
 
 /** Represents the ListRootsResult MCP model. */
@@ -473,22 +478,22 @@ data class ListRootsResult(
     val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
     /** The roots property. */
     val roots: List<Root>,
-)
+) : ClientResult
 
 /** Represents the ListToolsRequest MCP model. */
 @Serializable
 data class ListToolsRequest(
     /** The method property. */
-    val method: String = "tools/list",
+    @Required val method: String = "tools/list",
     /** The params property. */
     val params: ListToolsRequestParams? = null,
-)
+) : ClientRequest
 
 /** Represents the ListToolsRequestParams MCP model. */
 @Serializable
 data class ListToolsRequestParams(
     /** The cursor property. */
-    val cursor: String? = null,
+    @Required val cursor: String? = null,
 )
 
 /** Represents the ListToolsResult MCP model. */
@@ -500,18 +505,26 @@ data class ListToolsResult(
     val nextCursor: String? = null,
     /** The tools property. */
     val tools: List<Tool>,
-)
+) : ServerResult
 
 /** Represents the LoggingLevel MCP model. */
 @Serializable
 enum class LoggingLevel {
+  /** Debug-level log message. */
   @kotlinx.serialization.SerialName("debug") debug,
+  /** Informational log message. */
   @kotlinx.serialization.SerialName("info") info,
+  /** Normal but significant condition log message. */
   @kotlinx.serialization.SerialName("notice") notice,
+  /** Warning condition log message. */
   @kotlinx.serialization.SerialName("warning") warning,
+  /** Error condition log message. */
   @kotlinx.serialization.SerialName("error") error,
+  /** Critical condition log message. */
   @kotlinx.serialization.SerialName("critical") critical,
+  /** Action must be taken immediately log message. */
   @kotlinx.serialization.SerialName("alert") alert,
+  /** System is unusable log message. */
   @kotlinx.serialization.SerialName("emergency") emergency
 }
 
@@ -522,7 +535,7 @@ data class LoggingMessageNotification(
     val method: String = "notifications/message",
     /** The params property. */
     val params: LoggingMessageNotificationParams,
-)
+) : ServerNotification
 
 /** Represents the LoggingMessageNotificationParams MCP model. */
 @Serializable
@@ -546,7 +559,7 @@ data class ModelHint(
 @Serializable
 data class ModelPreferences(
     /** The costPriority property. */
-    val costPriority: Double? = null,
+    @Required val costPriority: Double? = null,
     /** The hints property. */
     val hints: List<ModelHint>? = null,
     /** The intelligencePriority property. */
@@ -577,14 +590,14 @@ data class PaginatedRequest(
 @Serializable
 data class PaginatedRequestParams(
     /** The cursor property. */
-    val cursor: String? = null,
+    @Required val cursor: String? = null,
 )
 
 /** Represents the PaginatedResult MCP model. */
 @Serializable
 data class PaginatedResult(
     /** The _meta property. */
-    val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
+    @Required val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
     /** The nextCursor property. */
     val nextCursor: String? = null,
 )
@@ -593,16 +606,16 @@ data class PaginatedResult(
 @Serializable
 data class PingRequest(
     /** The method property. */
-    val method: String = "ping",
+    @Required val method: String = "ping",
     /** The params property. */
     val params: PingRequestParams? = null,
-)
+) : ClientRequest, ServerRequest
 
 /** Represents the PingRequestParams MCP model. */
 @Serializable
 data class PingRequestParams(
     /** The _meta property. */
-    val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
+    @Required val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
 )
 
 /** Represents the ProgressNotification MCP model. */
@@ -612,7 +625,7 @@ data class ProgressNotification(
     val method: String = "notifications/progress",
     /** The params property. */
     val params: ProgressNotificationParams,
-)
+) : ClientNotification, ServerNotification
 
 /** Represents the ProgressNotificationParams MCP model. */
 @Serializable
@@ -651,16 +664,16 @@ data class PromptArgument(
 @Serializable
 data class PromptListChangedNotification(
     /** The method property. */
-    val method: String = "notifications/prompts/list_changed",
+    @Required val method: String = "notifications/prompts/list_changed",
     /** The params property. */
     val params: PromptListChangedNotificationParams? = null,
-)
+) : ServerNotification
 
 /** Represents the PromptListChangedNotificationParams MCP model. */
 @Serializable
 data class PromptListChangedNotificationParams(
     /** The _meta property. */
-    val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
+    @Required val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
 )
 
 /** Represents the PromptMessage MCP model. */
@@ -701,7 +714,7 @@ data class ReadResourceRequest(
     val method: String = "resources/read",
     /** The params property. */
     val params: ReadResourceRequestParams,
-)
+) : ClientRequest
 
 /** Represents the ReadResourceRequestParams MCP model. */
 @Serializable
@@ -717,7 +730,7 @@ data class ReadResourceResult(
     val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
     /** The contents property. */
     val contents: List<ResourceContents>,
-)
+) : ServerResult
 
 /** Represents the Request MCP model. */
 @Serializable
@@ -762,16 +775,16 @@ data class ResourceContents(
 @Serializable
 data class ResourceListChangedNotification(
     /** The method property. */
-    val method: String = "notifications/resources/list_changed",
+    @Required val method: String = "notifications/resources/list_changed",
     /** The params property. */
     val params: ResourceListChangedNotificationParams? = null,
-)
+) : ServerNotification
 
 /** Represents the ResourceListChangedNotificationParams MCP model. */
 @Serializable
 data class ResourceListChangedNotificationParams(
     /** The _meta property. */
-    val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
+    @Required val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
 )
 
 /** Represents the ResourceReference MCP model. */
@@ -805,7 +818,7 @@ data class ResourceUpdatedNotification(
     val method: String = "notifications/resources/updated",
     /** The params property. */
     val params: ResourceUpdatedNotificationParams,
-)
+) : ServerNotification
 
 /** Represents the ResourceUpdatedNotificationParams MCP model. */
 @Serializable
@@ -818,8 +831,8 @@ data class ResourceUpdatedNotificationParams(
 @Serializable
 data class Result(
     /** The _meta property. */
-    val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
-)
+    @Required val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
+) : ClientResult, ServerResult
 
 /** Represents the Root MCP model. */
 @Serializable
@@ -834,16 +847,16 @@ data class Root(
 @Serializable
 data class RootsListChangedNotification(
     /** The method property. */
-    val method: String = "notifications/roots/list_changed",
+    @Required val method: String = "notifications/roots/list_changed",
     /** The params property. */
     val params: RootsListChangedNotificationParams? = null,
-)
+) : ClientNotification
 
 /** Represents the RootsListChangedNotificationParams MCP model. */
 @Serializable
 data class RootsListChangedNotificationParams(
     /** The _meta property. */
-    val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
+    @Required val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
 )
 
 /** Represents the SamplingMessage MCP model. */
@@ -859,7 +872,7 @@ data class SamplingMessage(
 @Serializable
 data class ServerCapabilities(
     /** The experimental property. */
-    val experimental: Map<String, kotlinx.serialization.json.JsonElement>? = null,
+    @Required val experimental: Map<String, kotlinx.serialization.json.JsonElement>? = null,
     /** The logging property. */
     val logging: Map<String, kotlinx.serialization.json.JsonElement>? = null,
     /** The prompts property. */
@@ -874,14 +887,14 @@ data class ServerCapabilities(
 @Serializable
 data class ServerCapabilitiesPrompts(
     /** The listChanged property. */
-    val listChanged: Boolean? = null,
+    @Required val listChanged: Boolean? = null,
 )
 
 /** Represents the ServerCapabilitiesResources MCP model. */
 @Serializable
 data class ServerCapabilitiesResources(
     /** The listChanged property. */
-    val listChanged: Boolean? = null,
+    @Required val listChanged: Boolean? = null,
     /** The subscribe property. */
     val subscribe: Boolean? = null,
 )
@@ -890,7 +903,7 @@ data class ServerCapabilitiesResources(
 @Serializable
 data class ServerCapabilitiesTools(
     /** The listChanged property. */
-    val listChanged: Boolean? = null,
+    @Required val listChanged: Boolean? = null,
 )
 
 /** Represents the SetLevelRequest MCP model. */
@@ -900,7 +913,7 @@ data class SetLevelRequest(
     val method: String = "logging/setLevel",
     /** The params property. */
     val params: SetLevelRequestParams,
-)
+) : ClientRequest
 
 /** Represents the SetLevelRequestParams MCP model. */
 @Serializable
@@ -916,7 +929,7 @@ data class SubscribeRequest(
     val method: String = "resources/subscribe",
     /** The params property. */
     val params: SubscribeRequestParams,
-)
+) : ClientRequest
 
 /** Represents the SubscribeRequestParams MCP model. */
 @Serializable
@@ -966,23 +979,23 @@ data class ToolInputSchema(
     /** The required property. */
     val required: List<String>? = null,
     /** The type property. */
-    val type: String = "object",
+    @Required val type: String = "object",
 )
 
 /** Represents the ToolListChangedNotification MCP model. */
 @Serializable
 data class ToolListChangedNotification(
     /** The method property. */
-    val method: String = "notifications/tools/list_changed",
+    @Required val method: String = "notifications/tools/list_changed",
     /** The params property. */
     val params: ToolListChangedNotificationParams? = null,
-)
+) : ServerNotification
 
 /** Represents the ToolListChangedNotificationParams MCP model. */
 @Serializable
 data class ToolListChangedNotificationParams(
     /** The _meta property. */
-    val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
+    @Required val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
 )
 
 /** Represents the UnsubscribeRequest MCP model. */
@@ -992,7 +1005,7 @@ data class UnsubscribeRequest(
     val method: String = "resources/unsubscribe",
     /** The params property. */
     val params: UnsubscribeRequestParams,
-)
+) : ClientRequest
 
 /** Represents the UnsubscribeRequestParams MCP model. */
 @Serializable
@@ -1001,14 +1014,14 @@ data class UnsubscribeRequestParams(
     val uri: String,
 )
 
-/** Represents the ClientNotification MCP model. */
-@Serializable class ClientNotification()
+/** Sealed hierarchy representing all notifications sent from an MCP client to a server. */
+@Serializable sealed interface ClientNotification
 
-/** Represents the ClientRequest MCP model. */
-@Serializable class ClientRequest()
+/** Sealed hierarchy representing all requests sent from an MCP client to a server. */
+@Serializable sealed interface ClientRequest
 
-/** Represents the ClientResult MCP model. */
-@Serializable class ClientResult()
+/** Sealed hierarchy representing all result payloads returned from an MCP client to a server. */
+@Serializable sealed interface ClientResult
 
 /** Represents the Cursor MCP model. */
 typealias Cursor = String
@@ -1017,11 +1030,11 @@ typealias Cursor = String
 @Serializable
 data class EmptyResult(
     /** The _meta property. */
-    val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null
-)
+    @Required val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null
+) : ClientResult, ServerResult
 
-/** Represents the JSONRPCMessage MCP model. */
-@Serializable class JSONRPCMessage()
+/** Sealed hierarchy representing all JSON-RPC 2.0 protocol messages in MCP. */
+@Serializable sealed interface JSONRPCMessage
 
 /** Represents the ProgressToken MCP model. */
 typealias ProgressToken = String
@@ -1038,11 +1051,11 @@ enum class Role {
   @kotlinx.serialization.SerialName("assistant") assistant
 }
 
-/** Represents the ServerNotification MCP model. */
-@Serializable class ServerNotification()
+/** Sealed hierarchy representing all notifications sent from an MCP server to a client. */
+@Serializable sealed interface ServerNotification
 
-/** Represents the ServerRequest MCP model. */
-@Serializable class ServerRequest()
+/** Sealed hierarchy representing all requests sent from an MCP server to a client. */
+@Serializable sealed interface ServerRequest
 
-/** Represents the ServerResult MCP model. */
-@Serializable class ServerResult()
+/** Sealed hierarchy representing all result payloads returned from an MCP server to a client. */
+@Serializable sealed interface ServerResult

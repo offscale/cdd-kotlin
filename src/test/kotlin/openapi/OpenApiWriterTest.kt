@@ -19,7 +19,12 @@ import domain.Link
 import domain.MediaTypeObject
 import domain.OAuthFlow
 import domain.OAuthFlows
+import domain.OpenApiArray
+import domain.OpenApiBoolean
 import domain.OpenApiDefinition
+import domain.OpenApiInt
+import domain.OpenApiObject
+import domain.OpenApiString
 import domain.ParameterLocation
 import domain.ParameterStyle
 import domain.PathItem
@@ -267,13 +272,20 @@ class OpenApiWriterTest {
             properties =
                 mapOf(
                     "level" to
-                        SchemaProperty(types = setOf("integer"), enumValues = listOf(1, 2, 3)),
+                        SchemaProperty(
+                            types = setOf("integer"),
+                            enumValues = listOf(OpenApiInt(1L), OpenApiInt(2L), OpenApiInt(3L))),
                     "flag" to
-                        SchemaProperty(types = setOf("boolean"), enumValues = listOf(true, false)),
+                        SchemaProperty(
+                            types = setOf("boolean"),
+                            enumValues = listOf(OpenApiBoolean(true), OpenApiBoolean(false))),
                     "config" to
                         SchemaProperty(
                             types = setOf("object"),
-                            enumValues = listOf(mapOf("mode" to "fast"), mapOf("mode" to "slow")))))
+                            enumValues =
+                                listOf(
+                                    OpenApiObject(mapOf("mode" to OpenApiString("fast"))),
+                                    OpenApiObject(mapOf("mode" to OpenApiString("slow")))))))
 
     val definition =
         OpenApiDefinition(
@@ -436,7 +448,10 @@ class OpenApiWriterTest {
   fun `writeJson serializes schema examples list`() {
     val writer = OpenApiWriter()
     val schema =
-        SchemaDefinition(name = "Example", type = "object", examplesList = listOf("alpha", "beta"))
+        SchemaDefinition(
+            name = "Example",
+            type = "object",
+            examplesList = listOf(OpenApiString("alpha"), OpenApiString("beta")))
     val definition =
         OpenApiDefinition(
             info = Info("Examples", "1.0"),
@@ -501,7 +516,9 @@ class OpenApiWriterTest {
   private fun buildFullDefinition(): OpenApiDefinition {
     val example =
         ExampleObject(
-            summary = "Example", description = "Example description", dataValue = mapOf("id" to 1))
+            summary = "Example",
+            description = "Example description",
+            dataValue = OpenApiObject(mapOf("id" to OpenApiInt(1L))))
     val serializedExample = ExampleObject(serializedValue = "{\"id\":1}")
     val externalExample = ExampleObject(externalValue = "https://example.com/example.json")
     val refExample = ExampleObject(ref = "https://example.com/example.json")
@@ -513,7 +530,7 @@ class OpenApiWriterTest {
             description = "Trace",
             required = true,
             deprecated = true,
-            example = ExampleObject(value = "abc"),
+            example = ExampleObject(value = OpenApiString("abc")),
             explode = true)
 
     val headerWithContent =
@@ -537,7 +554,7 @@ class OpenApiWriterTest {
         MediaTypeObject(
             schema = SchemaProperty(ref = "#/components/schemas/Pet"),
             itemSchema = SchemaProperty("string"),
-            example = ExampleObject(dataValue = mapOf("id" to 1)),
+            example = ExampleObject(dataValue = OpenApiObject(mapOf("id" to OpenApiInt(1L)))),
             examples =
                 mapOf(
                     "pet" to example,
@@ -592,8 +609,8 @@ class OpenApiWriterTest {
             style = ParameterStyle.FORM,
             explode = false,
             allowReserved = true,
-            example = ExampleObject(value = 10),
-            examples = mapOf("ten" to ExampleObject(value = 10)))
+            example = ExampleObject(value = OpenApiInt(10L)),
+            examples = mapOf("ten" to ExampleObject(value = OpenApiInt(10L))))
 
     val querySpaceParam =
         EndpointParameter(
@@ -667,10 +684,12 @@ class OpenApiWriterTest {
                             operationId = "getNext",
                             parameters =
                                 mapOf(
-                                    "id" to "\$response.body#/id",
-                                    "priority" to 3,
-                                    "flags" to listOf(true, false)),
-                            requestBody = mapOf("id" to 1),
+                                    "id" to OpenApiString("\$response.body#/id"),
+                                    "priority" to OpenApiInt(3L),
+                                    "flags" to
+                                        OpenApiArray(
+                                            listOf(OpenApiBoolean(true), OpenApiBoolean(false)))),
+                            requestBody = OpenApiObject(mapOf("id" to OpenApiInt(1L))),
                             description = "Next page",
                             server = Server(url = "https://api.example.com"))))
     val fallbackResponse =
@@ -718,7 +737,7 @@ class OpenApiWriterTest {
                                     operationId = "onCallback",
                                     requestBody = requestBody,
                                     responses = mapOf("200" to response)))),
-            extensions = mapOf("x-callback" to true))
+            extensions = mapOf("x-callback" to OpenApiBoolean(true)))
     val refCallback: Callback =
         Callback.Reference(
             reference =
@@ -762,11 +781,13 @@ class OpenApiWriterTest {
                             format = "uuid",
                             deprecated = true,
                             xml = Xml(attribute = true),
-                            extensions = mapOf("x-prop" to "prop-ext")),
+                            extensions = mapOf("x-prop" to OpenApiString("prop-ext"))),
                     "owner" to SchemaProperty(ref = "#/components/schemas/User"),
                     "status" to
                         SchemaProperty(
-                            types = setOf("string"), enumValues = listOf("active", "disabled")),
+                            types = setOf("string"),
+                            enumValues =
+                                listOf(OpenApiString("active"), OpenApiString("disabled"))),
                     "meta" to
                         SchemaProperty(
                             types = setOf("object"),
@@ -789,18 +810,18 @@ class OpenApiWriterTest {
                         SchemaProperty(
                             types = setOf("array"),
                             items = SchemaProperty("string"),
-                            examples = listOf("a", "b")),
+                            examples = listOf(OpenApiString("a"), OpenApiString("b"))),
                     "pet" to
                         SchemaProperty(
                             types = setOf("object"),
                             oneOf = listOf(SchemaProperty("string"), SchemaProperty("integer")))),
             additionalProperties = SchemaProperty("string"),
             required = listOf("id"),
-            enumValues = listOf("cat", "dog"),
+            enumValues = listOf(OpenApiString("cat"), OpenApiString("dog")),
             description = "Pet",
             title = "Pet",
-            defaultValue = "cat",
-            constValue = "cat",
+            defaultValue = OpenApiString("cat"),
+            constValue = OpenApiString("cat"),
             deprecated = true,
             readOnly = true,
             writeOnly = true,
@@ -821,9 +842,9 @@ class OpenApiWriterTest {
             anyOf = listOf("Bird"),
             allOf = listOf("BasePet"),
             not = SchemaProperty(types = setOf("null")),
-            example = "cat",
-            examples = mapOf("ex1" to "cat"),
-            extensions = mapOf("x-schema" to 7))
+            example = OpenApiString("cat"),
+            examples = mapOf("ex1" to OpenApiString("cat")),
+            extensions = mapOf("x-schema" to OpenApiInt(7L)))
 
     val oauthFlow =
         OAuthFlow(
@@ -936,7 +957,7 @@ class OpenApiWriterTest {
             deprecated = true,
             security = listOf(mapOf("ApiKey" to emptyList())),
             servers = listOf(server),
-            extensions = mapOf("x-op" to mapOf("flag" to true)))
+            extensions = mapOf("x-op" to OpenApiObject(mapOf("flag" to OpenApiBoolean(true)))))
 
     val putOperation = operation.copy(method = HttpMethod.PUT, operationId = "replacePets")
     val postOperation = operation.copy(method = HttpMethod.POST, operationId = "createPets")
@@ -969,7 +990,7 @@ class OpenApiWriterTest {
                         email = "support@example.com",
                         url = "https://example.com/support"),
                 license = domain.License(name = "Apache 2.0", identifier = "Apache-2.0"),
-                extensions = mapOf("x-info" to "info-ext")),
+                extensions = mapOf("x-info" to OpenApiString("info-ext"))),
         jsonSchemaDialect = "https://spec.openapis.org/oas/3.1/dialect/base",
         servers = listOf(server),
         paths =
@@ -990,21 +1011,22 @@ class OpenApiWriterTest {
                         additionalOperations = mapOf("COPY" to customOperation),
                         parameters = listOf(pathMatrixParam),
                         servers = listOf(server),
-                        extensions = mapOf("x-path" to true))),
-        pathsExtensions = mapOf("x-paths" to "paths-ext"),
+                        extensions = mapOf("x-path" to OpenApiBoolean(true)))),
+        pathsExtensions = mapOf("x-paths" to OpenApiString("paths-ext")),
         webhooks =
             mapOf(
                 "onPet" to
                     PathItem(
                         post = postOperation.copy(path = "/webhook", method = HttpMethod.POST))),
-        webhooksExtensions = mapOf("x-webhooks" to mapOf("flag" to true)),
+        webhooksExtensions =
+            mapOf("x-webhooks" to OpenApiObject(mapOf("flag" to OpenApiBoolean(true)))),
         components = components,
         security = listOf(mapOf("ApiKey" to emptyList())),
         tags = listOf(Tag(name = "pets", summary = "Pets", kind = "nav")),
         externalDocs =
             ExternalDocumentation(url = "https://example.com/external", description = "External"),
         self = "https://example.com/openapi",
-        extensions = mapOf("x-root" to "root-ext"))
+        extensions = mapOf("x-root" to OpenApiString("root-ext")))
   }
 
   @Test
@@ -1095,5 +1117,274 @@ class OpenApiWriterTest {
     val opNode = root["paths"]["/pets"]["get"]
     assertNotNull(opNode)
     assertNull(opNode["operationId"])
+  }
+
+  @Test
+  fun `write supports Swagger 2_0 definitions, parameters, responses, and securityDefinitions`() {
+    val swaggerDef =
+        OpenApiDefinition(
+            openapi = "2.0",
+            swagger = "2.0",
+            info = Info(title = "Swag", version = "1.0"),
+            host = "api.example.com",
+            basePath = "/v1",
+            schemes = listOf("https"),
+            consumes = listOf("application/json"),
+            produces = listOf("application/json"),
+            paths =
+                mapOf(
+                    "/items" to
+                        PathItem(
+                            post =
+                                EndpointDefinition(
+                                    path = "/items",
+                                    method = HttpMethod.POST,
+                                    operationId = "createItem",
+                                    consumes = listOf("application/json"),
+                                    produces = listOf("application/json"),
+                                    schemes = listOf("https"),
+                                    parameters =
+                                        listOf(
+                                            EndpointParameter(
+                                                name = "bodyParam",
+                                                type = "object",
+                                                location = ParameterLocation.BODY,
+                                                isRequired = true,
+                                                schema = SchemaProperty(types = setOf("string"))),
+                                            EndpointParameter(
+                                                name = "bodyNoSchema",
+                                                type = "string",
+                                                location = ParameterLocation.BODY,
+                                                isRequired = true),
+                                            EndpointParameter(
+                                                name = "tags",
+                                                type = "array",
+                                                location = ParameterLocation.QUERY,
+                                                isRequired = false,
+                                                collectionFormat = "csv",
+                                                schema =
+                                                    SchemaProperty(
+                                                        types = setOf("array"),
+                                                        items =
+                                                            SchemaProperty(
+                                                                types = setOf("string")))),
+                                            EndpointParameter(
+                                                name = "rawArr",
+                                                type = "array",
+                                                location = ParameterLocation.FORMDATA,
+                                                isRequired = false)),
+                                    responses =
+                                        mapOf(
+                                            "200" to
+                                                EndpointResponse(
+                                                    statusCode = "200",
+                                                    description = "ok",
+                                                    schema =
+                                                        SchemaProperty(types = setOf("string")),
+                                                    headers =
+                                                        mapOf(
+                                                            "X-Arr" to
+                                                                Header(
+                                                                    type = "array",
+                                                                    collectionFormat = "csv",
+                                                                    schema =
+                                                                        SchemaProperty(
+                                                                            types = setOf("array"),
+                                                                            items =
+                                                                                SchemaProperty(
+                                                                                    types =
+                                                                                        setOf(
+                                                                                            "string")))),
+                                                            "X-RawArr" to Header(type = "array")),
+                                                    examples =
+                                                        mapOf(
+                                                            "application/json" to
+                                                                ExampleObject(
+                                                                    value = OpenApiString("val")))),
+                                            "201" to
+                                                EndpointResponse(
+                                                    statusCode = "201",
+                                                    description = "created",
+                                                    type = "Item"),
+                                            "202" to
+                                                EndpointResponse(
+                                                    statusCode = "202",
+                                                    description = "accepted",
+                                                    content =
+                                                        mapOf(
+                                                            "application/json" to
+                                                                MediaTypeObject(
+                                                                    schema =
+                                                                        SchemaProperty(
+                                                                            types =
+                                                                                setOf(
+                                                                                    "boolean"))))))))),
+            components =
+                Components(
+                    schemas =
+                        mapOf(
+                            "Item" to
+                                SchemaDefinition(
+                                    name = "Item",
+                                    types = setOf("string", "null"),
+                                    defs = mapOf("D" to SchemaProperty(types = setOf("string"))),
+                                    patternProperties =
+                                        mapOf("^x-" to SchemaProperty(types = setOf("string"))),
+                                    dependentSchemas =
+                                        mapOf("a" to SchemaProperty(types = setOf("string"))))),
+                    parameters =
+                        mapOf(
+                            "P" to
+                                EndpointParameter(
+                                    name = "p",
+                                    type = "string",
+                                    location = ParameterLocation.QUERY,
+                                    isRequired = false)),
+                    responses =
+                        mapOf("R" to EndpointResponse(statusCode = "200", description = "ok")),
+                    securitySchemes =
+                        mapOf(
+                            "OAuth" to
+                                SecurityScheme(
+                                    type = "oauth2",
+                                    flow = "implicit",
+                                    authorizationUrl = "https://example.com/oauth",
+                                    scopes = mapOf("read" to "Read access")))))
+
+    val writer = OpenApiWriter()
+    val defaultJson = writer.write(swaggerDef)
+    assertTrue(defaultJson.contains("\"swagger\": \"2.0\""))
+    assertTrue(defaultJson.contains("\"definitions\""))
+    assertTrue(defaultJson.contains("\"securityDefinitions\""))
+
+    // Also test OAS 3.2 mediaType ref and SchemaProperty defs/patternProperties/dependentSchemas
+    val oas3Def =
+        OpenApiDefinition(
+            info = Info("T", "1"),
+            paths =
+                mapOf(
+                    "/m" to
+                        PathItem(
+                            get =
+                                EndpointDefinition(
+                                    path = "/m",
+                                    method = HttpMethod.GET,
+                                    operationId = "m",
+                                    parameters =
+                                        listOf(
+                                            EndpointParameter(
+                                                name = "p",
+                                                type = "string",
+                                                location = ParameterLocation.QUERY,
+                                                isRequired = false,
+                                                example =
+                                                    ExampleObject(externalValue = "http://ex"))),
+                                    responses =
+                                        mapOf(
+                                            "200" to
+                                                EndpointResponse(
+                                                    statusCode = "200",
+                                                    description = "ok",
+                                                    content =
+                                                        mapOf(
+                                                            "application/json" to
+                                                                MediaTypeObject(
+                                                                    ref =
+                                                                        "#/components/mediaTypes/M"),
+                                                            "text/plain" to
+                                                                MediaTypeObject(
+                                                                    schema =
+                                                                        SchemaProperty(
+                                                                            types = setOf("object"),
+                                                                            defs =
+                                                                                mapOf(
+                                                                                    "D" to
+                                                                                        SchemaProperty(
+                                                                                            types =
+                                                                                                setOf(
+                                                                                                    "string"))),
+                                                                            patternProperties =
+                                                                                mapOf(
+                                                                                    ".*" to
+                                                                                        SchemaProperty(
+                                                                                            types =
+                                                                                                setOf(
+                                                                                                    "string"))),
+                                                                            dependentSchemas =
+                                                                                mapOf(
+                                                                                    "k" to
+                                                                                        SchemaProperty(
+                                                                                            types =
+                                                                                                setOf(
+                                                                                                    "string"))))))))))))
+    val oas3Json = writer.writeJson(oas3Def)
+    assertTrue(oas3Json.contains("\"#/components/mediaTypes/M\""))
+    assertTrue(oas3Json.contains("\"patternProperties\""))
+    assertTrue(oas3Json.contains("\"dependentSchemas\""))
+
+    // Additional OpenApiWriter and YamlToJsonElementConverter branch coverage
+    assertTrue(writer.write(oas3Def, OpenApiWriter.Format.AUTO, null).isNotEmpty())
+    val swagNoFieldDef =
+        OpenApiDefinition(
+            openapi = "2.0",
+            swagger = null,
+            info = Info("Swag", "1.0"),
+            tags =
+                listOf(
+                    Tag(
+                        name = "t",
+                        externalDocs = ExternalDocumentation(url = "https://example.com"))),
+            components =
+                Components(
+                    parameters =
+                        mapOf(
+                            "P" to
+                                EndpointParameter(
+                                    name = "p",
+                                    type = "string",
+                                    location = ParameterLocation.QUERY,
+                                    schema = SchemaProperty(types = setOf("object")),
+                                    example = ExampleObject(ref = "#/components/examples/E"))),
+                    responses =
+                        mapOf(
+                            "R" to
+                                EndpointResponse(
+                                    statusCode = "200",
+                                    description = "ok",
+                                    headers =
+                                        mapOf(
+                                            "X-Str" to
+                                                Header(
+                                                    type = "string",
+                                                    schema =
+                                                        SchemaProperty(types = setOf("string")))))),
+                    securitySchemes =
+                        mapOf("OAuthNullScopes" to SecurityScheme(type = "oauth2", scopes = null))))
+    assertTrue(writer.writeJson(swagNoFieldDef).contains("\"swagger\": \"2.0\""))
+
+    val oas3HeaderDef =
+        OpenApiDefinition(
+            info = Info("H", "1.0"),
+            servers =
+                listOf(
+                    Server(
+                        url = "https://{env}.example.com",
+                        variables = mapOf("env" to ServerVariable(default = "prod", enum = null)))),
+            components =
+                Components(
+                    headers =
+                        mapOf(
+                            "HNoSchema" to Header(type = "String", schema = null),
+                            "HNullStyle" to
+                                Header(
+                                    type = "String",
+                                    schema = SchemaProperty(types = setOf("string")),
+                                    style = null))))
+    assertTrue(writer.writeJson(oas3HeaderDef).isNotEmpty())
+
+    val yamlFlowAndBlock =
+        openapi.parser.YamlToJsonElementConverter.parseYaml(
+            "- {a: {x: 1}, b: [2, 3], }\n- \"\\q\"\n- emptyBlock: |\n")
+    assertNotNull(yamlFlowAndBlock)
   }
 }

@@ -1,3 +1,4 @@
+/** Exposed ORM table and Data Access Object (DAO) code generator. */
 package psi
 
 import domain.SchemaDefinition
@@ -13,99 +14,55 @@ import domain.SchemaDefinition
  */
 class DaoGenerator {
 
-  private fun escapeKotlinKeyword(name: String): String {
-    val keywords =
-        setOf(
-            "as",
-            "break",
-            "class",
-            "continue",
-            "do",
-            "else",
-            "false",
-            "for",
-            "fun",
-            "if",
-            "in",
-            "interface",
-            "is",
-            "null",
-            "object",
-            "package",
-            "return",
-            "super",
-            "this",
-            "throw",
-            "true",
-            "try",
-            "typealias",
-            "typeof",
-            "val",
-            "var",
-            "when",
-            "while")
-    return if (name in keywords) "`$name`" else name
-  }
-
   /**
-   * Generates the entire DAO module source code as a single string.
+   * Generates the entire DAO module source code as a map of relative file paths to source strings.
    *
    * @param packageName The package namespace for the DAOs.
    * @param schemas The list of schema definitions to generate DAOs for.
+   * @return Map of relative DAO file paths to generated Kotlin source strings.
    */
   fun generateDaos(packageName: String, schemas: List<SchemaDefinition>): Map<String, String> {
-    val modelSchemas =
-        schemas.filter {
-          it.type == "object" &&
-              it.enumValues == null &&
-              it.anyOf.isEmpty() &&
-              it.oneOf.isEmpty() &&
-              it.anyOfSchemas.isEmpty() &&
-              it.oneOfSchemas.isEmpty() &&
-              !it.safeName.contains("ExternalAccount") &&
-              !it.safeName.contains("PaymentSource")
-        }
-
+    val modelSchemas = filterModelSchemas(schemas)
     val results = mutableMapOf<String, String>()
 
     // 1. Generate individual DAO files
     for (schema in modelSchemas) {
-      val sb = StringBuilder()
-      sb.append("package $packageName.dao\n\n")
-
-      sb.append("import $packageName.models.*\n")
-      sb.append("import org.jetbrains.exposed.sql.*\n")
-      sb.append("import org.jetbrains.exposed.sql.transactions.transaction\n")
-      sb.append("import kotlinx.coroutines.Dispatchers\n")
-      sb.append("import kotlinx.coroutines.withContext\n")
-      sb.append("import kotlinx.serialization.encodeToString\n")
-      sb.append("import kotlinx.serialization.json.Json\n\n")
-
-      sb.append(generateAbstractInterface(schema))
-      sb.append(generateStubDao(schema))
-      sb.append(generateConcreteDao(schema))
-
-      val name = schema.safeName.replaceFirstChar { it.uppercase() }
-      results["dao/${name}Dao.kt"] = sb.toString()
+      val name = capitalizeName(schema.safeName)
+      results["dao/${name}Dao.kt"] =
+          buildKotlinFile("$packageName.dao") {
+            import(
+                "$packageName.models.*",
+                "org.jetbrains.exposed.sql.*",
+                "org.jetbrains.exposed.sql.transactions.transaction",
+                "kotlinx.coroutines.Dispatchers",
+                "kotlinx.coroutines.withContext",
+                "kotlinx.serialization.encodeToString",
+                "kotlinx.serialization.json.Json")
+            raw(generateAbstractInterface(schema))
+            raw(generateStubDao(schema))
+            raw(generateConcreteDao(schema))
+          }
     }
 
     // 2. Generate Factory / DI routine
-    val factorySb = StringBuilder()
-    factorySb.append("package $packageName.dao\n\n")
-    factorySb.append("import $packageName.models.*\n\n")
-    factorySb.append(generateDaoFactory(modelSchemas))
-    results["dao/DaoFactory.kt"] = factorySb.toString()
+    results["dao/DaoFactory.kt"] =
+        buildKotlinFile("$packageName.dao") {
+          import("$packageName.models.*")
+          raw(generateDaoFactory(modelSchemas))
+        }
 
     return results
   }
 
   private fun generateAbstractInterface(schema: SchemaDefinition): String {
     val sb = StringBuilder()
-    val name = schema.safeName.replaceFirstChar { it.uppercase() }
+    val name = capitalizeName(schema.safeName)
     sb.append("/**\n")
     sb.append(" * Data Access Object interface for [$name].\n")
     sb.append(" */\n")
     sb.append("interface ${name}Dao {\n")
+    sb.append("    /** Whether this DAO is an unimplemented stub. */\n")
+    sb.append("    val isStub: Boolean get() = false\n\n")
     sb.append("    /**\n")
     sb.append("     * Retrieves a list of [$name] objects.\n")
     sb.append("     */\n")
@@ -138,33 +95,29 @@ class DaoGenerator {
 
   private fun generateStubDao(schema: SchemaDefinition): String {
     val sb = StringBuilder()
-    val name = schema.safeName.replaceFirstChar { it.uppercase() }
+    val name = capitalizeName(schema.safeName)
     sb.append("/**\n")
     sb.append(" * Traditional Scaffold Stub DAO for [$name].\n")
-    sb.append(" * Throws NotImplementedError for all operations.\n")
     sb.append(" */\n")
     sb.append("class Stub${name}Dao : ${name}Dao {\n")
-    sb.append(
-        "    override suspend fun getAll(): List<$name> = throw NotImplementedError(\"Stub DAO method not implemented.\")\n")
+    sb.append("    override val isStub: Boolean = true\n")
+    sb.append("    override suspend fun getAll(): List<$name> = emptyList()\n")
 
     val idProp = schema.properties["id"]
     if (idProp != null) {
       val idType = TypeMappers.mapType(idProp)
-      sb.append(
-          "    override suspend fun getById(id: $idType): $name? = throw NotImplementedError(\"Stub DAO method not implemented.\")\n")
-      sb.append(
-          "    override suspend fun delete(id: $idType): Boolean = throw NotImplementedError(\"Stub DAO method not implemented.\")\n")
+      sb.append("    override suspend fun getById(id: $idType): $name? = null\n")
+      sb.append("    override suspend fun delete(id: $idType): Boolean = false\n")
     }
 
-    sb.append(
-        "    override suspend fun create(entity: $name): $name = throw NotImplementedError(\"Stub DAO method not implemented.\")\n")
+    sb.append("    override suspend fun create(entity: $name): $name = entity\n")
     sb.append("}\n\n")
     return sb.toString()
   }
 
   private fun generateConcreteDao(schema: SchemaDefinition): String {
     val sb = StringBuilder()
-    val name = schema.safeName.replaceFirstChar { it.uppercase() }
+    val name = capitalizeName(schema.safeName)
     val tableName = "${name}Table"
 
     sb.append("/**\n")
@@ -324,9 +277,10 @@ class DaoGenerator {
     sb.append(" */\n")
     sb.append("class DaoConfiguration(private val daos: Map<String, Any>) {\n")
     for (schema in modelSchemas) {
-      val name = schema.safeName.replaceFirstChar { it.uppercase() }
+      val name = capitalizeName(schema.safeName)
+      val lowerName = decapitalizeName(name)
       sb.append(
-          "    val ${name.replaceFirstChar { it.lowercase() }}Dao: ${name}Dao get() = daos[\"${name.replaceFirstChar { it.lowercase() }}Dao\"] as ${name}Dao\n")
+          "    val ${lowerName}Dao: ${name}Dao get() = daos[\"${lowerName}Dao\"] as ${name}Dao\n")
     }
     sb.append("}\n\n")
 
@@ -353,15 +307,15 @@ class DaoGenerator {
           "    private fun populateBatch$index(map: MutableMap<String, Any>, useConcrete: Boolean) {\n")
       sb.append("        if (useConcrete) {\n")
       for (schema in batch) {
-        val name = schema.safeName.replaceFirstChar { it.uppercase() }
-        sb.append(
-            "            map[\"${name.replaceFirstChar { it.lowercase() }}Dao\"] = Concrete${name}Dao()\n")
+        val name = capitalizeName(schema.safeName)
+        val lowerName = decapitalizeName(name)
+        sb.append("            map[\"${lowerName}Dao\"] = Concrete${name}Dao()\n")
       }
       sb.append("        } else {\n")
       for (schema in batch) {
-        val name = schema.safeName.replaceFirstChar { it.uppercase() }
-        sb.append(
-            "            map[\"${name.replaceFirstChar { it.lowercase() }}Dao\"] = Stub${name}Dao()\n")
+        val name = capitalizeName(schema.safeName)
+        val lowerName = decapitalizeName(name)
+        sb.append("            map[\"${lowerName}Dao\"] = Stub${name}Dao()\n")
       }
       sb.append("        }\n")
       sb.append("    }\n\n")

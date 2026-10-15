@@ -1,13 +1,17 @@
+/**
+ * Multiplatform in-memory registry for OpenAPI and standalone JSON Schema documents.
+ *
+ * Resolves cross-document `$ref` targets without network access across all targets (JVM, WASM).
+ */
 package openapi
 
 import domain.OpenApiDefinition
 import domain.PathItemRefResolver
 import domain.PathItemResolution
 import domain.SchemaProperty
-import java.net.URI
 
 /**
- * In-memory registry for OpenAPI/Schema documents to resolve $ref targets without network access.
+ * In-memory registry for OpenAPI/Schema documents to resolve `$ref` targets without network access.
  *
  * Register documents with their intended base URI (e.g., retrieval URI) and/or `$self`/`$id`.
  * Relative `$self`/`$id` values are resolved against the provided base URI for lookup purposes. The
@@ -38,28 +42,53 @@ class OpenApiDocumentRegistry {
     }
   }
 
-  /** Register an OpenAPI Object document. */
+  /**
+   * Register an OpenAPI Object document.
+   *
+   * @param definition The [OpenApiDefinition] to register.
+   * @param baseUri Optional base URI for resolving relative references.
+   */
   fun registerOpenApi(definition: OpenApiDefinition, baseUri: String? = null) {
     registerDocument(OpenApiDocument.OpenApi(definition), baseUri)
   }
 
-  /** Register a standalone Schema Object document. */
+  /**
+   * Register a standalone Schema Object document.
+   *
+   * @param schema The [SchemaProperty] to register.
+   * @param baseUri Optional base URI for resolving relative references.
+   */
   fun registerSchema(schema: SchemaProperty, baseUri: String? = null) {
     registerDocument(OpenApiDocument.Schema(schema), baseUri)
   }
 
-  /** Resolve any registered document by base URI. */
+  /**
+   * Resolve any registered document by base URI.
+   *
+   * @param baseUri The base URI to look up.
+   * @return The registered [OpenApiDocument], or `null` if not found.
+   */
   fun resolve(baseUri: String?): OpenApiDocument? {
     val normalized = normalizeBase(baseUri) ?: return null
     return documents[normalized]
   }
 
-  /** Resolve an OpenAPI Object document by base URI. */
+  /**
+   * Resolve an OpenAPI Object document by base URI.
+   *
+   * @param baseUri The base URI to look up.
+   * @return The registered [OpenApiDefinition], or `null` if not found or not an OpenAPI document.
+   */
   fun resolveOpenApi(baseUri: String?): OpenApiDefinition? {
     return (resolve(baseUri) as? OpenApiDocument.OpenApi)?.definition
   }
 
-  /** Resolve a Schema Object document by base URI. */
+  /**
+   * Resolve a Schema Object document by base URI.
+   *
+   * @param baseUri The base URI to look up.
+   * @return The registered [SchemaProperty], or `null` if not found or not a Schema document.
+   */
   fun resolveSchema(baseUri: String?): SchemaProperty? {
     return (resolve(baseUri) as? OpenApiDocument.Schema)?.schema
   }
@@ -71,23 +100,25 @@ class OpenApiDocumentRegistry {
 }
 
 /**
- * Builds a [PathItemRefResolver] that resolves external Path Item $ref targets from this registry.
+ * Builds a [PathItemRefResolver] that resolves external Path Item `$ref` targets from this
+ * registry.
+ *
+ * @return A [PathItemRefResolver] backed by this [OpenApiDocumentRegistry].
  */
 fun OpenApiDocumentRegistry.pathItemResolver(): PathItemRefResolver {
   return PathItemRefResolver { baseUri, key ->
-    val definition = resolveOpenApi(baseUri) ?: return@PathItemRefResolver null
-    val item = definition.components?.pathItems?.get(key) ?: return@PathItemRefResolver null
+    val normalizedBase = normalizeBase(baseUri) ?: return@PathItemRefResolver null
+    val definition = resolveOpenApi(normalizedBase) ?: return@PathItemRefResolver null
+    val pathItems = definition.components?.pathItems.orEmpty()
+    val item = pathItems[key] ?: return@PathItemRefResolver null
     val resolvedSelf = run {
-      val normalizedBase = normalizeBase(baseUri)
       val normalizedSelf = normalizeBase(definition.self)
-      if (normalizedSelf == null || normalizedBase == null || isAbsoluteUri(normalizedSelf)) {
+      if (normalizedSelf == null || isAbsoluteUri(normalizedSelf)) {
         normalizedSelf ?: definition.self
+      } else if ((normalizedBase + normalizedSelf).any { it.isWhitespace() }) {
+        normalizedSelf
       } else {
-        try {
-          URI(normalizedBase).resolve(normalizedSelf).toString().substringBefore("#")
-        } catch (_: Exception) {
-          normalizedSelf
-        }
+        resolveUri(normalizedBase, normalizedSelf).substringBefore("#")
       }
     }
     PathItemResolution(item = item, components = definition.components, selfBase = resolvedSelf)
@@ -104,17 +135,6 @@ private fun resolveRelative(reference: String?, baseUri: String?): String? {
   val normalized = normalizeBase(reference) ?: return null
   if (baseUri.isNullOrBlank()) return normalized
   if (isAbsoluteUri(normalized)) return normalized
-  return try {
-    URI(baseUri).resolve(normalized).toString().substringBefore("#")
-  } catch (_: Exception) {
-    normalized
-  }
-}
-
-private fun isAbsoluteUri(value: String): Boolean {
-  return try {
-    URI(value).isAbsolute
-  } catch (_: Exception) {
-    false
-  }
+  if ((baseUri + normalized).any { it.isWhitespace() }) return normalized
+  return resolveUri(baseUri, normalized).substringBefore("#")
 }

@@ -58,7 +58,9 @@ class DomainModelsCoverageTest {
             parent = "root",
             kind = "nav")
 
-    val example = ExampleObject(summary = "Example payload", dataValue = mapOf("id" to 1))
+    val example =
+        ExampleObject(
+            summary = "Example payload", dataValue = OpenApiObject(mapOf("id" to OpenApiInt(1L))))
     val encoding = EncodingObject(contentType = "application/json")
     val mediaType =
         MediaTypeObject(
@@ -100,8 +102,8 @@ class DomainModelsCoverageTest {
                                     "PositiveInt" to
                                         SchemaProperty(types = setOf("integer"), minimum = 1.0)),
                             title = "User schema",
-                            defaultValue = "{\"id\":1}",
-                            constValue = "{\"id\":1}",
+                            defaultValue = OpenApiString("{\"id\":1}"),
+                            constValue = OpenApiString("{\"id\":1}"),
                             deprecated = true,
                             readOnly = true,
                             writeOnly = false,
@@ -116,7 +118,8 @@ class DomainModelsCoverageTest {
                                     properties =
                                         mapOf(
                                             "country" to
-                                                SchemaProperty("string", constValue = "US"))),
+                                                SchemaProperty(
+                                                    "string", constValue = OpenApiString("US")))),
                             thenSchema =
                                 SchemaProperty(
                                     types = setOf("object"),
@@ -200,8 +203,8 @@ class DomainModelsCoverageTest {
     assertEquals("#/components/schemas/BaseUser", components.schemas["User"]?.dynamicRef)
     assertEquals("User schema comment", components.schemas["User"]?.comment)
     assertEquals("integer", components.schemas["User"]?.defs?.get("PositiveInt")?.type)
-    assertEquals("{\"id\":1}", components.schemas["User"]?.defaultValue)
-    assertEquals("{\"id\":1}", components.schemas["User"]?.constValue)
+    assertEquals(OpenApiString("{\"id\":1}"), components.schemas["User"]?.defaultValue)
+    assertEquals(OpenApiString("{\"id\":1}"), components.schemas["User"]?.constValue)
     assertEquals(true, components.schemas["User"]?.deprecated)
     assertEquals(true, components.parameters["limit"]?.deprecated)
     assertEquals("state", components.schemas["User"]?.thenSchema?.required?.first())

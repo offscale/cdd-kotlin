@@ -1,4720 +1,1014 @@
 package org.cdd.mcp
 
-import kotlinx.serialization.encodeToString
+import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.Json
-import org.junit.jupiter.api.Assertions.*
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
+/**
+ * Concise, parameterized round-trip serialization, equality, copy, and sealed-hierarchy tests for
+ * all MCP 1.0.0 protocol models in [McpModels.kt].
+ */
 class McpModelsCoverageTest {
-  companion object {
-    val testJsonBoth =
-        kotlinx.serialization.json.Json {
-          ignoreUnknownKeys = true
-          encodeDefaults = true
+  private val jsonCodec = Json {
+    ignoreUnknownKeys = true
+    encodeDefaults = true
+  }
+
+  private val jsonCompact = Json {
+    ignoreUnknownKeys = true
+    encodeDefaults = false
+  }
+
+  private fun <T : Any> verifyModel(
+      serializer: KSerializer<T>,
+      primary: T,
+      duplicate: T,
+      alternate: T,
+      copySame: (T) -> T
+  ) {
+    val encoded = jsonCodec.encodeToString(serializer, primary)
+    assertTrue(encoded.isNotBlank())
+    val decoded = jsonCodec.decodeFromString(serializer, encoded)
+    assertEquals(primary, decoded)
+
+    val encodedCompact = jsonCompact.encodeToString(serializer, primary)
+    assertEquals(primary, jsonCompact.decodeFromString(serializer, encodedCompact))
+
+    val encodedAlt = jsonCodec.encodeToString(serializer, alternate)
+    val decodedAlt = jsonCodec.decodeFromString(serializer, encodedAlt)
+    assertEquals(alternate, decodedAlt)
+
+    val encodedAltCompact = jsonCompact.encodeToString(serializer, alternate)
+    assertEquals(alternate, jsonCompact.decodeFromString(serializer, encodedAltCompact))
+
+    runCatching { jsonCompact.decodeFromString(serializer, "{}") }
+
+    assertEquals(primary, duplicate)
+    assertEquals(primary.hashCode(), duplicate.hashCode())
+    assertEquals(primary.toString(), duplicate.toString())
+    assertTrue(primary.equals(primary))
+    assertFalse(primary.equals(null))
+    assertFalse(primary.equals("unrelated"))
+    assertNotEquals(primary, alternate)
+    assertEquals(primary, copySame(primary))
+  }
+
+  @Test
+  fun testCorePrimitivesAndEnums() {
+    for (level in LoggingLevel.entries) {
+      val encoded = jsonCodec.encodeToString(LoggingLevel.serializer(), level)
+      assertEquals(level, jsonCodec.decodeFromString(LoggingLevel.serializer(), encoded))
+    }
+    assertNotEquals(LoggingLevel.debug, LoggingLevel.error)
+
+    for (role in Role.entries) {
+      val encoded = jsonCodec.encodeToString(Role.serializer(), role)
+      assertEquals(role, jsonCodec.decodeFromString(Role.serializer(), encoded))
+    }
+    assertNotEquals(Role.user, Role.assistant)
+
+    val cursor: Cursor = "cursor-1"
+    val progressToken: ProgressToken = "tok-1"
+    val requestId: RequestId = "req-1"
+    assertEquals("cursor-1", cursor)
+    assertEquals("tok-1", progressToken)
+    assertEquals("req-1", requestId)
+  }
+
+  @Test
+  fun testResourceAndContentModels() {
+    verifyModel(
+        Annotated.serializer(),
+        Annotated(),
+        Annotated(),
+        Annotated(annotations = mapOf("k" to "v"))) {
+          it.copy(annotations = it.annotations)
         }
-    val testJsonIgnore = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
-    val testJsonEncode = kotlinx.serialization.json.Json { encodeDefaults = true }
-  }
 
-  @Test
-  fun testAnnotated() {
-    val obj1 = Annotated()
-    val obj2 = Annotated()
-    val obj3 = Annotated(annotations = emptyMap<String, String>())
+    verifyModel(
+        BlobResourceContents.serializer(),
+        BlobResourceContents(blob = "YmxvYg==", uri = "file:///a"),
+        BlobResourceContents(blob = "YmxvYg==", uri = "file:///a"),
+        BlobResourceContents(
+            blob = "YWx0", mimeType = "application/octet-stream", uri = "file:///b")) {
+          it.copy(blob = it.blob, mimeType = it.mimeType, uri = it.uri)
+        }
 
-    assertNotNull(obj1)
+    verifyModel(
+        TextResourceContents.serializer(),
+        TextResourceContents(text = "hello", uri = "file:///a.txt"),
+        TextResourceContents(text = "hello", uri = "file:///a.txt"),
+        TextResourceContents(mimeType = "text/plain", text = "world", uri = "file:///b.txt")) {
+          it.copy(mimeType = it.mimeType, text = it.text, uri = it.uri)
+        }
 
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<Annotated>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<Annotated>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<Annotated>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
+    val rc1 = ResourceContents(uri = "file:///a")
+    val rc2 =
+        ResourceContents(
+            mimeType = "text/plain", uri = "file:///b", text = "bye", blob = "YmxvYg==")
+    verifyModel(ResourceContents.serializer(), rc1, rc1.copy(), rc2) {
+      it.copy(mimeType = it.mimeType, uri = it.uri, text = it.text, blob = it.blob)
     }
 
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(annotations = obj1.annotations)
-  }
-
-  @Test
-  fun testBlobResourceContents() {
-    val obj1 = BlobResourceContents(blob = "test", uri = "test")
-    val obj2 = BlobResourceContents(blob = "test", uri = "test")
-    val obj3 = BlobResourceContents(blob = "alt", mimeType = "alt", uri = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<BlobResourceContents>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<BlobResourceContents>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<BlobResourceContents>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(blob = obj1.blob, mimeType = obj1.mimeType, uri = obj1.uri)
-  }
-
-  @Test
-  fun testCallToolRequest() {
-    val obj1 = CallToolRequest(params = CallToolRequestParams(name = "test"))
-    val obj2 = CallToolRequest(params = CallToolRequestParams(name = "test"))
-    val obj3 =
-        CallToolRequest(
-            method = "alt",
-            params =
-                CallToolRequestParams(
-                    arguments = emptyMap<String, kotlinx.serialization.json.JsonElement>(),
-                    name = "alt"))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<CallToolRequest>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<CallToolRequest>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<CallToolRequest>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testCallToolRequestParams() {
-    val obj1 = CallToolRequestParams(name = "test")
-    val obj2 = CallToolRequestParams(name = "test")
-    val obj3 =
-        CallToolRequestParams(
-            arguments = emptyMap<String, kotlinx.serialization.json.JsonElement>(), name = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<CallToolRequestParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<CallToolRequestParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<CallToolRequestParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(arguments = obj1.arguments, name = obj1.name)
-  }
-
-  @Test
-  fun testCallToolResult() {
-    val obj1 = CallToolResult(content = emptyList<kotlinx.serialization.json.JsonElement>())
-    val obj2 = CallToolResult(content = emptyList<kotlinx.serialization.json.JsonElement>())
-    val obj3 =
-        CallToolResult(
-            _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>(),
-            content = emptyList<kotlinx.serialization.json.JsonElement>(),
-            isError = false)
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<CallToolResult>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<CallToolResult>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<CallToolResult>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(_meta = obj1._meta, content = obj1.content, isError = obj1.isError)
-  }
-
-  @Test
-  fun testCancelledNotification() {
-    val obj1 = CancelledNotification(params = CancelledNotificationParams(requestId = "test"))
-    val obj2 = CancelledNotification(params = CancelledNotificationParams(requestId = "test"))
-    val obj3 =
-        CancelledNotification(
-            method = "alt", params = CancelledNotificationParams(reason = "alt", requestId = "alt"))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<CancelledNotification>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<CancelledNotification>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<CancelledNotification>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testCancelledNotificationParams() {
-    val obj1 = CancelledNotificationParams(requestId = "test")
-    val obj2 = CancelledNotificationParams(requestId = "test")
-    val obj3 = CancelledNotificationParams(reason = "alt", requestId = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<CancelledNotificationParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<CancelledNotificationParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<CancelledNotificationParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(reason = obj1.reason, requestId = obj1.requestId)
-  }
-
-  @Test
-  fun testClientCapabilities() {
-    val obj1 = ClientCapabilities()
-    val obj2 = ClientCapabilities()
-    val obj3 =
-        ClientCapabilities(
-            experimental = emptyMap<String, kotlinx.serialization.json.JsonElement>(),
-            sampling = emptyMap<String, kotlinx.serialization.json.JsonElement>())
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ClientCapabilities>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ClientCapabilities>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ClientCapabilities>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(experimental = obj1.experimental, roots = obj1.roots, sampling = obj1.sampling)
-  }
-
-  @Test
-  fun testClientCapabilitiesRoots() {
-    val obj1 = ClientCapabilitiesRoots()
-    val obj2 = ClientCapabilitiesRoots()
-    val obj3 = ClientCapabilitiesRoots(listChanged = false)
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ClientCapabilitiesRoots>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ClientCapabilitiesRoots>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ClientCapabilitiesRoots>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(listChanged = obj1.listChanged)
-  }
-
-  @Test
-  fun testCompleteRequest() {
-    val obj1 =
-        CompleteRequest(
-            params =
-                CompleteRequestParams(
-                    argument = CompleteRequestArgument(name = "test", value = "test"),
-                    ref = CompleteRequestRef(type = "test")))
-    val obj2 =
-        CompleteRequest(
-            params =
-                CompleteRequestParams(
-                    argument = CompleteRequestArgument(name = "test", value = "test"),
-                    ref = CompleteRequestRef(type = "test")))
-    val obj3 =
-        CompleteRequest(
-            method = "alt",
-            params =
-                CompleteRequestParams(
-                    argument = CompleteRequestArgument(name = "alt", value = "alt"),
-                    ref = CompleteRequestRef(name = "alt", type = "alt")))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<CompleteRequest>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<CompleteRequest>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<CompleteRequest>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testCompleteRequestParams() {
-    val obj1 =
-        CompleteRequestParams(
-            argument = CompleteRequestArgument(name = "test", value = "test"),
-            ref = CompleteRequestRef(type = "test"))
-    val obj2 =
-        CompleteRequestParams(
-            argument = CompleteRequestArgument(name = "test", value = "test"),
-            ref = CompleteRequestRef(type = "test"))
-    val obj3 =
-        CompleteRequestParams(
-            argument = CompleteRequestArgument(name = "alt", value = "alt"),
-            ref = CompleteRequestRef(name = "alt", type = "alt"))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<CompleteRequestParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<CompleteRequestParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<CompleteRequestParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(argument = obj1.argument, ref = obj1.ref)
-  }
-
-  @Test
-  fun testCompleteRequestArgument() {
-    val obj1 = CompleteRequestArgument(name = "test", value = "test")
-    val obj2 = CompleteRequestArgument(name = "test", value = "test")
-    val obj3 = CompleteRequestArgument(name = "alt", value = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<CompleteRequestArgument>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<CompleteRequestArgument>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<CompleteRequestArgument>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(name = obj1.name, value = obj1.value)
-  }
-
-  @Test
-  fun testCompleteRequestRef() {
-    val obj1 = CompleteRequestRef(type = "test")
-    val obj2 = CompleteRequestRef(type = "test")
-    val obj3 = CompleteRequestRef(name = "alt", type = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<CompleteRequestRef>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<CompleteRequestRef>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<CompleteRequestRef>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(name = obj1.name, type = obj1.type)
-  }
-
-  @Test
-  fun testCompleteResult() {
-    val obj1 = CompleteResult(completion = CompleteResultCompletion(values = emptyList<String>()))
-    val obj2 = CompleteResult(completion = CompleteResultCompletion(values = emptyList<String>()))
-    val obj3 =
-        CompleteResult(
-            _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>(),
-            completion =
-                CompleteResultCompletion(hasMore = false, total = 1, values = emptyList<String>()))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<CompleteResult>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<CompleteResult>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<CompleteResult>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(_meta = obj1._meta, completion = obj1.completion)
-  }
-
-  @Test
-  fun testCompleteResultCompletion() {
-    val obj1 = CompleteResultCompletion(values = emptyList<String>())
-    val obj2 = CompleteResultCompletion(values = emptyList<String>())
-    val obj3 = CompleteResultCompletion(hasMore = false, total = 1, values = emptyList<String>())
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<CompleteResultCompletion>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<CompleteResultCompletion>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<CompleteResultCompletion>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(hasMore = obj1.hasMore, total = obj1.total, values = obj1.values)
-  }
-
-  @Test
-  fun testCreateMessageRequest() {
-    val obj1 =
-        CreateMessageRequest(
-            params =
-                CreateMessageRequestParams(maxTokens = 0, messages = emptyList<SamplingMessage>()))
-    val obj2 =
-        CreateMessageRequest(
-            params =
-                CreateMessageRequestParams(maxTokens = 0, messages = emptyList<SamplingMessage>()))
-    val obj3 =
-        CreateMessageRequest(
-            method = "alt",
-            params =
-                CreateMessageRequestParams(
-                    includeContext = "alt",
-                    maxTokens = 1,
-                    messages = emptyList<SamplingMessage>(),
-                    metadata = emptyMap<String, kotlinx.serialization.json.JsonElement>(),
-                    stopSequences = emptyList<String>(),
-                    systemPrompt = "alt",
-                    temperature = 1.0))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<CreateMessageRequest>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<CreateMessageRequest>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<CreateMessageRequest>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testCreateMessageRequestParams() {
-    val obj1 = CreateMessageRequestParams(maxTokens = 0, messages = emptyList<SamplingMessage>())
-    val obj2 = CreateMessageRequestParams(maxTokens = 0, messages = emptyList<SamplingMessage>())
-    val obj3 =
-        CreateMessageRequestParams(
-            includeContext = "alt",
-            maxTokens = 1,
-            messages = emptyList<SamplingMessage>(),
-            metadata = emptyMap<String, kotlinx.serialization.json.JsonElement>(),
-            stopSequences = emptyList<String>(),
-            systemPrompt = "alt",
-            temperature = 1.0)
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<CreateMessageRequestParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<CreateMessageRequestParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<CreateMessageRequestParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(
-        includeContext = obj1.includeContext,
-        maxTokens = obj1.maxTokens,
-        messages = obj1.messages,
-        metadata = obj1.metadata,
-        modelPreferences = obj1.modelPreferences,
-        stopSequences = obj1.stopSequences,
-        systemPrompt = obj1.systemPrompt,
-        temperature = obj1.temperature)
-  }
-
-  @Test
-  fun testCreateMessageResult() {
-    val obj1 =
-        CreateMessageResult(
-            content = SamplingMessageContent(type = "test"), model = "test", role = Role.user)
-    val obj2 =
-        CreateMessageResult(
-            content = SamplingMessageContent(type = "test"), model = "test", role = Role.user)
-    val obj3 =
-        CreateMessageResult(
-            _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>(),
-            content =
-                SamplingMessageContent(text = "alt", type = "alt", data = "alt", mimeType = "alt"),
-            model = "alt",
-            role = Role.assistant,
-            stopReason = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<CreateMessageResult>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<CreateMessageResult>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<CreateMessageResult>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(
-        _meta = obj1._meta,
-        content = obj1.content,
-        model = obj1.model,
-        role = obj1.role,
-        stopReason = obj1.stopReason)
-  }
-
-  @Test
-  fun testSamplingMessageContent() {
-    val obj1 = SamplingMessageContent(type = "test")
-    val obj2 = SamplingMessageContent(type = "test")
-    val obj3 = SamplingMessageContent(text = "alt", type = "alt", data = "alt", mimeType = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<SamplingMessageContent>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<SamplingMessageContent>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<SamplingMessageContent>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(text = obj1.text, type = obj1.type, data = obj1.data, mimeType = obj1.mimeType)
-  }
-
-  @Test
-  fun testEmbeddedResource() {
-    val obj1 = EmbeddedResource(resource = ResourceContents(uri = "test"))
-    val obj2 = EmbeddedResource(resource = ResourceContents(uri = "test"))
-    val obj3 =
-        EmbeddedResource(
-            annotations = emptyMap<String, String>(),
-            resource = ResourceContents(mimeType = "alt", uri = "alt", text = "alt", blob = "alt"),
-            type = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<EmbeddedResource>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<EmbeddedResource>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<EmbeddedResource>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(annotations = obj1.annotations, resource = obj1.resource, type = obj1.type)
-  }
-
-  @Test
-  fun testGetPromptRequest() {
-    val obj1 = GetPromptRequest(params = GetPromptRequestParams(name = "test"))
-    val obj2 = GetPromptRequest(params = GetPromptRequestParams(name = "test"))
-    val obj3 =
-        GetPromptRequest(
-            method = "alt",
-            params = GetPromptRequestParams(arguments = emptyMap<String, String>(), name = "alt"))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<GetPromptRequest>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<GetPromptRequest>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<GetPromptRequest>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testGetPromptRequestParams() {
-    val obj1 = GetPromptRequestParams(name = "test")
-    val obj2 = GetPromptRequestParams(name = "test")
-    val obj3 = GetPromptRequestParams(arguments = emptyMap<String, String>(), name = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<GetPromptRequestParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<GetPromptRequestParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<GetPromptRequestParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(arguments = obj1.arguments, name = obj1.name)
-  }
-
-  @Test
-  fun testGetPromptResult() {
-    val obj1 = GetPromptResult(messages = emptyList<PromptMessage>())
-    val obj2 = GetPromptResult(messages = emptyList<PromptMessage>())
-    val obj3 =
-        GetPromptResult(
-            _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>(),
-            description = "alt",
-            messages = emptyList<PromptMessage>())
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<GetPromptResult>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<GetPromptResult>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<GetPromptResult>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(_meta = obj1._meta, description = obj1.description, messages = obj1.messages)
-  }
-
-  @Test
-  fun testImageContent() {
-    val obj1 = ImageContent(data = "test", mimeType = "test")
-    val obj2 = ImageContent(data = "test", mimeType = "test")
-    val obj3 =
+    verifyModel(
+        EmbeddedResource.serializer(),
+        EmbeddedResource(resource = rc1),
+        EmbeddedResource(resource = rc1),
+        EmbeddedResource(annotations = mapOf("a" to "b"), resource = rc2, type = "resource")) {
+          it.copy(annotations = it.annotations, resource = it.resource, type = it.type)
+        }
+
+    verifyModel(
+        ImageContent.serializer(),
+        ImageContent(data = "img1", mimeType = "image/png"),
+        ImageContent(data = "img1", mimeType = "image/png"),
         ImageContent(
-            annotations = emptyMap<String, String>(), data = "alt", mimeType = "alt", type = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ImageContent>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ImageContent>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ImageContent>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(
-        annotations = obj1.annotations,
-        data = obj1.data,
-        mimeType = obj1.mimeType,
-        type = obj1.type)
-  }
-
-  @Test
-  fun testImplementation() {
-    val obj1 = Implementation(name = "test", version = "test")
-    val obj2 = Implementation(name = "test", version = "test")
-    val obj3 = Implementation(name = "alt", version = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<Implementation>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<Implementation>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<Implementation>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(name = obj1.name, version = obj1.version)
-  }
-
-  @Test
-  fun testInitializeRequest() {
-    val obj1 =
-        InitializeRequest(
-            params =
-                InitializeRequestParams(
-                    capabilities = ClientCapabilities(),
-                    clientInfo = Implementation(name = "test", version = "test"),
-                    protocolVersion = "test"))
-    val obj2 =
-        InitializeRequest(
-            params =
-                InitializeRequestParams(
-                    capabilities = ClientCapabilities(),
-                    clientInfo = Implementation(name = "test", version = "test"),
-                    protocolVersion = "test"))
-    val obj3 =
-        InitializeRequest(
-            method = "alt",
-            params =
-                InitializeRequestParams(
-                    capabilities =
-                        ClientCapabilities(
-                            experimental =
-                                emptyMap<String, kotlinx.serialization.json.JsonElement>(),
-                            sampling = emptyMap<String, kotlinx.serialization.json.JsonElement>()),
-                    clientInfo = Implementation(name = "alt", version = "alt"),
-                    protocolVersion = "alt"))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<InitializeRequest>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<InitializeRequest>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<InitializeRequest>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testInitializeRequestParams() {
-    val obj1 =
-        InitializeRequestParams(
-            capabilities = ClientCapabilities(),
-            clientInfo = Implementation(name = "test", version = "test"),
-            protocolVersion = "test")
-    val obj2 =
-        InitializeRequestParams(
-            capabilities = ClientCapabilities(),
-            clientInfo = Implementation(name = "test", version = "test"),
-            protocolVersion = "test")
-    val obj3 =
-        InitializeRequestParams(
-            capabilities =
-                ClientCapabilities(
-                    experimental = emptyMap<String, kotlinx.serialization.json.JsonElement>(),
-                    sampling = emptyMap<String, kotlinx.serialization.json.JsonElement>()),
-            clientInfo = Implementation(name = "alt", version = "alt"),
-            protocolVersion = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<InitializeRequestParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<InitializeRequestParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<InitializeRequestParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(
-        capabilities = obj1.capabilities,
-        clientInfo = obj1.clientInfo,
-        protocolVersion = obj1.protocolVersion)
-  }
-
-  @Test
-  fun testInitializeResult() {
-    val obj1 =
-        InitializeResult(
-            capabilities = ServerCapabilities(),
-            protocolVersion = "test",
-            serverInfo = Implementation(name = "test", version = "test"))
-    val obj2 =
-        InitializeResult(
-            capabilities = ServerCapabilities(),
-            protocolVersion = "test",
-            serverInfo = Implementation(name = "test", version = "test"))
-    val obj3 =
-        InitializeResult(
-            _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>(),
-            capabilities =
-                ServerCapabilities(
-                    experimental = emptyMap<String, kotlinx.serialization.json.JsonElement>(),
-                    logging = emptyMap<String, kotlinx.serialization.json.JsonElement>()),
-            instructions = "alt",
-            protocolVersion = "alt",
-            serverInfo = Implementation(name = "alt", version = "alt"))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<InitializeResult>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<InitializeResult>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<InitializeResult>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(
-        _meta = obj1._meta,
-        capabilities = obj1.capabilities,
-        instructions = obj1.instructions,
-        protocolVersion = obj1.protocolVersion,
-        serverInfo = obj1.serverInfo)
-  }
-
-  @Test
-  fun testInitializedNotification() {
-    val obj1 = InitializedNotification()
-    val obj2 = InitializedNotification()
-    val obj3 =
-        InitializedNotification(
-            method = "alt",
-            params =
-                InitializedNotificationParams(
-                    _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>()))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<InitializedNotification>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<InitializedNotification>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<InitializedNotification>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testInitializedNotificationParams() {
-    val obj1 = InitializedNotificationParams()
-    val obj2 = InitializedNotificationParams()
-    val obj3 =
-        InitializedNotificationParams(
-            _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>())
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<InitializedNotificationParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<InitializedNotificationParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<InitializedNotificationParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(_meta = obj1._meta)
-  }
-
-  @Test
-  fun testJSONRPCError() {
-    val obj1 = JSONRPCError(error = JSONRPCErrorError(code = 0, message = "test"), id = "test")
-    val obj2 = JSONRPCError(error = JSONRPCErrorError(code = 0, message = "test"), id = "test")
-    val obj3 =
-        JSONRPCError(
-            error =
-                JSONRPCErrorError(
-                    code = 1,
-                    data = kotlinx.serialization.json.JsonObject(emptyMap()),
-                    message = "alt"),
-            id = "alt",
-            jsonrpc = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<JSONRPCError>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<JSONRPCError>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<JSONRPCError>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(error = obj1.error, id = obj1.id, jsonrpc = obj1.jsonrpc)
-  }
-
-  @Test
-  fun testJSONRPCErrorError() {
-    val obj1 = JSONRPCErrorError(code = 0, message = "test")
-    val obj2 = JSONRPCErrorError(code = 0, message = "test")
-    val obj3 =
-        JSONRPCErrorError(
-            code = 1, data = kotlinx.serialization.json.JsonObject(emptyMap()), message = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<JSONRPCErrorError>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<JSONRPCErrorError>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<JSONRPCErrorError>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(code = obj1.code, data = obj1.data, message = obj1.message)
-  }
-
-  @Test
-  fun testJSONRPCNotification() {
-    val obj1 = JSONRPCNotification(method = "test")
-    val obj2 = JSONRPCNotification(method = "test")
-    val obj3 =
-        JSONRPCNotification(
-            jsonrpc = "alt",
-            method = "alt",
-            params = kotlinx.serialization.json.JsonObject(emptyMap()))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<JSONRPCNotification>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<JSONRPCNotification>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<JSONRPCNotification>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(jsonrpc = obj1.jsonrpc, method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testJSONRPCRequest() {
-    val obj1 = JSONRPCRequest(id = "test", method = "test")
-    val obj2 = JSONRPCRequest(id = "test", method = "test")
-    val obj3 =
-        JSONRPCRequest(
-            id = "alt",
-            jsonrpc = "alt",
-            method = "alt",
-            params = kotlinx.serialization.json.JsonObject(emptyMap()))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<JSONRPCRequest>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<JSONRPCRequest>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<JSONRPCRequest>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(id = obj1.id, jsonrpc = obj1.jsonrpc, method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testJSONRPCResponse() {
-    val obj1 =
-        JSONRPCResponse(id = "test", result = kotlinx.serialization.json.JsonObject(emptyMap()))
-    val obj2 =
-        JSONRPCResponse(id = "test", result = kotlinx.serialization.json.JsonObject(emptyMap()))
-    val obj3 =
-        JSONRPCResponse(
-            id = "alt", jsonrpc = "alt", result = kotlinx.serialization.json.JsonObject(emptyMap()))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<JSONRPCResponse>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<JSONRPCResponse>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<JSONRPCResponse>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(id = obj1.id, jsonrpc = obj1.jsonrpc, result = obj1.result)
-  }
-
-  @Test
-  fun testListPromptsRequest() {
-    val obj1 = ListPromptsRequest()
-    val obj2 = ListPromptsRequest()
-    val obj3 = ListPromptsRequest(method = "alt", params = ListPromptsRequestParams(cursor = "alt"))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ListPromptsRequest>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ListPromptsRequest>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ListPromptsRequest>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testListPromptsRequestParams() {
-    val obj1 = ListPromptsRequestParams()
-    val obj2 = ListPromptsRequestParams()
-    val obj3 = ListPromptsRequestParams(cursor = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ListPromptsRequestParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ListPromptsRequestParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ListPromptsRequestParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(cursor = obj1.cursor)
-  }
-
-  @Test
-  fun testListPromptsResult() {
-    val obj1 = ListPromptsResult(prompts = emptyList<Prompt>())
-    val obj2 = ListPromptsResult(prompts = emptyList<Prompt>())
-    val obj3 =
-        ListPromptsResult(
-            _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>(),
-            nextCursor = "alt",
-            prompts = emptyList<Prompt>())
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ListPromptsResult>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ListPromptsResult>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ListPromptsResult>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(_meta = obj1._meta, nextCursor = obj1.nextCursor, prompts = obj1.prompts)
-  }
-
-  @Test
-  fun testListResourceTemplatesRequest() {
-    val obj1 = ListResourceTemplatesRequest()
-    val obj2 = ListResourceTemplatesRequest()
-    val obj3 =
-        ListResourceTemplatesRequest(
-            method = "alt", params = ListResourceTemplatesRequestParams(cursor = "alt"))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ListResourceTemplatesRequest>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ListResourceTemplatesRequest>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ListResourceTemplatesRequest>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testListResourceTemplatesRequestParams() {
-    val obj1 = ListResourceTemplatesRequestParams()
-    val obj2 = ListResourceTemplatesRequestParams()
-    val obj3 = ListResourceTemplatesRequestParams(cursor = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ListResourceTemplatesRequestParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ListResourceTemplatesRequestParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ListResourceTemplatesRequestParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(cursor = obj1.cursor)
-  }
-
-  @Test
-  fun testListResourceTemplatesResult() {
-    val obj1 = ListResourceTemplatesResult(resourceTemplates = emptyList<ResourceTemplate>())
-    val obj2 = ListResourceTemplatesResult(resourceTemplates = emptyList<ResourceTemplate>())
-    val obj3 =
-        ListResourceTemplatesResult(
-            _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>(),
-            nextCursor = "alt",
-            resourceTemplates = emptyList<ResourceTemplate>())
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ListResourceTemplatesResult>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ListResourceTemplatesResult>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ListResourceTemplatesResult>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(
-        _meta = obj1._meta,
-        nextCursor = obj1.nextCursor,
-        resourceTemplates = obj1.resourceTemplates)
-  }
-
-  @Test
-  fun testListResourcesRequest() {
-    val obj1 = ListResourcesRequest()
-    val obj2 = ListResourcesRequest()
-    val obj3 =
-        ListResourcesRequest(method = "alt", params = ListResourcesRequestParams(cursor = "alt"))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ListResourcesRequest>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ListResourcesRequest>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ListResourcesRequest>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testListResourcesRequestParams() {
-    val obj1 = ListResourcesRequestParams()
-    val obj2 = ListResourcesRequestParams()
-    val obj3 = ListResourcesRequestParams(cursor = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ListResourcesRequestParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ListResourcesRequestParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ListResourcesRequestParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(cursor = obj1.cursor)
-  }
-
-  @Test
-  fun testListResourcesResult() {
-    val obj1 = ListResourcesResult(resources = emptyList<Resource>())
-    val obj2 = ListResourcesResult(resources = emptyList<Resource>())
-    val obj3 =
-        ListResourcesResult(
-            _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>(),
-            nextCursor = "alt",
-            resources = emptyList<Resource>())
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ListResourcesResult>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ListResourcesResult>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ListResourcesResult>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(_meta = obj1._meta, nextCursor = obj1.nextCursor, resources = obj1.resources)
-  }
-
-  @Test
-  fun testListRootsRequest() {
-    val obj1 = ListRootsRequest()
-    val obj2 = ListRootsRequest()
-    val obj3 =
-        ListRootsRequest(
-            method = "alt",
-            params =
-                ListRootsRequestParams(
-                    _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>()))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ListRootsRequest>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ListRootsRequest>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ListRootsRequest>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testListRootsRequestParams() {
-    val obj1 = ListRootsRequestParams()
-    val obj2 = ListRootsRequestParams()
-    val obj3 =
-        ListRootsRequestParams(_meta = emptyMap<String, kotlinx.serialization.json.JsonElement>())
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ListRootsRequestParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ListRootsRequestParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ListRootsRequestParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(_meta = obj1._meta)
-  }
-
-  @Test
-  fun testListRootsResult() {
-    val obj1 = ListRootsResult(roots = emptyList<Root>())
-    val obj2 = ListRootsResult(roots = emptyList<Root>())
-    val obj3 =
-        ListRootsResult(
-            _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>(),
-            roots = emptyList<Root>())
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ListRootsResult>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ListRootsResult>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ListRootsResult>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(_meta = obj1._meta, roots = obj1.roots)
-  }
-
-  @Test
-  fun testListToolsRequest() {
-    val obj1 = ListToolsRequest()
-    val obj2 = ListToolsRequest()
-    val obj3 = ListToolsRequest(method = "alt", params = ListToolsRequestParams(cursor = "alt"))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ListToolsRequest>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ListToolsRequest>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ListToolsRequest>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testListToolsRequestParams() {
-    val obj1 = ListToolsRequestParams()
-    val obj2 = ListToolsRequestParams()
-    val obj3 = ListToolsRequestParams(cursor = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ListToolsRequestParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ListToolsRequestParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ListToolsRequestParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(cursor = obj1.cursor)
-  }
-
-  @Test
-  fun testListToolsResult() {
-    val obj1 = ListToolsResult(tools = emptyList<Tool>())
-    val obj2 = ListToolsResult(tools = emptyList<Tool>())
-    val obj3 =
-        ListToolsResult(
-            _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>(),
-            nextCursor = "alt",
-            tools = emptyList<Tool>())
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ListToolsResult>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ListToolsResult>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ListToolsResult>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(_meta = obj1._meta, nextCursor = obj1.nextCursor, tools = obj1.tools)
-  }
-
-  @Test
-  fun testLoggingMessageNotification() {
-    val obj1 =
-        LoggingMessageNotification(
-            params =
-                LoggingMessageNotificationParams(
-                    data = kotlinx.serialization.json.JsonObject(emptyMap()),
-                    level = LoggingLevel.debug))
-    val obj2 =
-        LoggingMessageNotification(
-            params =
-                LoggingMessageNotificationParams(
-                    data = kotlinx.serialization.json.JsonObject(emptyMap()),
-                    level = LoggingLevel.debug))
-    val obj3 =
-        LoggingMessageNotification(
-            method = "alt",
-            params =
-                LoggingMessageNotificationParams(
-                    data = kotlinx.serialization.json.JsonObject(emptyMap()),
-                    level = LoggingLevel.info,
-                    logger = "alt"))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<LoggingMessageNotification>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<LoggingMessageNotification>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<LoggingMessageNotification>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testLoggingMessageNotificationParams() {
-    val obj1 =
-        LoggingMessageNotificationParams(
-            data = kotlinx.serialization.json.JsonObject(emptyMap()), level = LoggingLevel.debug)
-    val obj2 =
-        LoggingMessageNotificationParams(
-            data = kotlinx.serialization.json.JsonObject(emptyMap()), level = LoggingLevel.debug)
-    val obj3 =
-        LoggingMessageNotificationParams(
-            data = kotlinx.serialization.json.JsonObject(emptyMap()),
-            level = LoggingLevel.info,
-            logger = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<LoggingMessageNotificationParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<LoggingMessageNotificationParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<LoggingMessageNotificationParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(data = obj1.data, level = obj1.level, logger = obj1.logger)
-  }
-
-  @Test
-  fun testModelHint() {
-    val obj1 = ModelHint(name = "test")
-    val obj2 = ModelHint(name = "test")
-    val obj3 = ModelHint(name = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ModelHint>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ModelHint>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ModelHint>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(name = obj1.name)
-  }
-
-  @Test
-  fun testModelPreferences() {
-    val obj1 = ModelPreferences()
-    val obj2 = ModelPreferences()
-    val obj3 =
-        ModelPreferences(
-            costPriority = 1.0,
-            hints = emptyList<ModelHint>(),
-            intelligencePriority = 1.0,
-            speedPriority = 1.0)
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ModelPreferences>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ModelPreferences>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ModelPreferences>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(
-        costPriority = obj1.costPriority,
-        hints = obj1.hints,
-        intelligencePriority = obj1.intelligencePriority,
-        speedPriority = obj1.speedPriority)
-  }
-
-  @Test
-  fun testNotification() {
-    val obj1 = Notification(method = "test")
-    val obj2 = Notification(method = "test")
-    val obj3 =
-        Notification(
-            method = "alt", params = emptyMap<String, kotlinx.serialization.json.JsonElement>())
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<Notification>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<Notification>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<Notification>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testPaginatedRequest() {
-    val obj1 = PaginatedRequest(method = "test")
-    val obj2 = PaginatedRequest(method = "test")
-    val obj3 = PaginatedRequest(method = "alt", params = PaginatedRequestParams(cursor = "alt"))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<PaginatedRequest>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<PaginatedRequest>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<PaginatedRequest>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testPaginatedRequestParams() {
-    val obj1 = PaginatedRequestParams()
-    val obj2 = PaginatedRequestParams()
-    val obj3 = PaginatedRequestParams(cursor = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<PaginatedRequestParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<PaginatedRequestParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<PaginatedRequestParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(cursor = obj1.cursor)
-  }
-
-  @Test
-  fun testPaginatedResult() {
-    val obj1 = PaginatedResult()
-    val obj2 = PaginatedResult()
-    val obj3 =
-        PaginatedResult(
-            _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>(), nextCursor = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<PaginatedResult>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<PaginatedResult>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<PaginatedResult>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(_meta = obj1._meta, nextCursor = obj1.nextCursor)
-  }
-
-  @Test
-  fun testPingRequest() {
-    val obj1 = PingRequest()
-    val obj2 = PingRequest()
-    val obj3 =
-        PingRequest(
-            method = "alt",
-            params =
-                PingRequestParams(
-                    _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>()))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<PingRequest>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<PingRequest>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<PingRequest>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testPingRequestParams() {
-    val obj1 = PingRequestParams()
-    val obj2 = PingRequestParams()
-    val obj3 = PingRequestParams(_meta = emptyMap<String, kotlinx.serialization.json.JsonElement>())
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<PingRequestParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<PingRequestParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<PingRequestParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(_meta = obj1._meta)
-  }
-
-  @Test
-  fun testProgressNotification() {
-    val obj1 =
-        ProgressNotification(
-            params = ProgressNotificationParams(progressToken = "test", progress = 0.0))
-    val obj2 =
-        ProgressNotification(
-            params = ProgressNotificationParams(progressToken = "test", progress = 0.0))
-    val obj3 =
-        ProgressNotification(
-            method = "alt",
-            params = ProgressNotificationParams(progressToken = "alt", progress = 1.0, total = 1.0))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ProgressNotification>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ProgressNotification>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ProgressNotification>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testProgressNotificationParams() {
-    val obj1 = ProgressNotificationParams(progressToken = "test", progress = 0.0)
-    val obj2 = ProgressNotificationParams(progressToken = "test", progress = 0.0)
-    val obj3 = ProgressNotificationParams(progressToken = "alt", progress = 1.0, total = 1.0)
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ProgressNotificationParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ProgressNotificationParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ProgressNotificationParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(progressToken = obj1.progressToken, progress = obj1.progress, total = obj1.total)
-  }
-
-  @Test
-  fun testPrompt() {
-    val obj1 = Prompt(name = "test")
-    val obj2 = Prompt(name = "test")
-    val obj3 = Prompt(arguments = emptyList<PromptArgument>(), description = "alt", name = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<Prompt>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<Prompt>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<Prompt>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(arguments = obj1.arguments, description = obj1.description, name = obj1.name)
-  }
-
-  @Test
-  fun testPromptArgument() {
-    val obj1 = PromptArgument(name = "test")
-    val obj2 = PromptArgument(name = "test")
-    val obj3 = PromptArgument(description = "alt", name = "alt", required = false)
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<PromptArgument>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<PromptArgument>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<PromptArgument>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(description = obj1.description, name = obj1.name, required = obj1.required)
-  }
-
-  @Test
-  fun testPromptListChangedNotification() {
-    val obj1 = PromptListChangedNotification()
-    val obj2 = PromptListChangedNotification()
-    val obj3 =
-        PromptListChangedNotification(
-            method = "alt",
-            params =
-                PromptListChangedNotificationParams(
-                    _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>()))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<PromptListChangedNotification>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<PromptListChangedNotification>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<PromptListChangedNotification>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testPromptListChangedNotificationParams() {
-    val obj1 = PromptListChangedNotificationParams()
-    val obj2 = PromptListChangedNotificationParams()
-    val obj3 =
-        PromptListChangedNotificationParams(
-            _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>())
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<PromptListChangedNotificationParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<PromptListChangedNotificationParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<PromptListChangedNotificationParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(_meta = obj1._meta)
-  }
-
-  @Test
-  fun testPromptMessage() {
-    val obj1 = PromptMessage(content = PromptMessageContent(type = "test"), role = Role.user)
-    val obj2 = PromptMessage(content = PromptMessageContent(type = "test"), role = Role.user)
-    val obj3 =
-        PromptMessage(
-            content =
-                PromptMessageContent(text = "alt", type = "alt", data = "alt", mimeType = "alt"),
-            role = Role.assistant)
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<PromptMessage>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<PromptMessage>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<PromptMessage>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(content = obj1.content, role = obj1.role)
-  }
-
-  @Test
-  fun testPromptMessageContent() {
-    val obj1 = PromptMessageContent(type = "test")
-    val obj2 = PromptMessageContent(type = "test")
-    val obj3 = PromptMessageContent(text = "alt", type = "alt", data = "alt", mimeType = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<PromptMessageContent>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<PromptMessageContent>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<PromptMessageContent>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(text = obj1.text, type = obj1.type, data = obj1.data, mimeType = obj1.mimeType)
-  }
-
-  @Test
-  fun testPromptReference() {
-    val obj1 = PromptReference(name = "test")
-    val obj2 = PromptReference(name = "test")
-    val obj3 = PromptReference(name = "alt", type = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<PromptReference>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<PromptReference>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<PromptReference>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(name = obj1.name, type = obj1.type)
-  }
-
-  @Test
-  fun testReadResourceRequest() {
-    val obj1 = ReadResourceRequest(params = ReadResourceRequestParams(uri = "test"))
-    val obj2 = ReadResourceRequest(params = ReadResourceRequestParams(uri = "test"))
-    val obj3 = ReadResourceRequest(method = "alt", params = ReadResourceRequestParams(uri = "alt"))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ReadResourceRequest>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ReadResourceRequest>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ReadResourceRequest>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testReadResourceRequestParams() {
-    val obj1 = ReadResourceRequestParams(uri = "test")
-    val obj2 = ReadResourceRequestParams(uri = "test")
-    val obj3 = ReadResourceRequestParams(uri = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ReadResourceRequestParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ReadResourceRequestParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ReadResourceRequestParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(uri = obj1.uri)
-  }
-
-  @Test
-  fun testReadResourceResult() {
-    val obj1 = ReadResourceResult(contents = emptyList<ResourceContents>())
-    val obj2 = ReadResourceResult(contents = emptyList<ResourceContents>())
-    val obj3 =
-        ReadResourceResult(
-            _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>(),
-            contents = emptyList<ResourceContents>())
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ReadResourceResult>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ReadResourceResult>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ReadResourceResult>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(_meta = obj1._meta, contents = obj1.contents)
-  }
-
-  @Test
-  fun testRequest() {
-    val obj1 = Request(method = "test")
-    val obj2 = Request(method = "test")
-    val obj3 =
-        Request(method = "alt", params = emptyMap<String, kotlinx.serialization.json.JsonElement>())
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<Request>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<Request>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<Request>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testResource() {
-    val obj1 = Resource(name = "test", uri = "test")
-    val obj2 = Resource(name = "test", uri = "test")
-    val obj3 =
+            annotations = mapOf("a" to "1"),
+            data = "img2",
+            mimeType = "image/jpeg",
+            type = "image")) {
+          it.copy(
+              annotations = it.annotations, data = it.data, mimeType = it.mimeType, type = it.type)
+        }
+
+    verifyModel(
+        TextContent.serializer(),
+        TextContent(text = "hello"),
+        TextContent(text = "hello"),
+        TextContent(annotations = mapOf("a" to "1"), text = "world", type = "text")) {
+          it.copy(annotations = it.annotations, text = it.text, type = it.type)
+        }
+
+    verifyModel(
+        Resource.serializer(),
+        Resource(name = "r1", uri = "file:///r1"),
+        Resource(name = "r1", uri = "file:///r1"),
         Resource(
-            annotations = emptyMap<String, String>(),
-            description = "alt",
-            mimeType = "alt",
-            name = "alt",
-            size = 1,
-            uri = "alt")
+            annotations = mapOf("a" to "b"),
+            description = "desc",
+            mimeType = "text/plain",
+            name = "r2",
+            size = 42,
+            uri = "file:///r2")) {
+          it.copy(
+              annotations = it.annotations,
+              description = it.description,
+              mimeType = it.mimeType,
+              name = it.name,
+              size = it.size,
+              uri = it.uri)
+        }
 
-    assertNotNull(obj1)
+    verifyModel(
+        ResourceReference.serializer(),
+        ResourceReference(uri = "file:///r1"),
+        ResourceReference(uri = "file:///r1"),
+        ResourceReference(type = "resource", uri = "file:///r2")) {
+          it.copy(type = it.type, uri = it.uri)
+        }
 
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<Resource>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<Resource>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<Resource>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(
-        annotations = obj1.annotations,
-        description = obj1.description,
-        mimeType = obj1.mimeType,
-        name = obj1.name,
-        size = obj1.size,
-        uri = obj1.uri)
-  }
-
-  @Test
-  fun testResourceContents() {
-    val obj1 = ResourceContents(uri = "test")
-    val obj2 = ResourceContents(uri = "test")
-    val obj3 = ResourceContents(mimeType = "alt", uri = "alt", text = "alt", blob = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ResourceContents>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ResourceContents>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ResourceContents>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(mimeType = obj1.mimeType, uri = obj1.uri, text = obj1.text, blob = obj1.blob)
-  }
-
-  @Test
-  fun testResourceListChangedNotification() {
-    val obj1 = ResourceListChangedNotification()
-    val obj2 = ResourceListChangedNotification()
-    val obj3 =
-        ResourceListChangedNotification(
-            method = "alt",
-            params =
-                ResourceListChangedNotificationParams(
-                    _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>()))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ResourceListChangedNotification>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ResourceListChangedNotification>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ResourceListChangedNotification>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testResourceListChangedNotificationParams() {
-    val obj1 = ResourceListChangedNotificationParams()
-    val obj2 = ResourceListChangedNotificationParams()
-    val obj3 =
-        ResourceListChangedNotificationParams(
-            _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>())
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ResourceListChangedNotificationParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ResourceListChangedNotificationParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ResourceListChangedNotificationParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(_meta = obj1._meta)
-  }
-
-  @Test
-  fun testResourceReference() {
-    val obj1 = ResourceReference(uri = "test")
-    val obj2 = ResourceReference(uri = "test")
-    val obj3 = ResourceReference(type = "alt", uri = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ResourceReference>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ResourceReference>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ResourceReference>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(type = obj1.type, uri = obj1.uri)
-  }
-
-  @Test
-  fun testResourceTemplate() {
-    val obj1 = ResourceTemplate(name = "test", uriTemplate = "test")
-    val obj2 = ResourceTemplate(name = "test", uriTemplate = "test")
-    val obj3 =
+    verifyModel(
+        ResourceTemplate.serializer(),
+        ResourceTemplate(name = "tpl1", uriTemplate = "file:///{path}"),
+        ResourceTemplate(name = "tpl1", uriTemplate = "file:///{path}"),
         ResourceTemplate(
-            annotations = emptyMap<String, String>(),
-            description = "alt",
-            mimeType = "alt",
-            name = "alt",
-            uriTemplate = "alt")
+            annotations = mapOf("a" to "b"),
+            description = "desc",
+            mimeType = "text/plain",
+            name = "tpl2",
+            uriTemplate = "file:///{id}")) {
+          it.copy(
+              annotations = it.annotations,
+              description = it.description,
+              mimeType = it.mimeType,
+              name = it.name,
+              uriTemplate = it.uriTemplate)
+        }
 
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ResourceTemplate>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ResourceTemplate>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ResourceTemplate>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(
-        annotations = obj1.annotations,
-        description = obj1.description,
-        mimeType = obj1.mimeType,
-        name = obj1.name,
-        uriTemplate = obj1.uriTemplate)
+    verifyModel(
+        Root.serializer(),
+        Root(uri = "file:///workspace"),
+        Root(uri = "file:///workspace"),
+        Root(name = "main", uri = "file:///other")) {
+          it.copy(name = it.name, uri = it.uri)
+        }
   }
 
   @Test
-  fun testResourceUpdatedNotification() {
-    val obj1 = ResourceUpdatedNotification(params = ResourceUpdatedNotificationParams(uri = "test"))
-    val obj2 = ResourceUpdatedNotification(params = ResourceUpdatedNotificationParams(uri = "test"))
-    val obj3 =
-        ResourceUpdatedNotification(
-            method = "alt", params = ResourceUpdatedNotificationParams(uri = "alt"))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ResourceUpdatedNotification>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ResourceUpdatedNotification>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ResourceUpdatedNotification>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
+  fun testCapabilitiesAndImplementationModels() {
+    val rootsCap1 = ClientCapabilitiesRoots()
+    val rootsCap2 = ClientCapabilitiesRoots(listChanged = true)
+    verifyModel(ClientCapabilitiesRoots.serializer(), rootsCap1, rootsCap1.copy(), rootsCap2) {
+      it.copy(listChanged = it.listChanged)
     }
 
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testResourceUpdatedNotificationParams() {
-    val obj1 = ResourceUpdatedNotificationParams(uri = "test")
-    val obj2 = ResourceUpdatedNotificationParams(uri = "test")
-    val obj3 = ResourceUpdatedNotificationParams(uri = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ResourceUpdatedNotificationParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ResourceUpdatedNotificationParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ResourceUpdatedNotificationParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
+    val clientCap1 = ClientCapabilities()
+    val clientCap2 =
+        ClientCapabilities(
+            experimental = mapOf("exp" to JsonPrimitive(true)),
+            roots = rootsCap2,
+            sampling = mapOf("s" to JsonPrimitive(1)))
+    verifyModel(ClientCapabilities.serializer(), clientCap1, clientCap1.copy(), clientCap2) {
+      it.copy(experimental = it.experimental, roots = it.roots, sampling = it.sampling)
     }
 
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(uri = obj1.uri)
-  }
+    val promptsCap1 = ServerCapabilitiesPrompts()
+    val promptsCap2 = ServerCapabilitiesPrompts(listChanged = true)
+    verifyModel(
+        ServerCapabilitiesPrompts.serializer(), promptsCap1, promptsCap1.copy(), promptsCap2) {
+          it.copy(listChanged = it.listChanged)
+        }
 
-  @Test
-  fun testResult() {
-    val obj1 = Result()
-    val obj2 = Result()
-    val obj3 = Result(_meta = emptyMap<String, kotlinx.serialization.json.JsonElement>())
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<Result>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<Result>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<Result>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
+    val resCap1 = ServerCapabilitiesResources()
+    val resCap2 = ServerCapabilitiesResources(listChanged = true, subscribe = true)
+    verifyModel(ServerCapabilitiesResources.serializer(), resCap1, resCap1.copy(), resCap2) {
+      it.copy(listChanged = it.listChanged, subscribe = it.subscribe)
     }
 
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(_meta = obj1._meta)
-  }
-
-  @Test
-  fun testRoot() {
-    val obj1 = Root(uri = "test")
-    val obj2 = Root(uri = "test")
-    val obj3 = Root(name = "alt", uri = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<Root>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<Root>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<Root>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
+    val toolsCap1 = ServerCapabilitiesTools()
+    val toolsCap2 = ServerCapabilitiesTools(listChanged = true)
+    verifyModel(ServerCapabilitiesTools.serializer(), toolsCap1, toolsCap1.copy(), toolsCap2) {
+      it.copy(listChanged = it.listChanged)
     }
 
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(name = obj1.name, uri = obj1.uri)
-  }
-
-  @Test
-  fun testRootsListChangedNotification() {
-    val obj1 = RootsListChangedNotification()
-    val obj2 = RootsListChangedNotification()
-    val obj3 =
-        RootsListChangedNotification(
-            method = "alt",
-            params =
-                RootsListChangedNotificationParams(
-                    _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>()))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<RootsListChangedNotification>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<RootsListChangedNotification>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<RootsListChangedNotification>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testRootsListChangedNotificationParams() {
-    val obj1 = RootsListChangedNotificationParams()
-    val obj2 = RootsListChangedNotificationParams()
-    val obj3 =
-        RootsListChangedNotificationParams(
-            _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>())
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<RootsListChangedNotificationParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<RootsListChangedNotificationParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<RootsListChangedNotificationParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(_meta = obj1._meta)
-  }
-
-  @Test
-  fun testSamplingMessage() {
-    val obj1 = SamplingMessage(content = SamplingMessageContent(type = "test"), role = Role.user)
-    val obj2 = SamplingMessage(content = SamplingMessageContent(type = "test"), role = Role.user)
-    val obj3 =
-        SamplingMessage(
-            content =
-                SamplingMessageContent(text = "alt", type = "alt", data = "alt", mimeType = "alt"),
-            role = Role.assistant)
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<SamplingMessage>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<SamplingMessage>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<SamplingMessage>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(content = obj1.content, role = obj1.role)
-  }
-
-  @Test
-  fun testServerCapabilities() {
-    val obj1 = ServerCapabilities()
-    val obj2 = ServerCapabilities()
-    val obj3 =
+    val serverCap1 = ServerCapabilities()
+    val serverCap2 =
         ServerCapabilities(
-            experimental = emptyMap<String, kotlinx.serialization.json.JsonElement>(),
-            logging = emptyMap<String, kotlinx.serialization.json.JsonElement>())
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ServerCapabilities>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ServerCapabilities>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ServerCapabilities>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
+            experimental = mapOf("e" to JsonNull),
+            logging = mapOf("l" to JsonPrimitive("info")),
+            prompts = promptsCap2,
+            resources = resCap2,
+            tools = toolsCap2)
+    verifyModel(ServerCapabilities.serializer(), serverCap1, serverCap1.copy(), serverCap2) {
+      it.copy(
+          experimental = it.experimental,
+          logging = it.logging,
+          prompts = it.prompts,
+          resources = it.resources,
+          tools = it.tools)
     }
 
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(
-        experimental = obj1.experimental,
-        logging = obj1.logging,
-        prompts = obj1.prompts,
-        resources = obj1.resources,
-        tools = obj1.tools)
+    val impl1 = Implementation(name = "cdd-kotlin", version = "1.0.0")
+    val impl2 = Implementation(name = "cdd-other", version = "2.0.0")
+    verifyModel(Implementation.serializer(), impl1, impl1.copy(), impl2) {
+      it.copy(name = it.name, version = it.version)
+    }
+
+    val initParams1 =
+        InitializeRequestParams(
+            capabilities = clientCap1, clientInfo = impl1, protocolVersion = "2024-11-05")
+    val initParams2 =
+        InitializeRequestParams(
+            capabilities = clientCap2, clientInfo = impl2, protocolVersion = "2025-01-01")
+    verifyModel(
+        InitializeRequestParams.serializer(), initParams1, initParams1.copy(), initParams2) {
+          it.copy(
+              capabilities = it.capabilities,
+              clientInfo = it.clientInfo,
+              protocolVersion = it.protocolVersion)
+        }
+
+    val initReq1 = InitializeRequest(params = initParams1)
+    val initReq2 = InitializeRequest(method = "initialize", params = initParams2)
+    verifyModel(InitializeRequest.serializer(), initReq1, initReq1.copy(), initReq2) {
+      it.copy(method = it.method, params = it.params)
+    }
+
+    val initRes1 =
+        InitializeResult(
+            capabilities = serverCap1, protocolVersion = "2024-11-05", serverInfo = impl1)
+    val initRes2 =
+        InitializeResult(
+            _meta = mapOf("m" to JsonPrimitive("v")),
+            capabilities = serverCap2,
+            instructions = "Use tools",
+            protocolVersion = "2025-01-01",
+            serverInfo = impl2)
+    verifyModel(InitializeResult.serializer(), initRes1, initRes1.copy(), initRes2) {
+      it.copy(
+          _meta = it._meta,
+          capabilities = it.capabilities,
+          instructions = it.instructions,
+          protocolVersion = it.protocolVersion,
+          serverInfo = it.serverInfo)
+    }
   }
 
   @Test
-  fun testServerCapabilitiesPrompts() {
-    val obj1 = ServerCapabilitiesPrompts()
-    val obj2 = ServerCapabilitiesPrompts()
-    val obj3 = ServerCapabilitiesPrompts(listChanged = false)
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ServerCapabilitiesPrompts>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ServerCapabilitiesPrompts>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ServerCapabilitiesPrompts>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
+  fun testJsonRpcAndGenericMessageModels() {
+    val errDetail1 = JSONRPCErrorError(code = -32600, message = "Invalid Request")
+    val errDetail2 =
+        JSONRPCErrorError(code = -32603, data = JsonPrimitive("detail"), message = "Internal error")
+    verifyModel(JSONRPCErrorError.serializer(), errDetail1, errDetail1.copy(), errDetail2) {
+      it.copy(code = it.code, data = it.data, message = it.message)
     }
 
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(listChanged = obj1.listChanged)
+    val rpcErr1 = JSONRPCError(error = errDetail1, id = "1")
+    val rpcErr2 = JSONRPCError(error = errDetail2, id = "2", jsonrpc = "2.0")
+    verifyModel(JSONRPCError.serializer(), rpcErr1, rpcErr1.copy(), rpcErr2) {
+      it.copy(error = it.error, id = it.id, jsonrpc = it.jsonrpc)
+    }
+
+    val rpcNotif1 = JSONRPCNotification(method = "notifications/initialized")
+    val rpcNotif2 =
+        JSONRPCNotification(
+            jsonrpc = "2.0",
+            method = "notifications/cancelled",
+            params = buildJsonObject { put("requestId", "1") })
+    verifyModel(JSONRPCNotification.serializer(), rpcNotif1, rpcNotif1.copy(), rpcNotif2) {
+      it.copy(jsonrpc = it.jsonrpc, method = it.method, params = it.params)
+    }
+
+    val rpcReq1 = JSONRPCRequest(id = "1", method = "ping")
+    val rpcReq2 =
+        JSONRPCRequest(
+            id = "2",
+            jsonrpc = "2.0",
+            method = "tools/list",
+            params = buildJsonObject { put("cursor", "c1") })
+    verifyModel(JSONRPCRequest.serializer(), rpcReq1, rpcReq1.copy(), rpcReq2) {
+      it.copy(id = it.id, jsonrpc = it.jsonrpc, method = it.method, params = it.params)
+    }
+
+    val rpcResp1 = JSONRPCResponse(id = "1", result = buildJsonObject {})
+    val rpcResp2 =
+        JSONRPCResponse(id = "2", jsonrpc = "2.0", result = buildJsonObject { put("ok", true) })
+    verifyModel(JSONRPCResponse.serializer(), rpcResp1, rpcResp1.copy(), rpcResp2) {
+      it.copy(id = it.id, jsonrpc = it.jsonrpc, result = it.result)
+    }
+
+    val messages: List<JSONRPCMessage> = listOf(rpcErr1, rpcNotif1, rpcReq1, rpcResp1)
+    assertEquals(4, messages.size)
+
+    verifyModel(
+        Notification.serializer(),
+        Notification(method = "n1"),
+        Notification(method = "n1"),
+        Notification(method = "n2", params = mapOf("k" to JsonPrimitive("v")))) {
+          it.copy(method = it.method, params = it.params)
+        }
+
+    verifyModel(
+        Request.serializer(),
+        Request(method = "r1"),
+        Request(method = "r1"),
+        Request(method = "r2", params = mapOf("k" to JsonPrimitive("v")))) {
+          it.copy(method = it.method, params = it.params)
+        }
+
+    verifyModel(
+        Result.serializer(), Result(), Result(), Result(_meta = mapOf("k" to JsonPrimitive("v")))) {
+          it.copy(_meta = it._meta)
+        }
+
+    verifyModel(
+        EmptyResult.serializer(),
+        EmptyResult(),
+        EmptyResult(),
+        EmptyResult(_meta = mapOf("k" to JsonPrimitive("v")))) {
+          it.copy(_meta = it._meta)
+        }
+
+    val pagParams1 = PaginatedRequestParams()
+    val pagParams2 = PaginatedRequestParams(cursor = "c1")
+    verifyModel(PaginatedRequestParams.serializer(), pagParams1, pagParams1.copy(), pagParams2) {
+      it.copy(cursor = it.cursor)
+    }
+
+    verifyModel(
+        PaginatedRequest.serializer(),
+        PaginatedRequest(method = "m1"),
+        PaginatedRequest(method = "m1"),
+        PaginatedRequest(method = "m2", params = pagParams2)) {
+          it.copy(method = it.method, params = it.params)
+        }
+
+    verifyModel(
+        PaginatedResult.serializer(),
+        PaginatedResult(),
+        PaginatedResult(),
+        PaginatedResult(_meta = mapOf("k" to JsonNull), nextCursor = "c2")) {
+          it.copy(_meta = it._meta, nextCursor = it.nextCursor)
+        }
   }
 
   @Test
-  fun testServerCapabilitiesResources() {
-    val obj1 = ServerCapabilitiesResources()
-    val obj2 = ServerCapabilitiesResources()
-    val obj3 = ServerCapabilitiesResources(listChanged = false, subscribe = false)
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ServerCapabilitiesResources>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ServerCapabilitiesResources>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ServerCapabilitiesResources>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
+  fun testToolsPromptsResourcesAndCompletionModels() {
+    val callParams1 = CallToolRequestParams(name = "tool1")
+    val callParams2 =
+        CallToolRequestParams(arguments = mapOf("arg" to JsonPrimitive("val")), name = "tool2")
+    verifyModel(CallToolRequestParams.serializer(), callParams1, callParams1.copy(), callParams2) {
+      it.copy(arguments = it.arguments, name = it.name)
     }
 
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(listChanged = obj1.listChanged, subscribe = obj1.subscribe)
-  }
+    verifyModel(
+        CallToolRequest.serializer(),
+        CallToolRequest(params = callParams1),
+        CallToolRequest(params = callParams1),
+        CallToolRequest(method = "tools/call", params = callParams2)) {
+          it.copy(method = it.method, params = it.params)
+        }
 
-  @Test
-  fun testServerCapabilitiesTools() {
-    val obj1 = ServerCapabilitiesTools()
-    val obj2 = ServerCapabilitiesTools()
-    val obj3 = ServerCapabilitiesTools(listChanged = false)
+    verifyModel(
+        CallToolResult.serializer(),
+        CallToolResult(content = emptyList()),
+        CallToolResult(content = emptyList()),
+        CallToolResult(
+            _meta = mapOf("m" to JsonNull),
+            content = listOf(JsonPrimitive("out")),
+            isError = false)) {
+          it.copy(_meta = it._meta, content = it.content, isError = it.isError)
+        }
 
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ServerCapabilitiesTools>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ServerCapabilitiesTools>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ServerCapabilitiesTools>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(listChanged = obj1.listChanged)
-  }
-
-  @Test
-  fun testSetLevelRequest() {
-    val obj1 = SetLevelRequest(params = SetLevelRequestParams(level = LoggingLevel.debug))
-    val obj2 = SetLevelRequest(params = SetLevelRequestParams(level = LoggingLevel.debug))
-    val obj3 =
-        SetLevelRequest(method = "alt", params = SetLevelRequestParams(level = LoggingLevel.info))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<SetLevelRequest>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<SetLevelRequest>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<SetLevelRequest>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testSetLevelRequestParams() {
-    val obj1 = SetLevelRequestParams(level = LoggingLevel.debug)
-    val obj2 = SetLevelRequestParams(level = LoggingLevel.debug)
-    val obj3 = SetLevelRequestParams(level = LoggingLevel.info)
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<SetLevelRequestParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<SetLevelRequestParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<SetLevelRequestParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(level = obj1.level)
-  }
-
-  @Test
-  fun testSubscribeRequest() {
-    val obj1 = SubscribeRequest(params = SubscribeRequestParams(uri = "test"))
-    val obj2 = SubscribeRequest(params = SubscribeRequestParams(uri = "test"))
-    val obj3 = SubscribeRequest(method = "alt", params = SubscribeRequestParams(uri = "alt"))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<SubscribeRequest>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<SubscribeRequest>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<SubscribeRequest>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testSubscribeRequestParams() {
-    val obj1 = SubscribeRequestParams(uri = "test")
-    val obj2 = SubscribeRequestParams(uri = "test")
-    val obj3 = SubscribeRequestParams(uri = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<SubscribeRequestParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<SubscribeRequestParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<SubscribeRequestParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(uri = obj1.uri)
-  }
-
-  @Test
-  fun testTextContent() {
-    val obj1 = TextContent(text = "test")
-    val obj2 = TextContent(text = "test")
-    val obj3 = TextContent(annotations = emptyMap<String, String>(), text = "alt", type = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<TextContent>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<TextContent>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<TextContent>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(annotations = obj1.annotations, text = obj1.text, type = obj1.type)
-  }
-
-  @Test
-  fun testTextResourceContents() {
-    val obj1 = TextResourceContents(text = "test", uri = "test")
-    val obj2 = TextResourceContents(text = "test", uri = "test")
-    val obj3 = TextResourceContents(mimeType = "alt", text = "alt", uri = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<TextResourceContents>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<TextResourceContents>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<TextResourceContents>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(mimeType = obj1.mimeType, text = obj1.text, uri = obj1.uri)
-  }
-
-  @Test
-  fun testTool() {
-    val obj1 = Tool(inputSchema = ToolInputSchema(), name = "test")
-    val obj2 = Tool(inputSchema = ToolInputSchema(), name = "test")
-    val obj3 =
-        Tool(
-            description = "alt",
-            inputSchema =
-                ToolInputSchema(
-                    properties = emptyMap<String, kotlinx.serialization.json.JsonElement>(),
-                    required = emptyList<String>(),
-                    type = "alt"),
-            name = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<Tool>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<Tool>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<Tool>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(description = obj1.description, inputSchema = obj1.inputSchema, name = obj1.name)
-  }
-
-  @Test
-  fun testToolInputSchema() {
-    val obj1 = ToolInputSchema()
-    val obj2 = ToolInputSchema()
-    val obj3 =
+    val schema1 = ToolInputSchema()
+    val schema2 =
         ToolInputSchema(
-            properties = emptyMap<String, kotlinx.serialization.json.JsonElement>(),
-            required = emptyList<String>(),
-            type = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ToolInputSchema>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ToolInputSchema>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ToolInputSchema>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
+            properties = mapOf("p" to JsonPrimitive("string")),
+            required = listOf("p"),
+            type = "object")
+    verifyModel(ToolInputSchema.serializer(), schema1, schema1.copy(), schema2) {
+      it.copy(properties = it.properties, required = it.required, type = it.type)
     }
 
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(properties = obj1.properties, required = obj1.required, type = obj1.type)
+    val tool1 = Tool(inputSchema = schema1, name = "t1")
+    val tool2 = Tool(description = "desc", inputSchema = schema2, name = "t2")
+    verifyModel(Tool.serializer(), tool1, tool1.copy(), tool2) {
+      it.copy(description = it.description, inputSchema = it.inputSchema, name = it.name)
+    }
+
+    val listToolsParams1 = ListToolsRequestParams()
+    val listToolsParams2 = ListToolsRequestParams(cursor = "next")
+    verifyModel(
+        ListToolsRequestParams.serializer(),
+        listToolsParams1,
+        listToolsParams1.copy(),
+        listToolsParams2) {
+          it.copy(cursor = it.cursor)
+        }
+
+    verifyModel(
+        ListToolsRequest.serializer(),
+        ListToolsRequest(),
+        ListToolsRequest(),
+        ListToolsRequest(method = "tools/list", params = listToolsParams2)) {
+          it.copy(method = it.method, params = it.params)
+        }
+
+    verifyModel(
+        ListToolsResult.serializer(),
+        ListToolsResult(tools = emptyList()),
+        ListToolsResult(tools = emptyList()),
+        ListToolsResult(_meta = mapOf("m" to JsonNull), nextCursor = "c2", tools = listOf(tool1))) {
+          it.copy(_meta = it._meta, nextCursor = it.nextCursor, tools = it.tools)
+        }
+
+    val compArg1 = CompleteRequestArgument(name = "a1", value = "v1")
+    val compArg2 = CompleteRequestArgument(name = "a2", value = "v2")
+    verifyModel(CompleteRequestArgument.serializer(), compArg1, compArg1.copy(), compArg2) {
+      it.copy(name = it.name, value = it.value)
+    }
+
+    val compRef1 = CompleteRequestRef(type = "ref/prompt")
+    val compRef2 = CompleteRequestRef(name = "p1", type = "ref/resource")
+    verifyModel(CompleteRequestRef.serializer(), compRef1, compRef1.copy(), compRef2) {
+      it.copy(name = it.name, type = it.type)
+    }
+
+    val compParams1 = CompleteRequestParams(argument = compArg1, ref = compRef1)
+    val compParams2 = CompleteRequestParams(argument = compArg2, ref = compRef2)
+    verifyModel(CompleteRequestParams.serializer(), compParams1, compParams1.copy(), compParams2) {
+      it.copy(argument = it.argument, ref = it.ref)
+    }
+
+    verifyModel(
+        CompleteRequest.serializer(),
+        CompleteRequest(params = compParams1),
+        CompleteRequest(params = compParams1),
+        CompleteRequest(method = "completion/complete", params = compParams2)) {
+          it.copy(method = it.method, params = it.params)
+        }
+
+    val compOut1 = CompleteResultCompletion(values = listOf("a"))
+    val compOut2 = CompleteResultCompletion(hasMore = true, total = 10, values = listOf("a", "b"))
+    verifyModel(CompleteResultCompletion.serializer(), compOut1, compOut1.copy(), compOut2) {
+      it.copy(hasMore = it.hasMore, total = it.total, values = it.values)
+    }
+
+    verifyModel(
+        CompleteResult.serializer(),
+        CompleteResult(completion = compOut1),
+        CompleteResult(completion = compOut1),
+        CompleteResult(_meta = mapOf("k" to JsonNull), completion = compOut2)) {
+          it.copy(_meta = it._meta, completion = it.completion)
+        }
+
+    val promptArg1 = PromptArgument(name = "pa1")
+    val promptArg2 = PromptArgument(description = "d", name = "pa2", required = true)
+    verifyModel(PromptArgument.serializer(), promptArg1, promptArg1.copy(), promptArg2) {
+      it.copy(description = it.description, name = it.name, required = it.required)
+    }
+
+    val prompt1 = Prompt(name = "p1")
+    val prompt2 = Prompt(arguments = listOf(promptArg2), description = "d", name = "p2")
+    verifyModel(Prompt.serializer(), prompt1, prompt1.copy(), prompt2) {
+      it.copy(arguments = it.arguments, description = it.description, name = it.name)
+    }
+
+    val pmContent1 = PromptMessageContent(type = "text")
+    val pmContent2 =
+        PromptMessageContent(text = "hi", type = "image", data = "ZGF0YQ==", mimeType = "image/png")
+    verifyModel(PromptMessageContent.serializer(), pmContent1, pmContent1.copy(), pmContent2) {
+      it.copy(text = it.text, type = it.type, data = it.data, mimeType = it.mimeType)
+    }
+
+    val pm1 = PromptMessage(content = pmContent1, role = Role.user)
+    val pm2 = PromptMessage(content = pmContent2, role = Role.assistant)
+    verifyModel(PromptMessage.serializer(), pm1, pm1.copy(), pm2) {
+      it.copy(content = it.content, role = it.role)
+    }
+
+    verifyModel(
+        PromptReference.serializer(),
+        PromptReference(name = "pr1"),
+        PromptReference(name = "pr1"),
+        PromptReference(name = "pr2", type = "prompt")) {
+          it.copy(name = it.name, type = it.type)
+        }
+
+    val gpParams1 = GetPromptRequestParams(name = "p1")
+    val gpParams2 = GetPromptRequestParams(arguments = mapOf("k" to "v"), name = "p2")
+    verifyModel(GetPromptRequestParams.serializer(), gpParams1, gpParams1.copy(), gpParams2) {
+      it.copy(arguments = it.arguments, name = it.name)
+    }
+
+    verifyModel(
+        GetPromptRequest.serializer(),
+        GetPromptRequest(params = gpParams1),
+        GetPromptRequest(params = gpParams1),
+        GetPromptRequest(method = "prompts/get", params = gpParams2)) {
+          it.copy(method = it.method, params = it.params)
+        }
+
+    verifyModel(
+        GetPromptResult.serializer(),
+        GetPromptResult(messages = emptyList()),
+        GetPromptResult(messages = emptyList()),
+        GetPromptResult(
+            _meta = mapOf("k" to JsonNull), description = "d", messages = listOf(pm1))) {
+          it.copy(_meta = it._meta, description = it.description, messages = it.messages)
+        }
+
+    val lpParams1 = ListPromptsRequestParams()
+    val lpParams2 = ListPromptsRequestParams(cursor = "c")
+    verifyModel(ListPromptsRequestParams.serializer(), lpParams1, lpParams1.copy(), lpParams2) {
+      it.copy(cursor = it.cursor)
+    }
+
+    verifyModel(
+        ListPromptsRequest.serializer(),
+        ListPromptsRequest(),
+        ListPromptsRequest(),
+        ListPromptsRequest(method = "prompts/list", params = lpParams2)) {
+          it.copy(method = it.method, params = it.params)
+        }
+
+    verifyModel(
+        ListPromptsResult.serializer(),
+        ListPromptsResult(prompts = emptyList()),
+        ListPromptsResult(prompts = emptyList()),
+        ListPromptsResult(
+            _meta = mapOf("k" to JsonNull), nextCursor = "c", prompts = listOf(prompt1))) {
+          it.copy(_meta = it._meta, nextCursor = it.nextCursor, prompts = it.prompts)
+        }
+
+    val lrtParams1 = ListResourceTemplatesRequestParams()
+    val lrtParams2 = ListResourceTemplatesRequestParams(cursor = "c")
+    verifyModel(
+        ListResourceTemplatesRequestParams.serializer(),
+        lrtParams1,
+        lrtParams1.copy(),
+        lrtParams2) {
+          it.copy(cursor = it.cursor)
+        }
+
+    verifyModel(
+        ListResourceTemplatesRequest.serializer(),
+        ListResourceTemplatesRequest(),
+        ListResourceTemplatesRequest(),
+        ListResourceTemplatesRequest(method = "resources/templates/list", params = lrtParams2)) {
+          it.copy(method = it.method, params = it.params)
+        }
+
+    verifyModel(
+        ListResourceTemplatesResult.serializer(),
+        ListResourceTemplatesResult(resourceTemplates = emptyList()),
+        ListResourceTemplatesResult(resourceTemplates = emptyList()),
+        ListResourceTemplatesResult(
+            _meta = mapOf("k" to JsonNull),
+            nextCursor = "c",
+            resourceTemplates = listOf(ResourceTemplate(name = "t", uriTemplate = "u")))) {
+          it.copy(
+              _meta = it._meta,
+              nextCursor = it.nextCursor,
+              resourceTemplates = it.resourceTemplates)
+        }
+
+    val lrParams1 = ListResourcesRequestParams()
+    val lrParams2 = ListResourcesRequestParams(cursor = "c")
+    verifyModel(ListResourcesRequestParams.serializer(), lrParams1, lrParams1.copy(), lrParams2) {
+      it.copy(cursor = it.cursor)
+    }
+
+    verifyModel(
+        ListResourcesRequest.serializer(),
+        ListResourcesRequest(),
+        ListResourcesRequest(),
+        ListResourcesRequest(method = "resources/list", params = lrParams2)) {
+          it.copy(method = it.method, params = it.params)
+        }
+
+    verifyModel(
+        ListResourcesResult.serializer(),
+        ListResourcesResult(resources = emptyList()),
+        ListResourcesResult(resources = emptyList()),
+        ListResourcesResult(
+            _meta = mapOf("k" to JsonNull),
+            nextCursor = "c",
+            resources = listOf(Resource(name = "r", uri = "u")))) {
+          it.copy(_meta = it._meta, nextCursor = it.nextCursor, resources = it.resources)
+        }
+
+    val lrootsParams1 = ListRootsRequestParams()
+    val lrootsParams2 = ListRootsRequestParams(_meta = mapOf("k" to JsonNull))
+    verifyModel(
+        ListRootsRequestParams.serializer(), lrootsParams1, lrootsParams1.copy(), lrootsParams2) {
+          it.copy(_meta = it._meta)
+        }
+
+    verifyModel(
+        ListRootsRequest.serializer(),
+        ListRootsRequest(),
+        ListRootsRequest(),
+        ListRootsRequest(method = "roots/list", params = lrootsParams2)) {
+          it.copy(method = it.method, params = it.params)
+        }
+
+    verifyModel(
+        ListRootsResult.serializer(),
+        ListRootsResult(roots = emptyList()),
+        ListRootsResult(roots = emptyList()),
+        ListRootsResult(
+            _meta = mapOf("k" to JsonNull), roots = listOf(Root(name = "r", uri = "u")))) {
+          it.copy(_meta = it._meta, roots = it.roots)
+        }
+
+    val rrParams1 = ReadResourceRequestParams(uri = "file:///a")
+    val rrParams2 = ReadResourceRequestParams(uri = "file:///b")
+    verifyModel(ReadResourceRequestParams.serializer(), rrParams1, rrParams1.copy(), rrParams2) {
+      it.copy(uri = it.uri)
+    }
+
+    verifyModel(
+        ReadResourceRequest.serializer(),
+        ReadResourceRequest(params = rrParams1),
+        ReadResourceRequest(params = rrParams1),
+        ReadResourceRequest(method = "resources/read", params = rrParams2)) {
+          it.copy(method = it.method, params = it.params)
+        }
+
+    verifyModel(
+        ReadResourceResult.serializer(),
+        ReadResourceResult(contents = emptyList()),
+        ReadResourceResult(contents = emptyList()),
+        ReadResourceResult(
+            _meta = mapOf("k" to JsonNull),
+            contents = listOf(ResourceContents(uri = "file:///a", text = "hi")))) {
+          it.copy(_meta = it._meta, contents = it.contents)
+        }
+
+    val subParams1 = SubscribeRequestParams(uri = "file:///a")
+    val subParams2 = SubscribeRequestParams(uri = "file:///b")
+    verifyModel(SubscribeRequestParams.serializer(), subParams1, subParams1.copy(), subParams2) {
+      it.copy(uri = it.uri)
+    }
+
+    verifyModel(
+        SubscribeRequest.serializer(),
+        SubscribeRequest(params = subParams1),
+        SubscribeRequest(params = subParams1),
+        SubscribeRequest(method = "resources/subscribe", params = subParams2)) {
+          it.copy(method = it.method, params = it.params)
+        }
+
+    val unsubParams1 = UnsubscribeRequestParams(uri = "file:///a")
+    val unsubParams2 = UnsubscribeRequestParams(uri = "file:///b")
+    verifyModel(
+        UnsubscribeRequestParams.serializer(), unsubParams1, unsubParams1.copy(), unsubParams2) {
+          it.copy(uri = it.uri)
+        }
+
+    verifyModel(
+        UnsubscribeRequest.serializer(),
+        UnsubscribeRequest(params = unsubParams1),
+        UnsubscribeRequest(params = unsubParams1),
+        UnsubscribeRequest(method = "resources/unsubscribe", params = unsubParams2)) {
+          it.copy(method = it.method, params = it.params)
+        }
   }
 
   @Test
-  fun testToolListChangedNotification() {
-    val obj1 = ToolListChangedNotification()
-    val obj2 = ToolListChangedNotification()
-    val obj3 =
+  fun testSamplingNotificationsAndSealedHierarchies() {
+    val smContent1 = SamplingMessageContent(type = "text")
+    val smContent2 =
+        SamplingMessageContent(
+            text = "hello", type = "image", data = "ZGF0YQ==", mimeType = "image/png")
+    verifyModel(SamplingMessageContent.serializer(), smContent1, smContent1.copy(), smContent2) {
+      it.copy(text = it.text, type = it.type, data = it.data, mimeType = it.mimeType)
+    }
+
+    val sm1 = SamplingMessage(content = smContent1, role = Role.user)
+    val sm2 = SamplingMessage(content = smContent2, role = Role.assistant)
+    verifyModel(SamplingMessage.serializer(), sm1, sm1.copy(), sm2) {
+      it.copy(content = it.content, role = it.role)
+    }
+
+    val hint1 = ModelHint(name = "gemini-2.5-pro")
+    val hint2 = ModelHint(name = "gemini-2.5-flash")
+    verifyModel(ModelHint.serializer(), hint1, hint1.copy(), hint2) { it.copy(name = it.name) }
+
+    val prefs1 = ModelPreferences()
+    val prefs2 =
+        ModelPreferences(
+            costPriority = 0.5,
+            hints = listOf(hint1),
+            intelligencePriority = 0.9,
+            speedPriority = 0.7)
+    verifyModel(ModelPreferences.serializer(), prefs1, prefs1.copy(), prefs2) {
+      it.copy(
+          costPriority = it.costPriority,
+          hints = it.hints,
+          intelligencePriority = it.intelligencePriority,
+          speedPriority = it.speedPriority)
+    }
+
+    val cmParams1 = CreateMessageRequestParams(maxTokens = 100, messages = listOf(sm1))
+    val cmParams2 =
+        CreateMessageRequestParams(
+            includeContext = "allServers",
+            maxTokens = 500,
+            messages = listOf(sm2),
+            metadata = mapOf("k" to JsonNull),
+            modelPreferences = prefs2,
+            stopSequences = listOf("STOP"),
+            systemPrompt = "sys",
+            temperature = 0.2)
+    verifyModel(CreateMessageRequestParams.serializer(), cmParams1, cmParams1.copy(), cmParams2) {
+      it.copy(
+          includeContext = it.includeContext,
+          maxTokens = it.maxTokens,
+          messages = it.messages,
+          metadata = it.metadata,
+          modelPreferences = it.modelPreferences,
+          stopSequences = it.stopSequences,
+          systemPrompt = it.systemPrompt,
+          temperature = it.temperature)
+    }
+
+    val cmReq1 = CreateMessageRequest(params = cmParams1)
+    val cmReq2 = CreateMessageRequest(method = "sampling/createMessage", params = cmParams2)
+    verifyModel(CreateMessageRequest.serializer(), cmReq1, cmReq1.copy(), cmReq2) {
+      it.copy(method = it.method, params = it.params)
+    }
+
+    val cmRes1 = CreateMessageResult(content = smContent1, model = "gemini", role = Role.assistant)
+    val cmRes2 =
+        CreateMessageResult(
+            _meta = mapOf("k" to JsonNull),
+            content = smContent2,
+            model = "gemini-pro",
+            role = Role.user,
+            stopReason = "endTurn")
+    verifyModel(CreateMessageResult.serializer(), cmRes1, cmRes1.copy(), cmRes2) {
+      it.copy(
+          _meta = it._meta,
+          content = it.content,
+          model = it.model,
+          role = it.role,
+          stopReason = it.stopReason)
+    }
+
+    val cancelParams1 = CancelledNotificationParams(requestId = "1")
+    val cancelParams2 = CancelledNotificationParams(reason = "timeout", requestId = "2")
+    verifyModel(
+        CancelledNotificationParams.serializer(),
+        cancelParams1,
+        cancelParams1.copy(),
+        cancelParams2) {
+          it.copy(reason = it.reason, requestId = it.requestId)
+        }
+
+    val cancelNotif1 = CancelledNotification(params = cancelParams1)
+    val cancelNotif2 =
+        CancelledNotification(method = "notifications/cancelled", params = cancelParams2)
+    verifyModel(
+        CancelledNotification.serializer(), cancelNotif1, cancelNotif1.copy(), cancelNotif2) {
+          it.copy(method = it.method, params = it.params)
+        }
+
+    val initNotifParams1 = InitializedNotificationParams()
+    val initNotifParams2 = InitializedNotificationParams(_meta = mapOf("k" to JsonNull))
+    verifyModel(
+        InitializedNotificationParams.serializer(),
+        initNotifParams1,
+        initNotifParams1.copy(),
+        initNotifParams2) {
+          it.copy(_meta = it._meta)
+        }
+
+    val initNotif1 = InitializedNotification()
+    val initNotif2 =
+        InitializedNotification(method = "notifications/initialized", params = initNotifParams2)
+    verifyModel(InitializedNotification.serializer(), initNotif1, initNotif1.copy(), initNotif2) {
+      it.copy(method = it.method, params = it.params)
+    }
+
+    val logParams1 =
+        LoggingMessageNotificationParams(data = JsonPrimitive("msg"), level = LoggingLevel.info)
+    val logParams2 =
+        LoggingMessageNotificationParams(
+            data = JsonPrimitive("err"), level = LoggingLevel.error, logger = "main")
+    verifyModel(
+        LoggingMessageNotificationParams.serializer(), logParams1, logParams1.copy(), logParams2) {
+          it.copy(data = it.data, level = it.level, logger = it.logger)
+        }
+
+    val logNotif1 = LoggingMessageNotification(params = logParams1)
+    val logNotif2 =
+        LoggingMessageNotification(method = "notifications/message", params = logParams2)
+    verifyModel(LoggingMessageNotification.serializer(), logNotif1, logNotif1.copy(), logNotif2) {
+      it.copy(method = it.method, params = it.params)
+    }
+
+    val pingParams1 = PingRequestParams()
+    val pingParams2 = PingRequestParams(_meta = mapOf("k" to JsonNull))
+    verifyModel(PingRequestParams.serializer(), pingParams1, pingParams1.copy(), pingParams2) {
+      it.copy(_meta = it._meta)
+    }
+
+    val pingReq1 = PingRequest()
+    val pingReq2 = PingRequest(method = "ping", params = pingParams2)
+    verifyModel(PingRequest.serializer(), pingReq1, pingReq1.copy(), pingReq2) {
+      it.copy(method = it.method, params = it.params)
+    }
+
+    val progParams1 = ProgressNotificationParams(progressToken = "t1", progress = 0.5)
+    val progParams2 = ProgressNotificationParams(progressToken = "t2", progress = 1.0, total = 10.0)
+    verifyModel(
+        ProgressNotificationParams.serializer(), progParams1, progParams1.copy(), progParams2) {
+          it.copy(progressToken = it.progressToken, progress = it.progress, total = it.total)
+        }
+
+    val progNotif1 = ProgressNotification(params = progParams1)
+    val progNotif2 = ProgressNotification(method = "notifications/progress", params = progParams2)
+    verifyModel(ProgressNotification.serializer(), progNotif1, progNotif1.copy(), progNotif2) {
+      it.copy(method = it.method, params = it.params)
+    }
+
+    val plcParams1 = PromptListChangedNotificationParams()
+    val plcParams2 = PromptListChangedNotificationParams(_meta = mapOf("k" to JsonNull))
+    verifyModel(
+        PromptListChangedNotificationParams.serializer(),
+        plcParams1,
+        plcParams1.copy(),
+        plcParams2) {
+          it.copy(_meta = it._meta)
+        }
+
+    val plcNotif1 = PromptListChangedNotification()
+    val plcNotif2 =
+        PromptListChangedNotification(
+            method = "notifications/prompts/list_changed", params = plcParams2)
+    verifyModel(
+        PromptListChangedNotification.serializer(), plcNotif1, plcNotif1.copy(), plcNotif2) {
+          it.copy(method = it.method, params = it.params)
+        }
+
+    val rlcParams1 = ResourceListChangedNotificationParams()
+    val rlcParams2 = ResourceListChangedNotificationParams(_meta = mapOf("k" to JsonNull))
+    verifyModel(
+        ResourceListChangedNotificationParams.serializer(),
+        rlcParams1,
+        rlcParams1.copy(),
+        rlcParams2) {
+          it.copy(_meta = it._meta)
+        }
+
+    val rlcNotif1 = ResourceListChangedNotification()
+    val rlcNotif2 =
+        ResourceListChangedNotification(
+            method = "notifications/resources/list_changed", params = rlcParams2)
+    verifyModel(
+        ResourceListChangedNotification.serializer(), rlcNotif1, rlcNotif1.copy(), rlcNotif2) {
+          it.copy(method = it.method, params = it.params)
+        }
+
+    val ruParams1 = ResourceUpdatedNotificationParams(uri = "file:///a")
+    val ruParams2 = ResourceUpdatedNotificationParams(uri = "file:///b")
+    verifyModel(
+        ResourceUpdatedNotificationParams.serializer(), ruParams1, ruParams1.copy(), ruParams2) {
+          it.copy(uri = it.uri)
+        }
+
+    val ruNotif1 = ResourceUpdatedNotification(params = ruParams1)
+    val ruNotif2 =
+        ResourceUpdatedNotification(method = "notifications/resources/updated", params = ruParams2)
+    verifyModel(ResourceUpdatedNotification.serializer(), ruNotif1, ruNotif1.copy(), ruNotif2) {
+      it.copy(method = it.method, params = it.params)
+    }
+
+    val rootsLcParams1 = RootsListChangedNotificationParams()
+    val rootsLcParams2 = RootsListChangedNotificationParams(_meta = mapOf("k" to JsonNull))
+    verifyModel(
+        RootsListChangedNotificationParams.serializer(),
+        rootsLcParams1,
+        rootsLcParams1.copy(),
+        rootsLcParams2) {
+          it.copy(_meta = it._meta)
+        }
+
+    val rootsLcNotif1 = RootsListChangedNotification()
+    val rootsLcNotif2 =
+        RootsListChangedNotification(
+            method = "notifications/roots/list_changed", params = rootsLcParams2)
+    verifyModel(
+        RootsListChangedNotification.serializer(),
+        rootsLcNotif1,
+        rootsLcNotif1.copy(),
+        rootsLcNotif2) {
+          it.copy(method = it.method, params = it.params)
+        }
+
+    val setLevelParams1 = SetLevelRequestParams(level = LoggingLevel.debug)
+    val setLevelParams2 = SetLevelRequestParams(level = LoggingLevel.warning)
+    verifyModel(
+        SetLevelRequestParams.serializer(),
+        setLevelParams1,
+        setLevelParams1.copy(),
+        setLevelParams2) {
+          it.copy(level = it.level)
+        }
+
+    val setLevelReq1 = SetLevelRequest(params = setLevelParams1)
+    val setLevelReq2 = SetLevelRequest(method = "logging/setLevel", params = setLevelParams2)
+    verifyModel(SetLevelRequest.serializer(), setLevelReq1, setLevelReq1.copy(), setLevelReq2) {
+      it.copy(method = it.method, params = it.params)
+    }
+
+    val tlcParams1 = ToolListChangedNotificationParams()
+    val tlcParams2 = ToolListChangedNotificationParams(_meta = mapOf("k" to JsonNull))
+    verifyModel(
+        ToolListChangedNotificationParams.serializer(), tlcParams1, tlcParams1.copy(), tlcParams2) {
+          it.copy(_meta = it._meta)
+        }
+
+    val tlcNotif1 = ToolListChangedNotification()
+    val tlcNotif2 =
         ToolListChangedNotification(
-            method = "alt",
-            params =
-                ToolListChangedNotificationParams(
-                    _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>()))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ToolListChangedNotification>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ToolListChangedNotification>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ToolListChangedNotification>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
+            method = "notifications/tools/list_changed", params = tlcParams2)
+    verifyModel(ToolListChangedNotification.serializer(), tlcNotif1, tlcNotif1.copy(), tlcNotif2) {
+      it.copy(method = it.method, params = it.params)
     }
 
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
+    val clientNotifications: List<ClientNotification> =
+        listOf(cancelNotif1, initNotif1, progNotif1, rootsLcNotif1)
+    val serverNotifications: List<ServerNotification> =
+        listOf(cancelNotif1, logNotif1, progNotif1, plcNotif1, rlcNotif1, ruNotif1, tlcNotif1)
+    val clientRequests: List<ClientRequest> = listOf(pingReq1, setLevelReq1)
+    val serverRequests: List<ServerRequest> = listOf(pingReq1, cmReq1)
+    val clientResults: List<ClientResult> = listOf(EmptyResult(), Result(), cmRes1)
+    val serverResults: List<ServerResult> = listOf(EmptyResult(), Result())
 
-  @Test
-  fun testToolListChangedNotificationParams() {
-    val obj1 = ToolListChangedNotificationParams()
-    val obj2 = ToolListChangedNotificationParams()
-    val obj3 =
-        ToolListChangedNotificationParams(
-            _meta = emptyMap<String, kotlinx.serialization.json.JsonElement>())
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<ToolListChangedNotificationParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<ToolListChangedNotificationParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<ToolListChangedNotificationParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(_meta = obj1._meta)
-  }
-
-  @Test
-  fun testUnsubscribeRequest() {
-    val obj1 = UnsubscribeRequest(params = UnsubscribeRequestParams(uri = "test"))
-    val obj2 = UnsubscribeRequest(params = UnsubscribeRequestParams(uri = "test"))
-    val obj3 = UnsubscribeRequest(method = "alt", params = UnsubscribeRequestParams(uri = "alt"))
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<UnsubscribeRequest>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<UnsubscribeRequest>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<UnsubscribeRequest>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(method = obj1.method, params = obj1.params)
-  }
-
-  @Test
-  fun testUnsubscribeRequestParams() {
-    val obj1 = UnsubscribeRequestParams(uri = "test")
-    val obj2 = UnsubscribeRequestParams(uri = "test")
-    val obj3 = UnsubscribeRequestParams(uri = "alt")
-
-    assertNotNull(obj1)
-
-    // Serialization coverage
-    val json = testJsonBoth.encodeToString(obj1)
-    assertNotNull(json)
-    val decoded = testJsonBoth.decodeFromString<UnsubscribeRequestParams>(json)
-    assertEquals(obj1, decoded)
-
-    // Fuzz serialization branches
-    try {
-      val unknownJson = "{\"unknown_key_123\":\"val\"}"
-      testJsonIgnore.decodeFromString<UnsubscribeRequestParams>(unknownJson)
-    } catch (e: Exception) {}
-
-    try {
-      val emptyJson = "{}"
-      testJsonIgnore.decodeFromString<UnsubscribeRequestParams>(emptyJson)
-    } catch (e: Exception) {}
-
-    // Branch coverage for generated equals, hashCode, toString
-    assertEquals(obj1, obj2)
-    assertEquals(obj1.hashCode(), obj2.hashCode())
-    assertEquals(obj1.toString(), obj2.toString())
-    assertTrue(obj1.equals(obj1))
-    assertFalse(obj1.equals(null))
-    assertFalse(obj1.equals(Any()))
-    // If properties change, it should not equal (if alt exists and differs)
-    if (obj1.toString() != obj3.toString()) {
-      assertFalse(obj1.equals(obj3))
-    }
-
-    // Exhaustive data class copy branch coverage
-    obj1.copy()
-    obj1.copy(uri = obj1.uri)
-  }
-
-  @Test
-  fun testEmptyClasses() {
-    assertNotNull(ClientNotification())
-    assertNotNull(ClientRequest())
-    assertNotNull(ClientResult())
-    assertNotNull(JSONRPCMessage())
-    assertNotNull(ServerNotification())
-    assertNotNull(ServerRequest())
-    assertNotNull(ServerResult())
-    assertNotNull(EmptyResult())
-  }
-
-  @Test
-  fun testLoggingLevel() {
-    val obj1 = LoggingLevel.debug
-    val obj2 = LoggingLevel.debug
-    val obj3 = LoggingLevel.info
-
-    assertNotNull(obj1)
-    val json = kotlinx.serialization.json.Json.encodeToString(obj1)
-    val decoded = kotlinx.serialization.json.Json.decodeFromString<LoggingLevel>(json)
-    org.junit.jupiter.api.Assertions.assertEquals(obj1, decoded)
-    org.junit.jupiter.api.Assertions.assertEquals(obj1, obj2)
-    org.junit.jupiter.api.Assertions.assertEquals(obj1.hashCode(), obj2.hashCode())
-    org.junit.jupiter.api.Assertions.assertTrue(obj1.equals(obj1))
-    org.junit.jupiter.api.Assertions.assertFalse(obj1.equals(null))
-    org.junit.jupiter.api.Assertions.assertFalse(obj1.equals(Any()))
-    org.junit.jupiter.api.Assertions.assertFalse(obj1.equals(obj3))
-  }
-
-  @Test
-  fun testRole() {
-    val obj1 = Role.user
-    val obj2 = Role.user
-    val obj3 = Role.assistant
-
-    assertNotNull(obj1)
-    val json = kotlinx.serialization.json.Json.encodeToString(obj1)
-    val decoded = kotlinx.serialization.json.Json.decodeFromString<Role>(json)
-    org.junit.jupiter.api.Assertions.assertEquals(obj1, decoded)
-    org.junit.jupiter.api.Assertions.assertEquals(obj1, obj2)
-    org.junit.jupiter.api.Assertions.assertTrue(obj1.equals(obj1))
-    org.junit.jupiter.api.Assertions.assertFalse(obj1.equals(obj3))
+    assertEquals(4, clientNotifications.size)
+    assertEquals(7, serverNotifications.size)
+    assertEquals(2, clientRequests.size)
+    assertEquals(2, serverRequests.size)
+    assertEquals(3, clientResults.size)
+    assertEquals(2, serverResults.size)
+    assertNotNull(ClientNotification.serializer())
+    assertNotNull(ServerNotification.serializer())
+    assertNotNull(ClientRequest.serializer())
+    assertNotNull(ServerRequest.serializer())
+    assertNotNull(ClientResult.serializer())
+    assertNotNull(ServerResult.serializer())
+    assertNotNull(JSONRPCMessage.serializer())
   }
 }

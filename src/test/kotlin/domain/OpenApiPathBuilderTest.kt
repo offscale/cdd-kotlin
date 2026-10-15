@@ -88,5 +88,61 @@ class OpenApiPathBuilderTest {
     assertEquals(null, item.get?.summary)
     assertEquals(null, item.get?.description)
     assertTrue(item.get?.servers?.isEmpty() == true)
+
+    // Test when parameters, summary, description, and servers are NOT shared across operations
+    val p1 = EndpointParameter(name = "p1", type = "String", location = ParameterLocation.QUERY)
+    val p2 = EndpointParameter(name = "p2", type = "String", location = ParameterLocation.QUERY)
+    val nonSharedEndpoints =
+        listOf(
+            EndpointDefinition(
+                path = "/mixed",
+                method = HttpMethod.GET,
+                operationId = "op1",
+                summary = "Sum 1",
+                description = null,
+                parameters = listOf(p1),
+                servers = emptyList()),
+            EndpointDefinition(
+                path = "/mixed",
+                method = HttpMethod.CUSTOM,
+                customMethod = null,
+                operationId = "op2",
+                summary = "Sum 2",
+                description = null,
+                parameters = listOf(p2),
+                servers = emptyList()))
+    val mixedPaths =
+        OpenApiPathBuilder.buildPaths(nonSharedEndpoints, liftCommonPathMetadata = true)
+    val mixedItem = mixedPaths["/mixed"]!!
+    assertEquals(null, mixedItem.summary)
+    assertEquals(null, mixedItem.description)
+    assertTrue(mixedItem.parameters.isEmpty())
+    assertTrue(mixedItem.servers.isEmpty())
+    assertEquals("Sum 1", mixedItem.get?.summary)
+    assertEquals(1, mixedItem.get?.parameters?.size)
+    assertTrue(mixedItem.additionalOperations.containsKey("CUSTOM"))
+
+    // Test when first operation has empty parameters
+    val emptyFirstParams =
+        listOf(
+            EndpointDefinition(
+                path = "/emptyFirst",
+                method = HttpMethod.GET,
+                operationId = "op1",
+                parameters = emptyList(),
+                servers = listOf(Server("https://s1.example.com"))),
+            EndpointDefinition(
+                path = "/emptyFirst",
+                method = HttpMethod.POST,
+                operationId = "op2",
+                parameters = listOf(p1),
+                servers = listOf(Server("https://s2.example.com"))))
+    val emptyFirstPaths =
+        OpenApiPathBuilder.buildPaths(emptyFirstParams, liftCommonPathMetadata = true)
+    val emptyFirstItem = emptyFirstPaths["/emptyFirst"]!!
+    assertTrue(emptyFirstItem.parameters.isEmpty())
+    assertTrue(emptyFirstItem.servers.isEmpty())
+    assertEquals(1, emptyFirstItem.post?.parameters?.size)
+    assertEquals(1, emptyFirstItem.get?.servers?.size)
   }
 }

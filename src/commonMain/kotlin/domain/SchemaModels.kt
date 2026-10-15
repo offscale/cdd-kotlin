@@ -1,4 +1,224 @@
+/**
+ * Core JSON Schema Draft 2020-12 and OpenAPI 3.2 Schema Object domain models.
+ *
+ * Defines [SchemaCore], [SchemaDefinition], [SchemaProperty], [SchemaType], [XmlNodeType],
+ * [Discriminator], and [Xml].
+ */
 package domain
+
+/**
+ * Strongly-typed enumeration of standard JSON Schema Draft 2020-12 / OpenAPI 3.2 primitive and
+ * structural data types.
+ *
+ * @property wireName The lowercase JSON Schema keyword string.
+ */
+enum class SchemaType(val wireName: String) {
+  /** JSON `string` type. */
+  STRING("string"),
+  /** JSON `number` type. */
+  NUMBER("number"),
+  /** JSON `integer` type. */
+  INTEGER("integer"),
+  /** JSON `boolean` type. */
+  BOOLEAN("boolean"),
+  /** JSON `array` type. */
+  ARRAY("array"),
+  /** JSON `object` type. */
+  OBJECT("object"),
+  /** JSON `null` type. */
+  NULL("null");
+
+  companion object {
+    /**
+     * Resolves a [SchemaType] from its lowercase wire name, or `null` if unrecognized.
+     *
+     * @param value The raw type string.
+     * @return The matching [SchemaType] or `null`.
+     */
+    fun fromWireName(value: String): SchemaType? =
+        entries.firstOrNull { it.wireName.equals(value, ignoreCase = true) }
+  }
+}
+
+/**
+ * Strongly-typed enumeration of OpenAPI 3.2 XML Object `nodeType` values.
+ *
+ * @property wireName The lowercase wire string (`element`, `attribute`, `text`, `cdata`, `none`).
+ */
+enum class XmlNodeType(val wireName: String) {
+  /** XML element node. */
+  ELEMENT("element"),
+  /** XML attribute node. */
+  ATTRIBUTE("attribute"),
+  /** XML text node. */
+  TEXT("text"),
+  /** XML CDATA section node. */
+  CDATA("cdata"),
+  /** No XML wrapper node. */
+  NONE("none");
+
+  companion object {
+    /**
+     * Resolves an [XmlNodeType] from its wire string, or `null` if unrecognized.
+     *
+     * @param value The raw nodeType string.
+     * @return The matching [XmlNodeType] or `null`.
+     */
+    fun fromWireName(value: String): XmlNodeType? =
+        entries.firstOrNull { it.wireName.equals(value, ignoreCase = true) }
+  }
+}
+
+/**
+ * Shared contract for JSON Schema Draft 2020-12 and OpenAPI 3.2 Schema Objects, unifying
+ * root/component schemas ([SchemaDefinition]) and nested property/subschemas ([SchemaProperty]).
+ */
+sealed interface SchemaCore {
+  /** URI Reference (`$ref`). */
+  val ref: String?
+  /** Dynamic URI Reference (`$dynamicRef`). */
+  val dynamicRef: String?
+  /** Boolean schema literal (`true` or `false`). */
+  val booleanSchema: Boolean?
+  /** Canonical schema resource identifier (`$id`). */
+  val schemaId: String?
+  /** JSON Schema dialect URI (`$schema`). */
+  val schemaDialect: String?
+  /** Plain name fragment identifier (`$anchor`). */
+  val anchor: String?
+  /** Dynamic anchor identifier (`$dynamicAnchor`). */
+  val dynamicAnchor: String?
+  /** Tooling comment (`$comment`). */
+  val comment: String?
+  /** Local schema definitions (`$defs`). */
+  val defs: Map<String, SchemaProperty>
+  /** Explicit multi-type set (`type`). */
+  val types: Set<String>
+  /** Data type format modifier (`format`). */
+  val format: String?
+  /** MIME type of string-encoded content (`contentMediaType`). */
+  val contentMediaType: String?
+  /** Encoding of string-encoded content (`contentEncoding`). */
+  val contentEncoding: String?
+  /** Minimum string length (`minLength`). */
+  val minLength: Int?
+  /** Maximum string length (`maxLength`). */
+  val maxLength: Int?
+  /** ECMA-262 regular expression (`pattern`). */
+  val pattern: String?
+  /** Inclusive lower numeric bound (`minimum`). */
+  val minimum: Double?
+  /** Inclusive upper numeric bound (`maximum`). */
+  val maximum: Double?
+  /** Numeric divisor constraint (`multipleOf`). */
+  val multipleOf: Double?
+  /** Exclusive lower numeric bound (`exclusiveMinimum`). */
+  val exclusiveMinimum: Double?
+  /** Exclusive upper numeric bound (`exclusiveMaximum`). */
+  val exclusiveMaximum: Double?
+  /** Minimum array length (`minItems`). */
+  val minItems: Int?
+  /** Maximum array length (`maxItems`). */
+  val maxItems: Int?
+  /** Swagger 2.0 array collection format (`collectionFormat`). */
+  val collectionFormat: String?
+  /** Whether array elements must be unique (`uniqueItems`). */
+  val uniqueItems: Boolean?
+  /** Minimum object property count (`minProperties`). */
+  val minProperties: Int?
+  /** Maximum object property count (`maxProperties`). */
+  val maxProperties: Int?
+  /** Array item subschema (`items`). */
+  val items: SchemaProperty?
+  /** Positional tuple array subschemas (`prefixItems`). */
+  val prefixItems: List<SchemaProperty>
+  /** Subschema that at least one array element must match (`contains`). */
+  val contains: SchemaProperty?
+  /** Minimum matches for `contains` (`minContains`). */
+  val minContains: Int?
+  /** Maximum matches for `contains` (`maxContains`). */
+  val maxContains: Int?
+  /** Object property definitions (`properties`). */
+  val properties: Map<String, SchemaProperty>
+  /** Schema for dynamic/additional object properties (`additionalProperties`). */
+  val additionalProperties: SchemaProperty?
+  /** Mandatory object property names (`required`). */
+  val required: List<String>
+  /** Allowed enumerated values (`enum`). */
+  val enumValues: List<OpenApiValue>?
+  /** Schema description (`description`). */
+  val description: String?
+  /** Short schema title (`title`). */
+  val title: String?
+  /** Default instance value (`default`). */
+  val defaultValue: OpenApiValue?
+  /** Constant instance value (`const`). */
+  val constValue: OpenApiValue?
+  /** Whether this schema is deprecated (`deprecated`). */
+  val deprecated: Boolean
+  /** Whether this schema is read-only (`readOnly`). */
+  val readOnly: Boolean
+  /** Whether this schema is write-only (`writeOnly`). */
+  val writeOnly: Boolean
+  /** Additional external documentation (`externalDocs`). */
+  val externalDocs: ExternalDocumentation?
+  /** Polymorphic discriminator metadata (`discriminator`). */
+  val discriminator: Discriminator?
+  /** XML serialization metadata (`xml`). */
+  val xml: Xml?
+  /** Negated subschema (`not`). */
+  val not: SchemaProperty?
+  /** Conditional `if` subschema (`if`). */
+  val ifSchema: SchemaProperty?
+  /** Conditional `then` subschema (`then`). */
+  val thenSchema: SchemaProperty?
+  /** Conditional `else` subschema (`else`). */
+  val elseSchema: SchemaProperty?
+  /** Single example value (`example`). */
+  val example: OpenApiValue?
+  /** Regex-keyed property subschemas (`patternProperties`). */
+  val patternProperties: Map<String, SchemaProperty>
+  /** Subschema validating object property names (`propertyNames`). */
+  val propertyNames: SchemaProperty?
+  /** Property presence dependencies (`dependentRequired`). */
+  val dependentRequired: Map<String, List<String>>
+  /** Schema dependencies triggered by property presence (`dependentSchemas`). */
+  val dependentSchemas: Map<String, SchemaProperty>
+  /** Subschema for unevaluated object properties (`unevaluatedProperties`). */
+  val unevaluatedProperties: SchemaProperty?
+  /** Subschema for unevaluated array items (`unevaluatedItems`). */
+  val unevaluatedItems: SchemaProperty?
+  /** Decoded content subschema (`contentSchema`). */
+  val contentSchema: SchemaProperty?
+  /** Arbitrary custom vocabulary keywords (`customKeywords`). */
+  val customKeywords: Map<String, OpenApiValue>
+  /** Specification extensions starting with `x-` (`extensions`). */
+  val extensions: Map<String, OpenApiValue>
+}
+
+/** Strongly-typed set of [SchemaType]s parsed from [SchemaCore.types]. */
+val SchemaCore.parsedTypes: Set<SchemaType>
+  get() = types.mapNotNull { SchemaType.fromWireName(it) }.toSet()
+
+/** Strongly-typed [OpenApiValue] view of [SchemaCore.defaultValue], or `null` if absent. */
+val SchemaCore.typedDefaultValue: OpenApiValue?
+  get() = defaultValue
+
+/** Strongly-typed [OpenApiValue] view of [SchemaCore.constValue], or `null` if absent. */
+val SchemaCore.typedConstValue: OpenApiValue?
+  get() = constValue
+
+/** Strongly-typed [OpenApiValue] view of [SchemaCore.example], or `null` if absent. */
+val SchemaCore.typedExample: OpenApiValue?
+  get() = example
+
+/** Strongly-typed [OpenApiValue] map view of [SchemaCore.customKeywords]. */
+val SchemaCore.typedCustomKeywords: Map<String, OpenApiValue>
+  get() = customKeywords
+
+/** Strongly-typed [OpenApiValue] map view of [SchemaCore.extensions]. */
+val SchemaCore.typedExtensions: Map<String, OpenApiValue>
+  get() = extensions
 
 /**
  * The Schema Object allows the definition of input and output data types. These types can be
@@ -18,25 +238,26 @@ data class SchemaDefinition(
      * Generation context.
      */
     val name: String,
+    /** Sanitized Kotlin identifier for [name]. */
     val safeName: String = psi.ReferenceResolver.sanitizeTypeName(name),
 
     /**
      * If this schema is a reference to another schema, this holds the URI Reference. JSON Schema
      * keyword: `$ref`.
      */
-    val ref: String? = null,
+    override val ref: String? = null,
 
     /**
      * Dynamic reference resolved via `$dynamicAnchor` scopes. JSON Schema keyword: `$dynamicRef`.
      */
-    val dynamicRef: String? = null,
+    override val dynamicRef: String? = null,
 
     /**
      * Represents a boolean schema (`true` or `false`). `true` means any instance is valid, `false`
      * means no instance is valid. When this is set, other schema keywords are ignored for
      * validation purposes.
      */
-    val booleanSchema: Boolean? = null,
+    override val booleanSchema: Boolean? = null,
 
     /**
      * The type of schema. Data types in the OAS are based on the types defined by the JSON Schema
@@ -55,167 +276,167 @@ data class SchemaDefinition(
     val typeExplicit: Boolean = true,
 
     /** Canonical identifier for the schema. JSON Schema keyword: `$id`. */
-    val schemaId: String? = null,
+    override val schemaId: String? = null,
 
     /**
      * Dialect to apply when processing this schema resource root. JSON Schema keyword: `$schema`.
      */
-    val schemaDialect: String? = null,
+    override val schemaDialect: String? = null,
 
     /**
      * Defines a named schema location within the current resource. JSON Schema keyword: `$anchor`.
      */
-    val anchor: String? = null,
+    override val anchor: String? = null,
 
     /**
      * Defines a dynamic anchor for resolving `$dynamicRef` keywords. JSON Schema keyword:
      * `$dynamicAnchor`.
      */
-    val dynamicAnchor: String? = null,
+    override val dynamicAnchor: String? = null,
 
     /** A comment for tooling, not used in validation. JSON Schema keyword: `$comment`. */
-    val comment: String? = null,
+    override val comment: String? = null,
 
     /** Schema definitions available for reuse within this schema. JSON Schema keyword: `$defs`. */
-    val defs: Map<String, SchemaProperty> = emptyMap(),
+    override val defs: Map<String, SchemaProperty> = emptyMap(),
 
     /**
      * Optional explicit type set for OAS 3.2 / JSON Schema multi-type definitions. When provided,
      * this overrides [type] for codegen decisions. Example: {"string", "null"}.
      */
-    val types: Set<String> = emptySet(),
+    override val types: Set<String> = emptySet(),
 
     /**
      * The format refinement (e.g., "int32", "int64", "float", "double", "date-time", "password").
      * This applies when [type] is a primitive.
      */
-    val format: String? = null,
+    override val format: String? = null,
 
     /**
      * The standard MIME type of the content (e.g., "image/png", "application/octet-stream").
      * Applies when [type] is "string" and content is binary/encoded.
      */
-    val contentMediaType: String? = null,
+    override val contentMediaType: String? = null,
 
     /**
      * The Content-Encoding specifying how the content is encoded in the schema (e.g., "base64",
      * "base64url"). Applies when [type] is "string" and content is encoded.
      */
-    val contentEncoding: String? = null,
+    override val contentEncoding: String? = null,
 
     /** Minimum string length (applies to string types). JSON Schema keyword: `minLength`. */
-    val minLength: Int? = null,
+    override val minLength: Int? = null,
 
     /** Maximum string length (applies to string types). JSON Schema keyword: `maxLength`. */
-    val maxLength: Int? = null,
+    override val maxLength: Int? = null,
 
     /** Regular expression pattern that a string must match. JSON Schema keyword: `pattern`. */
-    val pattern: String? = null,
+    override val pattern: String? = null,
 
     /** Minimum numeric value (applies to number/integer types). JSON Schema keyword: `minimum`. */
-    val minimum: Double? = null,
+    override val minimum: Double? = null,
 
     /** Maximum numeric value (applies to number/integer types). JSON Schema keyword: `maximum`. */
-    val maximum: Double? = null,
+    override val maximum: Double? = null,
 
     /** Numbers must be a multiple of this value. JSON Schema keyword: `multipleOf`. */
-    val multipleOf: Double? = null,
+    override val multipleOf: Double? = null,
 
     /** Exclusive lower bound for numbers. JSON Schema keyword: `exclusiveMinimum`. */
-    val exclusiveMinimum: Double? = null,
+    override val exclusiveMinimum: Double? = null,
 
     /** Exclusive upper bound for numbers. JSON Schema keyword: `exclusiveMaximum`. */
-    val exclusiveMaximum: Double? = null,
+    override val exclusiveMaximum: Double? = null,
 
     /** Minimum number of items for arrays. JSON Schema keyword: `minItems`. */
-    val minItems: Int? = null,
+    override val minItems: Int? = null,
 
     /** Maximum number of items for arrays. JSON Schema keyword: `maxItems`. */
-    val maxItems: Int? = null,
+    override val maxItems: Int? = null,
 
     /** Swagger 2.0 (Items Object): Determines the format of the array if type array is used. */
-    val collectionFormat: String? = null,
+    override val collectionFormat: String? = null,
 
     /** Whether array items must be unique. JSON Schema keyword: `uniqueItems`. */
-    val uniqueItems: Boolean? = null,
+    override val uniqueItems: Boolean? = null,
 
     /** Minimum number of properties for objects. JSON Schema keyword: `minProperties`. */
-    val minProperties: Int? = null,
+    override val minProperties: Int? = null,
 
     /** Maximum number of properties for objects. JSON Schema keyword: `maxProperties`. */
-    val maxProperties: Int? = null,
+    override val maxProperties: Int? = null,
 
     /** If type is "array", this describes the items schema. JSON Schema keyword: `items`. */
-    val items: SchemaProperty? = null,
+    override val items: SchemaProperty? = null,
 
     /** Tuple typing for arrays using positional schemas. JSON Schema keyword: `prefixItems`. */
-    val prefixItems: List<SchemaProperty> = emptyList(),
+    override val prefixItems: List<SchemaProperty> = emptyList(),
 
     /**
      * Applies a subschema to array elements and requires at least one to match. JSON Schema
      * keyword: `contains`.
      */
-    val contains: SchemaProperty? = null,
+    override val contains: SchemaProperty? = null,
 
     /**
      * Minimum number of array elements that must match [contains]. JSON Schema keyword:
      * `minContains`.
      */
-    val minContains: Int? = null,
+    override val minContains: Int? = null,
 
     /**
      * Maximum number of array elements that must match [contains]. JSON Schema keyword:
      * `maxContains`.
      */
-    val maxContains: Int? = null,
+    override val maxContains: Int? = null,
 
     /** If type is "object", this map contains its properties. JSON Schema keyword: `properties`. */
-    val properties: Map<String, SchemaProperty> = emptyMap(),
+    override val properties: Map<String, SchemaProperty> = emptyMap(),
 
     /**
      * If type is "object", this schema defines the value type for additional properties. JSON
      * Schema keyword: `additionalProperties`.
      */
-    val additionalProperties: SchemaProperty? = null,
+    override val additionalProperties: SchemaProperty? = null,
 
     /** List of field names that are mandatory (not nullable). JSON Schema keyword: `required`. */
-    val required: List<String> = emptyList(),
+    override val required: List<String> = emptyList(),
 
     /**
      * If type is "enum", this list contains the allowed values. JSON Schema allows any JSON value
      * type (string, number, boolean, object, array, null). JSON Schema keyword: `enum`.
      */
-    val enumValues: List<Any?>? = null,
+    override val enumValues: List<OpenApiValue>? = null,
 
     /** A description of the schema. CommonMark syntax MAY be used for rich text representation. */
-    val description: String? = null,
+    override val description: String? = null,
 
     /** A short title for the schema. JSON Schema keyword: `title`. */
-    val title: String? = null,
+    override val title: String? = null,
 
     /**
      * The default value for the schema instance, expressed as a JSON-compatible literal value. JSON
      * Schema keyword: `default`.
      */
-    val defaultValue: Any? = null,
+    override val defaultValue: OpenApiValue? = null,
 
     /**
      * A fixed value for the schema instance, expressed as a JSON-compatible literal value. JSON
      * Schema keyword: `const`.
      */
-    val constValue: Any? = null,
+    override val constValue: OpenApiValue? = null,
 
     /**
      * Declares this schema to be deprecated. Consumers SHOULD refrain from usage. JSON Schema
      * keyword: `deprecated`.
      */
-    val deprecated: Boolean = false,
+    override val deprecated: Boolean = false,
 
     /** Declares the schema is read-only (response-only). JSON Schema keyword: `readOnly`. */
-    val readOnly: Boolean = false,
+    override val readOnly: Boolean = false,
 
     /** Declares the schema is write-only (request-only). JSON Schema keyword: `writeOnly`. */
-    val writeOnly: Boolean = false,
+    override val writeOnly: Boolean = false,
 
     /**
      * Additional external documentation for this schema.
@@ -223,7 +444,7 @@ data class SchemaDefinition(
      * See
      * [External Documentation Object](https://spec.openapis.org/oas/v3.2.0#external-documentation-object)
      */
-    val externalDocs: ExternalDocumentation? = null,
+    override val externalDocs: ExternalDocumentation? = null,
 
     /**
      * The discriminator provides a "hint" for which of a set of schemas a payload is expected to
@@ -231,14 +452,14 @@ data class SchemaDefinition(
      *
      * See [Discriminator Object](https://spec.openapis.org/oas/v3.2.0#discriminator-object)
      */
-    val discriminator: Discriminator? = null,
+    override val discriminator: Discriminator? = null,
 
     /**
      * Adds additional metadata to describe the XML representation of this schema.
      *
      * See [XML Object](https://spec.openapis.org/oas/v3.2.0#xml-object)
      */
-    val xml: Xml? = null,
+    override val xml: Xml? = null,
 
     /**
      * Inline usage of `oneOf`. Ensure that exactly one of the subschemas validates.
@@ -281,16 +502,16 @@ data class SchemaDefinition(
     val allOfSchemas: List<SchemaProperty> = emptyList(),
 
     /** Negation of a schema. JSON Schema keyword: `not`. */
-    val not: SchemaProperty? = null,
+    override val not: SchemaProperty? = null,
 
     /** Conditional schema applied when `if` validates. JSON Schema keyword: `if`. */
-    val ifSchema: SchemaProperty? = null,
+    override val ifSchema: SchemaProperty? = null,
 
     /** Conditional schema applied when `if` validates. JSON Schema keyword: `then`. */
-    val thenSchema: SchemaProperty? = null,
+    override val thenSchema: SchemaProperty? = null,
 
     /** Conditional schema applied when `if` fails to validate. JSON Schema keyword: `else`. */
-    val elseSchema: SchemaProperty? = null,
+    override val elseSchema: SchemaProperty? = null,
 
     /**
      * A free-form field to include an example of an instance for this schema.
@@ -299,68 +520,68 @@ data class SchemaDefinition(
      * `examples` keyword. Use of `example` is discouraged, and later versions of this specification
      * may remove it.
      */
-    val example: Any? = null,
+    override val example: OpenApiValue? = null,
 
     /**
      * A map of named sample values (OAS specific examples). Or can map to JSON Schema `examples`
      * array logic depending on serialization.
      */
-    val examples: Map<String, Any?>? = null,
+    val examples: Map<String, OpenApiValue>? = null,
 
     /**
      * A list of example values for this schema (JSON Schema `examples` array). This is the
      * spec-compliant array form and preserves example ordering.
      */
-    val examplesList: List<Any?>? = null,
+    val examplesList: List<OpenApiValue>? = null,
 
     /**
      * Applies subschemas to properties matching the regex. JSON Schema keyword:
      * `patternProperties`.
      */
-    val patternProperties: Map<String, SchemaProperty> = emptyMap(),
+    override val patternProperties: Map<String, SchemaProperty> = emptyMap(),
 
     /** Applies a schema to all property names. JSON Schema keyword: `propertyNames`. */
-    val propertyNames: SchemaProperty? = null,
+    override val propertyNames: SchemaProperty? = null,
 
     /**
      * Declares required property sets that depend on the presence of another property. JSON Schema
      * keyword: `dependentRequired`.
      */
-    val dependentRequired: Map<String, List<String>> = emptyMap(),
+    override val dependentRequired: Map<String, List<String>> = emptyMap(),
 
     /**
      * Declares schemas that are conditionally applied based on property presence. JSON Schema
      * keyword: `dependentSchemas`.
      */
-    val dependentSchemas: Map<String, SchemaProperty> = emptyMap(),
+    override val dependentSchemas: Map<String, SchemaProperty> = emptyMap(),
 
     /**
      * Applies a schema to properties that were not evaluated by other keywords. JSON Schema
      * keyword: `unevaluatedProperties`.
      */
-    val unevaluatedProperties: SchemaProperty? = null,
+    override val unevaluatedProperties: SchemaProperty? = null,
 
     /**
      * Applies a schema to array items that were not evaluated by other keywords. JSON Schema
      * keyword: `unevaluatedItems`.
      */
-    val unevaluatedItems: SchemaProperty? = null,
+    override val unevaluatedItems: SchemaProperty? = null,
 
     /**
      * A schema for string-encoded content (e.g., JSON in a string). JSON Schema keyword:
      * `contentSchema`.
      */
-    val contentSchema: SchemaProperty? = null,
+    override val contentSchema: SchemaProperty? = null,
 
     /**
      * Additional JSON Schema keywords not explicitly modeled by this IR. OAS 3.2 allows Schema
      * Objects to include arbitrary vocabulary keywords without an `x-` prefix.
      */
-    val customKeywords: Map<String, Any?> = emptyMap(),
+    override val customKeywords: Map<String, OpenApiValue> = emptyMap(),
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
-) {
+    override val extensions: Map<String, OpenApiValue> = emptyMap()
+) : SchemaCore {
   /** Effective types for this schema, using [types] when provided, otherwise [type]. */
   val effectiveTypes: Set<String>
     get() =
@@ -401,7 +622,7 @@ data class Discriminator(
     val defaultMapping: String? = null,
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
+    val extensions: Map<String, OpenApiValue> = emptyMap()
 )
 
 /**
@@ -446,8 +667,12 @@ data class Xml(
     val wrapped: Boolean = false,
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
-)
+    val extensions: Map<String, OpenApiValue> = emptyMap()
+) {
+  /** Strongly-typed [XmlNodeType] parsed from [nodeType], or `null` if unspecified/custom. */
+  val parsedNodeType: XmlNodeType?
+    get() = nodeType?.let { XmlNodeType.fromWireName(it) }
+}
 
 /**
  * Represents a single property within a Schema. In a standard Schema Object, a property is simply a
@@ -464,117 +689,117 @@ data class SchemaProperty(
      * means no instance is valid. When this is set, other schema keywords are ignored for
      * validation purposes.
      */
-    val booleanSchema: Boolean? = null,
+    override val booleanSchema: Boolean? = null,
 
     /**
      * The set of JSON types allowed for this property. E.g. {"string"}, {"integer", "null"},
      * {"array"}. Replaces the single `type` string field.
      */
-    val types: Set<String> = emptySet(),
+    override val types: Set<String> = emptySet(),
 
     /**
      * The format refinement (e.g., "int32", "int64", "float", "double", "date-time", "password").
      * See [Data Type Format](https://spec.openapis.org/oas/v3.2.0#data-type-format)
      */
-    val format: String? = null,
+    override val format: String? = null,
 
     /**
      * The standard MIME type of the content (e.g., "image/png", "application/octet-stream").
      * Replaces `format: binary` in OAS 3.1+.
      */
-    val contentMediaType: String? = null,
+    override val contentMediaType: String? = null,
 
     /**
      * The Content-Encoding specifying how the content is encoded in the schema (e.g., "base64",
      * "base64url"). Should be used in conjunction with `type: string`.
      */
-    val contentEncoding: String? = null,
+    override val contentEncoding: String? = null,
 
     /** Minimum string length (applies to string types). JSON Schema keyword: `minLength`. */
-    val minLength: Int? = null,
+    override val minLength: Int? = null,
 
     /** Maximum string length (applies to string types). JSON Schema keyword: `maxLength`. */
-    val maxLength: Int? = null,
+    override val maxLength: Int? = null,
 
     /** Regular expression pattern that a string must match. JSON Schema keyword: `pattern`. */
-    val pattern: String? = null,
+    override val pattern: String? = null,
 
     /** Minimum numeric value (applies to number/integer types). JSON Schema keyword: `minimum`. */
-    val minimum: Double? = null,
+    override val minimum: Double? = null,
 
     /** Maximum numeric value (applies to number/integer types). JSON Schema keyword: `maximum`. */
-    val maximum: Double? = null,
+    override val maximum: Double? = null,
 
     /** Numbers must be a multiple of this value. JSON Schema keyword: `multipleOf`. */
-    val multipleOf: Double? = null,
+    override val multipleOf: Double? = null,
 
     /** Exclusive lower bound for numbers. JSON Schema keyword: `exclusiveMinimum`. */
-    val exclusiveMinimum: Double? = null,
+    override val exclusiveMinimum: Double? = null,
 
     /** Exclusive upper bound for numbers. JSON Schema keyword: `exclusiveMaximum`. */
-    val exclusiveMaximum: Double? = null,
+    override val exclusiveMaximum: Double? = null,
 
     /** Minimum number of items for arrays. JSON Schema keyword: `minItems`. */
-    val minItems: Int? = null,
+    override val minItems: Int? = null,
 
     /** Maximum number of items for arrays. JSON Schema keyword: `maxItems`. */
-    val maxItems: Int? = null,
+    override val maxItems: Int? = null,
 
     /** Swagger 2.0 (Items Object): Determines the format of the array if type array is used. */
-    val collectionFormat: String? = null,
+    override val collectionFormat: String? = null,
 
     /** Whether array items must be unique. JSON Schema keyword: `uniqueItems`. */
-    val uniqueItems: Boolean? = null,
+    override val uniqueItems: Boolean? = null,
 
     /** Minimum number of properties for objects. JSON Schema keyword: `minProperties`. */
-    val minProperties: Int? = null,
+    override val minProperties: Int? = null,
 
     /** Maximum number of properties for objects. JSON Schema keyword: `maxProperties`. */
-    val maxProperties: Int? = null,
+    override val maxProperties: Int? = null,
 
     /**
      * If type contains "array", this describes the contents of the list. Corresponds to JSON Schema
      * `items`.
      */
-    val items: SchemaProperty? = null,
+    override val items: SchemaProperty? = null,
 
     /**
      * Tuple typing for arrays using positional schemas. Corresponds to JSON Schema `prefixItems`.
      */
-    val prefixItems: List<SchemaProperty> = emptyList(),
+    override val prefixItems: List<SchemaProperty> = emptyList(),
 
     /**
      * Applies a subschema to array elements and requires at least one to match. Corresponds to JSON
      * Schema `contains`.
      */
-    val contains: SchemaProperty? = null,
+    override val contains: SchemaProperty? = null,
 
     /**
      * Minimum number of array elements that must match [contains]. Corresponds to JSON Schema
      * `minContains`.
      */
-    val minContains: Int? = null,
+    override val minContains: Int? = null,
 
     /**
      * Maximum number of array elements that must match [contains]. Corresponds to JSON Schema
      * `maxContains`.
      */
-    val maxContains: Int? = null,
+    override val maxContains: Int? = null,
 
     /**
      * If type contains "object", this map contains its properties. Corresponds to JSON Schema
      * `properties`.
      */
-    val properties: Map<String, SchemaProperty> = emptyMap(),
+    override val properties: Map<String, SchemaProperty> = emptyMap(),
 
     /** Required property names for object schemas. Corresponds to JSON Schema `required`. */
-    val required: List<String> = emptyList(),
+    override val required: List<String> = emptyList(),
 
     /**
      * If type contains "object", this describes the value schema for dynamic keys. Corresponds to
      * JSON Schema `additionalProperties`.
      */
-    val additionalProperties: SchemaProperty? = null,
+    override val additionalProperties: SchemaProperty? = null,
 
     /**
      * If this property is a reference to another object, this holds the URI Reference. Supports:
@@ -582,69 +807,69 @@ data class SchemaProperty(
      * - Relative Files: `./User.yaml`
      * - Class Names (Legacy/Simple): `User`
      */
-    val ref: String? = null,
+    override val ref: String? = null,
 
     /** Canonical identifier for the schema. JSON Schema keyword: `$id`. */
-    val schemaId: String? = null,
+    override val schemaId: String? = null,
 
     /**
      * Dialect to apply when processing this schema resource root. JSON Schema keyword: `$schema`.
      */
-    val schemaDialect: String? = null,
+    override val schemaDialect: String? = null,
 
     /**
      * Defines a named schema location within the current resource. JSON Schema keyword: `$anchor`.
      */
-    val anchor: String? = null,
+    override val anchor: String? = null,
 
     /**
      * Defines a dynamic anchor for resolving `$dynamicRef` keywords. JSON Schema keyword:
      * `$dynamicAnchor`.
      */
-    val dynamicAnchor: String? = null,
+    override val dynamicAnchor: String? = null,
 
     /**
      * Dynamic reference resolved via `$dynamicAnchor` scopes. JSON Schema keyword: `$dynamicRef`.
      */
-    val dynamicRef: String? = null,
+    override val dynamicRef: String? = null,
 
     /** A comment for tooling, not used in validation. JSON Schema keyword: `$comment`. */
-    val comment: String? = null,
+    override val comment: String? = null,
 
     /**
      * Schema definitions available for reuse within this subschema. JSON Schema keyword: `$defs`.
      */
-    val defs: Map<String, SchemaProperty> = emptyMap(),
+    override val defs: Map<String, SchemaProperty> = emptyMap(),
 
     /** Documentation for this specific property. */
-    val description: String? = null,
+    override val description: String? = null,
 
     /** A short title for the property schema. JSON Schema keyword: `title`. */
-    val title: String? = null,
+    override val title: String? = null,
 
     /**
      * The default value for the property, expressed as a JSON-compatible literal value. JSON Schema
      * keyword: `default`.
      */
-    val defaultValue: Any? = null,
+    override val defaultValue: OpenApiValue? = null,
 
     /**
      * A fixed value for the property, expressed as a JSON-compatible literal value. JSON Schema
      * keyword: `const`.
      */
-    val constValue: Any? = null,
+    override val constValue: OpenApiValue? = null,
 
     /**
      * Declares this property to be deprecated. Consumers SHOULD refrain from usage. JSON Schema
      * keyword: `deprecated`.
      */
-    val deprecated: Boolean = false,
+    override val deprecated: Boolean = false,
 
     /** Declares the property is read-only (response-only). JSON Schema keyword: `readOnly`. */
-    val readOnly: Boolean = false,
+    override val readOnly: Boolean = false,
 
     /** Declares the property is write-only (request-only). JSON Schema keyword: `writeOnly`. */
-    val writeOnly: Boolean = false,
+    override val writeOnly: Boolean = false,
 
     /**
      * Additional external documentation for this schema property.
@@ -652,20 +877,20 @@ data class SchemaProperty(
      * See
      * [External Documentation Object](https://spec.openapis.org/oas/v3.2.0#external-documentation-object)
      */
-    val externalDocs: ExternalDocumentation? = null,
+    override val externalDocs: ExternalDocumentation? = null,
 
     /**
      * The discriminator provides a hint for which schema a payload is expected to satisfy.
      *
      * See [Discriminator Object](https://spec.openapis.org/oas/v3.2.0#discriminator-object)
      */
-    val discriminator: Discriminator? = null,
+    override val discriminator: Discriminator? = null,
 
     /**
      * Enumerated allowed values for this schema. JSON Schema allows any JSON value type (string,
      * number, boolean, object, array, null). JSON Schema keyword: `enum`.
      */
-    val enumValues: List<Any?>? = null,
+    override val enumValues: List<OpenApiValue>? = null,
 
     /** Inline usage of `oneOf` for nested schemas. JSON Schema keyword: `oneOf`. */
     val oneOf: List<SchemaProperty> = emptyList(),
@@ -677,74 +902,74 @@ data class SchemaProperty(
     val allOf: List<SchemaProperty> = emptyList(),
 
     /** Negation of a nested schema. JSON Schema keyword: `not`. */
-    val not: SchemaProperty? = null,
+    override val not: SchemaProperty? = null,
 
     /** Conditional subschema applied when `if` validates. JSON Schema keyword: `if`. */
-    val ifSchema: SchemaProperty? = null,
+    override val ifSchema: SchemaProperty? = null,
 
     /** Conditional subschema applied when `if` validates. JSON Schema keyword: `then`. */
-    val thenSchema: SchemaProperty? = null,
+    override val thenSchema: SchemaProperty? = null,
 
     /** Conditional subschema applied when `if` fails to validate. JSON Schema keyword: `else`. */
-    val elseSchema: SchemaProperty? = null,
+    override val elseSchema: SchemaProperty? = null,
 
     /** A sample value for this property. */
-    val example: Any? = null,
+    override val example: OpenApiValue? = null,
 
     /** A list of example values for this property. JSON Schema keyword: `examples`. */
-    val examples: List<Any?>? = null,
+    val examples: List<OpenApiValue>? = null,
 
     /** Adds additional metadata to describe the XML representation of this property. */
-    val xml: Xml? = null,
+    override val xml: Xml? = null,
 
     /**
      * Applies subschemas to properties matching the regex. JSON Schema keyword:
      * `patternProperties`.
      */
-    val patternProperties: Map<String, SchemaProperty> = emptyMap(),
+    override val patternProperties: Map<String, SchemaProperty> = emptyMap(),
 
     /** Applies a schema to all property names. JSON Schema keyword: `propertyNames`. */
-    val propertyNames: SchemaProperty? = null,
+    override val propertyNames: SchemaProperty? = null,
 
     /**
      * Declares required property sets that depend on the presence of another property. JSON Schema
      * keyword: `dependentRequired`.
      */
-    val dependentRequired: Map<String, List<String>> = emptyMap(),
+    override val dependentRequired: Map<String, List<String>> = emptyMap(),
 
     /**
      * Declares schemas that are conditionally applied based on property presence. JSON Schema
      * keyword: `dependentSchemas`.
      */
-    val dependentSchemas: Map<String, SchemaProperty> = emptyMap(),
+    override val dependentSchemas: Map<String, SchemaProperty> = emptyMap(),
 
     /**
      * Applies a schema to properties that were not evaluated by other keywords. JSON Schema
      * keyword: `unevaluatedProperties`.
      */
-    val unevaluatedProperties: SchemaProperty? = null,
+    override val unevaluatedProperties: SchemaProperty? = null,
 
     /**
      * Applies a schema to array items that were not evaluated by other keywords. JSON Schema
      * keyword: `unevaluatedItems`.
      */
-    val unevaluatedItems: SchemaProperty? = null,
+    override val unevaluatedItems: SchemaProperty? = null,
 
     /**
      * A schema for string-encoded content (e.g., JSON in a string). JSON Schema keyword:
      * `contentSchema`.
      */
-    val contentSchema: SchemaProperty? = null,
+    override val contentSchema: SchemaProperty? = null,
 
     /**
      * Additional JSON Schema keywords not explicitly modeled by this IR. OAS 3.2 allows Schema
      * Objects to include arbitrary vocabulary keywords without an `x-` prefix.
      */
-    val customKeywords: Map<String, Any?> = emptyMap(),
+    override val customKeywords: Map<String, OpenApiValue> = emptyMap(),
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
-) {
+    override val extensions: Map<String, OpenApiValue> = emptyMap()
+) : SchemaCore {
   /**
    * Legacy constructor for single-type definition (Swagger 2.0 / OAS 3.0 style). Maps the single
    * type to a set of one type.
@@ -779,15 +1004,15 @@ data class SchemaProperty(
       defs: Map<String, SchemaProperty> = emptyMap(),
       description: String? = null,
       title: String? = null,
-      defaultValue: Any? = null,
-      constValue: Any? = null,
+      defaultValue: OpenApiValue? = null,
+      constValue: OpenApiValue? = null,
       deprecated: Boolean = false,
       readOnly: Boolean = false,
       writeOnly: Boolean = false,
       externalDocs: ExternalDocumentation? = null,
       discriminator: Discriminator? = null,
-      example: Any? = null,
-      examples: List<Any?>? = null,
+      example: OpenApiValue? = null,
+      examples: List<OpenApiValue>? = null,
       xml: Xml? = null,
       patternProperties: Map<String, SchemaProperty> = emptyMap(),
       propertyNames: SchemaProperty? = null,
@@ -796,8 +1021,8 @@ data class SchemaProperty(
       unevaluatedProperties: SchemaProperty? = null,
       unevaluatedItems: SchemaProperty? = null,
       contentSchema: SchemaProperty? = null,
-      customKeywords: Map<String, Any?> = emptyMap(),
-      extensions: Map<String, Any?> = emptyMap(),
+      customKeywords: Map<String, OpenApiValue> = emptyMap(),
+      extensions: Map<String, OpenApiValue> = emptyMap(),
       ifSchema: SchemaProperty? = null,
       thenSchema: SchemaProperty? = null,
       elseSchema: SchemaProperty? = null

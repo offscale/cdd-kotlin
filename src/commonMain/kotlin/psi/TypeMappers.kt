@@ -1,5 +1,14 @@
+/** Bidirectional OpenAPI 3.2 and Kotlin type mapping utilities. */
 package psi
 
+import domain.OpenApiArray
+import domain.OpenApiBoolean
+import domain.OpenApiInt
+import domain.OpenApiNull
+import domain.OpenApiNumber
+import domain.OpenApiObject
+import domain.OpenApiString
+import domain.OpenApiValue
 import domain.SchemaProperty
 
 /**
@@ -41,54 +50,58 @@ object TypeMappers {
       stack: MutableSet<SchemaProperty>
   ): String {
     if (!stack.add(prop)) return "kotlinx.serialization.json.JsonElement"
+    val mapped = computeMappedType(prop, dynamicRefResolver, stack)
+    stack.remove(prop)
+    return mapped
+  }
 
-    try {
-      prop.booleanSchema?.let { booleanValue ->
-        return if (booleanValue) "kotlinx.serialization.json.JsonElement" else "Nothing"
+  private fun computeMappedType(
+      prop: SchemaProperty,
+      dynamicRefResolver: ((SchemaProperty, String) -> SchemaProperty?)?,
+      stack: MutableSet<SchemaProperty>
+  ): String {
+    prop.booleanSchema?.let { booleanValue ->
+      return if (booleanValue) "kotlinx.serialization.json.JsonElement" else "Nothing"
+    }
+
+    prop.dynamicRef?.let { dynamicRef ->
+      val resolved = dynamicRefResolver?.invoke(prop, dynamicRef)
+      if (resolved != null && resolved !== prop) {
+        return mapTypeInternal(resolved, dynamicRefResolver, stack)
       }
+    }
 
-      prop.dynamicRef?.let { dynamicRef ->
-        val resolved = dynamicRefResolver?.invoke(prop, dynamicRef)
-        if (resolved != null && resolved !== prop) {
-          return mapTypeInternal(resolved, dynamicRefResolver, stack)
+    val ref = prop.ref ?: prop.dynamicRef
+    if (ref != null) {
+      return ReferenceResolver.resolveRefToType(ref)
+    }
+
+    val effectiveTypes = if (prop.types.isNotEmpty()) prop.types else inferTypes(prop)
+
+    // Identify primary type (ignore "null" for type selection, it handled via nullability later)
+    val primaryType =
+        effectiveTypes.firstOrNull { it != "null" } ?: effectiveTypes.firstOrNull() ?: "string"
+
+    return when (primaryType) {
+      "string" -> mapStringType(prop)
+      "integer" -> if (prop.format == "int64") "Long" else "Int"
+      "number" -> if (prop.format == "float") "Float" else "Double"
+      "boolean" -> "Boolean"
+      "array" -> {
+        val itemType =
+            if (prop.items != null) mapTypeInternal(prop.items, dynamicRefResolver, stack)
+            else "kotlinx.serialization.json.JsonElement"
+        "List<$itemType>"
+      }
+      "object" -> {
+        if (prop.additionalProperties != null) {
+          val valueType = mapTypeInternal(prop.additionalProperties, dynamicRefResolver, stack)
+          "Map<String, $valueType>"
+        } else {
+          "kotlinx.serialization.json.JsonElement"
         }
       }
-
-      val ref = prop.ref ?: prop.dynamicRef
-      if (ref != null) {
-        val typeName = ReferenceResolver.resolveRefToType(ref)
-        return typeName
-      }
-
-      val effectiveTypes = if (prop.types.isNotEmpty()) prop.types else inferTypes(prop)
-
-      // Identify primary type (ignore "null" for type selection, it handled via nullability later)
-      val primaryType =
-          effectiveTypes.firstOrNull { it != "null" } ?: effectiveTypes.firstOrNull() ?: "string"
-
-      return when (primaryType) {
-        "string" -> mapStringType(prop)
-        "integer" -> if (prop.format == "int64") "Long" else "Int"
-        "number" -> if (prop.format == "float") "Float" else "Double"
-        "boolean" -> "Boolean"
-        "array" -> {
-          val itemType =
-              if (prop.items != null) mapTypeInternal(prop.items, dynamicRefResolver, stack)
-              else "kotlinx.serialization.json.JsonElement"
-          "List<$itemType>"
-        }
-        "object" -> {
-          if (prop.additionalProperties != null) {
-            val valueType = mapTypeInternal(prop.additionalProperties, dynamicRefResolver, stack)
-            "Map<String, $valueType>"
-          } else {
-            "kotlinx.serialization.json.JsonElement"
-          }
-        }
-        else -> "kotlinx.serialization.json.JsonElement" // Fallback for unknown types
-      }
-    } finally {
-      stack.remove(prop)
+      else -> "kotlinx.serialization.json.JsonElement" // Fallback for unknown types
     }
   }
 
@@ -137,8 +150,7 @@ object TypeMappers {
     }
 
     prop.constValue?.let { value ->
-      val type = inferTypeFromValue(value)
-      return if (type.isNullOrBlank()) emptySet() else setOf(type)
+      return setOf(inferTypeFromValue(value))
     }
 
     prop.enumValues?.let { values ->
@@ -166,29 +178,23 @@ object TypeMappers {
     return emptySet()
   }
 
-  private fun inferTypesFromEnum(values: List<Any?>): Set<String> {
+  private fun inferTypesFromEnum(values: List<OpenApiValue>): Set<String> {
     if (values.isEmpty()) return emptySet()
-    val types = values.mapNotNull { inferTypeFromValue(it) }.toSet()
-    if (types.isEmpty()) return emptySet()
+    val types = values.map { inferTypeFromValue(it) }.toSet()
     if (types.size == 1) return types
     if (types.size == 2 && types.contains("null")) return types
     return emptySet()
   }
 
-  private fun inferTypeFromValue(value: Any?): String? {
+  private fun inferTypeFromValue(value: OpenApiValue): String {
     return when (value) {
-      null -> "null"
-      is String -> "string"
-      is Int,
-      is Long,
-      is Short,
-      is Byte -> "integer"
-      is Float,
-      is Double -> "number"
-      is Boolean -> "boolean"
-      is Map<*, *> -> "object"
-      is List<*> -> "array"
-      else -> null
+      is OpenApiNull -> "null"
+      is OpenApiString -> "string"
+      is OpenApiInt -> "integer"
+      is OpenApiNumber -> "number"
+      is OpenApiBoolean -> "boolean"
+      is OpenApiObject -> "object"
+      is OpenApiArray -> "array"
     }
   }
 

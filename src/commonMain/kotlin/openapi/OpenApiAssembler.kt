@@ -1,3 +1,4 @@
+/** OpenAPI definition assembler combining parsed Kotlin DTOs, endpoints, and root metadata. */
 package openapi
 
 import domain.Components
@@ -6,6 +7,7 @@ import domain.ExternalDocumentation
 import domain.Info
 import domain.OpenApiDefinition
 import domain.OpenApiPathBuilder
+import domain.OpenApiValue
 import domain.PathItem
 import domain.SchemaDefinition
 import domain.SecurityRequirement
@@ -48,8 +50,8 @@ class OpenApiAssembler {
       servers: List<Server> = emptyList(),
       components: Components? = null,
       webhooks: Map<String, PathItem> = emptyMap(),
-      pathsExtensions: Map<String, Any?> = emptyMap(),
-      webhooksExtensions: Map<String, Any?> = emptyMap(),
+      pathsExtensions: Map<String, OpenApiValue> = emptyMap(),
+      webhooksExtensions: Map<String, OpenApiValue> = emptyMap(),
       pathsExplicitEmpty: Boolean = false,
       webhooksExplicitEmpty: Boolean = false,
       pathItems: Map<String, PathItem> = emptyMap(),
@@ -57,7 +59,7 @@ class OpenApiAssembler {
       securityExplicitEmpty: Boolean = false,
       tags: List<Tag> = emptyList(),
       externalDocs: ExternalDocumentation? = null,
-      extensions: Map<String, Any?> = emptyMap(),
+      extensions: Map<String, OpenApiValue> = emptyMap(),
       openapi: String = "3.2.0",
       jsonSchemaDialect: String? = null,
       self: String? = null,
@@ -130,9 +132,9 @@ class OpenApiAssembler {
   }
 
   private fun mergeExtensions(
-      base: Map<String, Any?>,
-      overrides: Map<String, Any?>
-  ): Map<String, Any?> {
+      base: Map<String, OpenApiValue>,
+      overrides: Map<String, OpenApiValue>
+  ): Map<String, OpenApiValue> {
 
     return base + overrides
   }

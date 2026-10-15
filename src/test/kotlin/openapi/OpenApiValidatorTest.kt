@@ -18,7 +18,10 @@ import domain.Link
 import domain.MediaTypeObject
 import domain.OAuthFlow
 import domain.OAuthFlows
+import domain.OpenApiBoolean
 import domain.OpenApiDefinition
+import domain.OpenApiInt
+import domain.OpenApiString
 import domain.ParameterLocation
 import domain.ParameterStyle
 import domain.PathItem
@@ -235,7 +238,7 @@ class OpenApiValidatorTest {
                             "Example" to
                                 ExampleObject(
                                     ref = "#/components/examples/Other",
-                                    extensions = mapOf("x-extra" to true)))))
+                                    extensions = mapOf("x-extra" to OpenApiBoolean(true))))))
 
     val issues = validator.validate(definition)
     val messages = issues.map { it.message }
@@ -1676,7 +1679,7 @@ class OpenApiValidatorTest {
 
   @Test
   fun `validate flags example conflicts and invalid example object fields`() {
-    val badExample = ExampleObject(dataValue = 1, value = 2)
+    val badExample = ExampleObject(dataValue = OpenApiInt(1L), value = OpenApiInt(2L))
     val paramWithExamples =
         EndpointParameter(
             name = "filter",
@@ -1684,7 +1687,7 @@ class OpenApiValidatorTest {
             location = ParameterLocation.QUERY,
             schema = SchemaProperty(types = setOf("string")),
             example = badExample,
-            examples = mapOf("one" to ExampleObject(value = "a")))
+            examples = mapOf("one" to ExampleObject(value = OpenApiString("a"))))
     val response =
         EndpointResponse(
             statusCode = "200",
@@ -1692,8 +1695,8 @@ class OpenApiValidatorTest {
                 mapOf(
                     "application/json" to
                         MediaTypeObject(
-                            example = ExampleObject(value = "x"),
-                            examples = mapOf("y" to ExampleObject(value = "y")))))
+                            example = ExampleObject(value = OpenApiString("x")),
+                            examples = mapOf("y" to ExampleObject(value = OpenApiString("y"))))))
 
     val definition =
         OpenApiDefinition(
@@ -2000,7 +2003,10 @@ class OpenApiValidatorTest {
                     "next" to
                         Link(
                             operationId = "getNext",
-                            parameters = mapOf("id" to "\$response.body#/id", "bad" to "\$bad"))))
+                            parameters =
+                                mapOf(
+                                    "id" to OpenApiString("\$response.body#/id"),
+                                    "bad" to OpenApiString("\$bad")))))
     val endpoint =
         EndpointDefinition(
             path = "/pets",
@@ -2300,7 +2306,10 @@ class OpenApiValidatorTest {
   @Test
   fun `validate warns when custom keywords appear under json schema dialect`() {
     val schema =
-        SchemaDefinition(name = "Pet", type = "object", customKeywords = mapOf("x-extra" to true))
+        SchemaDefinition(
+            name = "Pet",
+            type = "object",
+            customKeywords = mapOf("x-extra" to OpenApiBoolean(true)))
     val definition =
         OpenApiDefinition(
             info = Info("Pets", "1.0"),

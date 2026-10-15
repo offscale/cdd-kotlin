@@ -1,3 +1,4 @@
+/** Unit test generator for the generated Ktor and Clikt mock server CLI. */
 package psi
 
 import domain.SchemaDefinition
@@ -17,90 +18,70 @@ class ServerMainTestGenerator {
   ): Map<String, String> {
     val results = mutableMapOf<String, String>()
 
-    val sb = StringBuilder()
-    sb.append("package $packageName\n\n")
-
-    sb.append("import kotlin.test.*\n")
-    sb.append("import kotlin.test.Test\n")
-    sb.append("import com.github.ajalt.clikt.testing.test\n\n")
-
-    sb.append("/**\n")
-    sb.append(" * Tests for [MockServerCli].\n")
-    sb.append(" */\n")
-    sb.append("class MockServerCliTest {\n")
-    sb.append("    @Test\n")
-    sb.append("    fun `cli parser handles ephemeral and seed flags`() {\n")
-    sb.append("        val cli = MockServerCli()\n")
-    sb.append("        val result = cli.test(\"--ephemeral --seed\")\n")
-    sb.append("        // Since test() executes run(), it might block if embeddedServer starts.\n")
-    sb.append("        // In an actual generated test suite, we'd mock the server start.\n")
-    sb.append("        // For coverage, we verify flags parse correctly.\n")
-    sb.append("        assertNotNull(result)\n")
-    sb.append("    }\n\n")
-
-    sb.append("    @Test\n")
-    sb.append("    fun `cli parser handles strict-validation flag`() {\n")
-    sb.append("        val cli = MockServerCli()\n")
-    sb.append("        val result = cli.test(\"--strict-validation\")\n")
-    sb.append("        assertNotNull(result)\n")
-    sb.append("    }\n\n")
-
-    sb.append("    @Test\n")
-    sb.append("    fun `cli parser handles enforce-auth flag`() {\n")
-    sb.append("        val cli = MockServerCli()\n")
-    sb.append("        val result = cli.test(\"--enforce-auth\")\n")
-    sb.append("        assertNotNull(result)\n")
-    sb.append("    }\n\n")
-
-    sb.append("    @Test\n")
-    sb.append("    fun `cli parser handles start-auth-server flag`() {\n")
-    sb.append("        val cli = MockServerCli()\n")
-    sb.append("        val result = cli.test(\"--start-auth-server\")\n")
-    sb.append("        assertNotNull(result)\n")
-    sb.append("    }\n")
-    sb.append("}\n")
-
-    results["MainTest.kt"] = sb.toString()
-
-    val modelSchemas =
-        schemas.filter {
-          it.type == "object" &&
-              it.enumValues == null &&
-              it.anyOf.isEmpty() &&
-              it.oneOf.isEmpty() &&
-              it.anyOfSchemas.isEmpty() &&
-              it.oneOfSchemas.isEmpty() &&
-              !it.safeName.contains("ExternalAccount") &&
-              !it.safeName.contains("PaymentSource")
+    results["MainTest.kt"] =
+        buildKotlinFile(packageName) {
+          import("kotlin.test.*", "kotlin.test.Test", "com.github.ajalt.clikt.testing.test")
+          kdoc("Tests for [MockServerCli].")
+          block("class MockServerCliTest") {
+            line("@Test")
+            block("fun `cli parser handles ephemeral and seed flags`()") {
+              line("val cli = MockServerCli()")
+              line("val result = cli.test(\"--ephemeral --seed\")")
+              line("// Since test() executes run(), it might block if embeddedServer starts.")
+              line("// In an actual generated test suite, we'd mock the server start.")
+              line("// For coverage, we verify flags parse correctly.")
+              line("assertNotNull(result)")
+            }
+            line()
+            line("@Test")
+            block("fun `cli parser handles strict-validation flag`()") {
+              line("val cli = MockServerCli()")
+              line("val result = cli.test(\"--strict-validation\")")
+              line("assertNotNull(result)")
+            }
+            line()
+            line("@Test")
+            block("fun `cli parser handles enforce-auth flag`()") {
+              line("val cli = MockServerCli()")
+              line("val result = cli.test(\"--enforce-auth\")")
+              line("assertNotNull(result)")
+            }
+            line()
+            line("@Test")
+            block("fun `cli parser handles start-auth-server flag`()") {
+              line("val cli = MockServerCli()")
+              line("val result = cli.test(\"--start-auth-server\")")
+              line("assertNotNull(result)")
+            }
+          }
         }
 
-    for (schema in modelSchemas) {
-      val name = schema.safeName.replaceFirstChar { it.uppercase() }
-      val routeName = schema.safeName.replaceFirstChar { it.lowercase() }
-      val testSb = StringBuilder()
-      testSb.append("package $packageName.routes\n\n")
-      testSb.append("import kotlin.test.Test\n")
-      testSb.append("import kotlin.test.*\n")
-      testSb.append("import io.ktor.client.request.get\n")
-      testSb.append("import io.ktor.http.HttpStatusCode\n")
-      testSb.append("import io.ktor.server.testing.testApplication\n")
-      testSb.append("import io.ktor.server.routing.routing\n")
-      testSb.append("import $packageName.dao.DaoFactory\n\n")
-      testSb.append("class ${name}RoutesTest {\n")
-      testSb.append("    @Test\n")
-      testSb.append(
-          "    fun `route $routeName handles stub DAO returning NotImplementedError`() = testApplication {\n")
-      testSb.append("        val daoConfig = DaoFactory.create(useConcrete = false)\n")
-      testSb.append("        application {\n")
-      testSb.append("            routing {\n")
-      testSb.append("                ${routeName}Routes(daoConfig)\n")
-      testSb.append("            }\n")
-      testSb.append("        }\n")
-      testSb.append("        val response = client.get(\"/${routeName}\")\n")
-      testSb.append("        assertEquals(HttpStatusCode.NotImplemented, response.status)\n")
-      testSb.append("    }\n")
-      testSb.append("}\n")
-      results["routes/${name}RoutesTest.kt"] = testSb.toString()
+    for (schema in filterModelSchemas(schemas)) {
+      val name = capitalizeName(schema.safeName)
+      val routeName = decapitalizeName(schema.safeName)
+      results["routes/${name}RoutesTest.kt"] =
+          buildKotlinFile("$packageName.routes") {
+            import(
+                "kotlin.test.Test",
+                "kotlin.test.*",
+                "io.ktor.client.request.get",
+                "io.ktor.http.HttpStatusCode",
+                "io.ktor.server.testing.testApplication",
+                "io.ktor.server.routing.routing",
+                "$packageName.dao.DaoFactory")
+            block("class ${name}RoutesTest") {
+              line("@Test")
+              block(
+                  "fun `route $routeName handles stub DAO returning NotImplementedError`() = testApplication") {
+                    line("val daoConfig = DaoFactory.create(useConcrete = false)")
+                    block("application") {
+                      block("routing") { line("${routeName}Routes(daoConfig)") }
+                    }
+                    line("val response = client.get(\"/${routeName}\")")
+                    line("assertEquals(HttpStatusCode.NotImplemented, response.status)")
+                  }
+            }
+          }
     }
 
     return results

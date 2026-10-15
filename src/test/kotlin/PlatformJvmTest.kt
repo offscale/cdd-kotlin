@@ -25,10 +25,10 @@ class PlatformJvmTest {
     val tempDir = Files.createTempDirectory("platform_test")
     val file = File(tempDir.toFile(), "test.txt")
 
-    writeToFile(file.absolutePath, "test content")
+    assertTrue(writeToFile(file.absolutePath, "test content").isSuccess)
     assertTrue(file.exists())
 
-    val content = readFile(file.absolutePath)
+    val content = readFile(file.absolutePath).getOrThrow()
     assertEquals("test content", content)
 
     file.delete()

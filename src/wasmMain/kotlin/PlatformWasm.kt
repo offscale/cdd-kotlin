@@ -1,16 +1,42 @@
+/**
+ * WebAssembly (WASI Preview 1) implementations of platform expect functions for environment
+ * variable access, POSIX file I/O, and platform operation error handling.
+ */
+import domain.CddError
+import domain.toFailure
 import kotlin.wasm.WasmImport
 import kotlin.wasm.unsafe.Pointer
 import kotlin.wasm.unsafe.UnsafeWasmMemoryApi
 import kotlin.wasm.unsafe.withScopedMemoryAllocator
 
+/**
+ * Low-level WASI `environ_sizes_get` import.
+ *
+ * @param environ_count_ptr Pointer to store the environment variable count.
+ * @param environ_buf_size_ptr Pointer to store the environment buffer size.
+ * @return WASI errno code (0 for success).
+ */
 @OptIn(kotlin.wasm.ExperimentalWasmInterop::class)
 @WasmImport("wasi_snapshot_preview1", "environ_sizes_get")
 private external fun wasi_environ_sizes_get(environ_count_ptr: Int, environ_buf_size_ptr: Int): Int
 
+/**
+ * Low-level WASI `environ_get` import.
+ *
+ * @param environ_ptr Pointer to the array of string pointers.
+ * @param environ_buf_ptr Pointer to the character buffer.
+ * @return WASI errno code (0 for success).
+ */
 @OptIn(kotlin.wasm.ExperimentalWasmInterop::class)
 @WasmImport("wasi_snapshot_preview1", "environ_get")
 private external fun wasi_environ_get(environ_ptr: Int, environ_buf_ptr: Int): Int
 
+/**
+ * Retrieves an environment variable using WASI `environ_sizes_get` and `environ_get`.
+ *
+ * @param name The name of the environment variable.
+ * @return The value of the environment variable, or `null` if not set.
+ */
 @OptIn(kotlin.wasm.unsafe.UnsafeWasmMemoryApi::class)
 actual fun getEnvVar(name: String): String? {
   var count = 0
@@ -57,10 +83,10 @@ actual fun getEnvVar(name: String): String? {
  * Reads a file using WASI POSIX imports.
  *
  * @param path The path of the file to read.
- * @return The contents of the file as a String.
+ * @return A [Result] containing the contents of the file as a String or a [CddError.FileIoError].
  */
 @OptIn(kotlin.wasm.unsafe.UnsafeWasmMemoryApi::class)
-actual fun readFile(path: String): String {
+actual fun readFile(path: String): Result<String> {
   val cleanPath = if (path.startsWith("/")) path.substring(1) else path
   val pathBytes = cleanPath.encodeToByteArray()
   var inFd = -1
@@ -94,14 +120,16 @@ actual fun readFile(path: String): String {
         lastErrno = errno
       }
     }
+  }
 
-    if (!success) {
-      throw RuntimeException("Can't open $cleanPath for read: WASI errno $lastErrno")
-    }
+  if (!success) {
+    return CddError.FileIoError(cleanPath, "Can't open $cleanPath for read: WASI errno $lastErrno")
+        .toFailure()
   }
 
   val bufferSize = 8192
   val resultBytes = mutableListOf<Byte>()
+  var readErrno = 0
 
   withScopedMemoryAllocator { alloc ->
     val dataPtr = alloc.allocate(bufferSize)
@@ -113,8 +141,8 @@ actual fun readFile(path: String): String {
     while (true) {
       val errno = wasi_fd_read(inFd, iovsPtr.address.toInt(), 1, nreadPtr.address.toInt())
       if (errno != 0) {
-        wasi_fd_close(inFd)
-        throw RuntimeException("WASI fd_read failed for $cleanPath with errno $errno")
+        readErrno = errno
+        break
       }
       val nread = nreadPtr.loadInt()
       if (nread == 0) {
@@ -127,13 +155,41 @@ actual fun readFile(path: String): String {
   }
 
   wasi_fd_close(inFd)
-  return resultBytes.toByteArray().decodeToString()
+  if (readErrno != 0) {
+    return CddError.FileIoError(
+            cleanPath, "WASI fd_read failed for $cleanPath with errno $readErrno")
+        .toFailure()
+  }
+  return Result.success(resultBytes.toByteArray().decodeToString())
 }
 
+/**
+ * Low-level WASI `fd_read` import.
+ *
+ * @param fd Open file descriptor.
+ * @param iovs_ptr Pointer to the I/O vector array.
+ * @param iovs_len Number of I/O vectors.
+ * @param nread_ptr Pointer to store the number of bytes read.
+ * @return WASI errno code (0 for success).
+ */
 @OptIn(kotlin.wasm.ExperimentalWasmInterop::class)
 @WasmImport("wasi_snapshot_preview1", "fd_read")
 private external fun wasi_fd_read(fd: Int, iovs_ptr: Int, iovs_len: Int, nread_ptr: Int): Int
 
+/**
+ * Low-level WASI `path_open` import.
+ *
+ * @param fd Base directory file descriptor.
+ * @param dirflags Lookup flags (e.g. symlink follow).
+ * @param path_ptr Pointer to the UTF-8 path string.
+ * @param path_len Length of the path string in bytes.
+ * @param oflags Open flags (`O_CREAT`, `O_TRUNC`, etc.).
+ * @param fs_rights_base Base file descriptor rights mask.
+ * @param fs_rights_inheriting Inheriting rights mask.
+ * @param fdflags File descriptor flags.
+ * @param opened_fd_ptr Pointer to store the newly opened file descriptor.
+ * @return WASI errno code (0 for success).
+ */
 @OptIn(kotlin.wasm.ExperimentalWasmInterop::class)
 @WasmImport("wasi_snapshot_preview1", "path_open")
 private external fun wasi_path_open(
@@ -148,14 +204,34 @@ private external fun wasi_path_open(
     opened_fd_ptr: Int
 ): Int
 
+/**
+ * Low-level WASI `fd_write` import.
+ *
+ * @param fd Open file descriptor.
+ * @param iovs_ptr Pointer to the I/O vector array.
+ * @param iovs_len Number of I/O vectors.
+ * @param nwritten_ptr Pointer to store the number of bytes written.
+ * @return WASI errno code (0 for success).
+ */
 @OptIn(kotlin.wasm.ExperimentalWasmInterop::class)
 @WasmImport("wasi_snapshot_preview1", "fd_write")
 private external fun wasi_fd_write(fd: Int, iovs_ptr: Int, iovs_len: Int, nwritten_ptr: Int): Int
 
+/**
+ * Low-level WASI `fd_close` import.
+ *
+ * @param fd File descriptor to close.
+ * @return WASI errno code (0 for success).
+ */
 @OptIn(kotlin.wasm.ExperimentalWasmInterop::class)
 @WasmImport("wasi_snapshot_preview1", "fd_close")
 private external fun wasi_fd_close(fd: Int): Int
 
+/**
+ * Writes an error message directly to WASI stderr (fd 2).
+ *
+ * @param message The error message string to write.
+ */
 @OptIn(kotlin.wasm.unsafe.UnsafeWasmMemoryApi::class)
 private fun logStderr(message: String) {
   val bytes = message.encodeToByteArray()
@@ -172,10 +248,23 @@ private fun logStderr(message: String) {
   }
 }
 
+/**
+ * Low-level WASI `path_create_directory` import.
+ *
+ * @param fd Base directory file descriptor.
+ * @param path_ptr Pointer to the directory path bytes.
+ * @param path_len Length of the directory path in bytes.
+ * @return WASI errno code (0 for success).
+ */
 @OptIn(kotlin.wasm.ExperimentalWasmInterop::class)
 @WasmImport("wasi_snapshot_preview1", "path_create_directory")
 private external fun wasi_path_create_directory(fd: Int, path_ptr: Int, path_len: Int): Int
 
+/**
+ * Recursively creates parent directories for [path] across preopened WASI descriptors.
+ *
+ * @param path Target file path whose parent directories should be created.
+ */
 @OptIn(kotlin.wasm.unsafe.UnsafeWasmMemoryApi::class)
 private fun wasiMkdirs(path: String) {
   val cleanPath = if (path.startsWith("/")) path.substring(1) else path
@@ -208,9 +297,10 @@ private fun wasiMkdirs(path: String) {
  *
  * @param path The path where the content should be written.
  * @param content The string content to write.
+ * @return A [Result] indicating success or a [CddError.FileIoError].
  */
 @OptIn(kotlin.wasm.unsafe.UnsafeWasmMemoryApi::class)
-actual fun writeToFile(path: String, content: String) {
+actual fun writeToFile(path: String, content: String): Result<Unit> {
   wasiMkdirs(path)
   val cleanPath = if (path.startsWith("/")) path.substring(1) else path
   val pathBytes = cleanPath.encodeToByteArray()
@@ -245,12 +335,14 @@ actual fun writeToFile(path: String, content: String) {
         lastErrno = errno
       }
     }
+  }
 
-    if (!success) {
-      logStderr("Failed to open path: $path, last WASI errno: $lastErrno\n")
-      throw RuntimeException(
-          "WASI path_open failed for $path with errno $lastErrno. No preopened directory available.")
-    }
+  if (!success) {
+    logStderr("Failed to open path: $path, last WASI errno: $lastErrno\n")
+    return CddError.FileIoError(
+            path,
+            "WASI path_open failed for $path with errno $lastErrno. No preopened directory available.")
+        .toFailure()
   }
 
   val contentBytes = content.encodeToByteArray()
@@ -279,27 +371,94 @@ actual fun writeToFile(path: String, content: String) {
 
   if (!writeSuccess) {
     logStderr("Failed to write to fd: $outFd for path: $path, WASI errno: $writeErrno\n")
-    throw RuntimeException("WASI fd_write failed for $path with errno $writeErrno")
+    return CddError.FileIoError(path, "WASI fd_write failed for $path with errno $writeErrno")
+        .toFailure()
   }
+  return Result.success(Unit)
 }
 
-actual fun generateToOpenApi(inputDir: String, outputFile: String) {
-  throw RuntimeException("generateToOpenApi is not supported on WASM")
+/**
+ * Returns a failed [Result] with [CddError.UnsupportedPlatformOperationError] because PSI-based
+ * Kotlin-to-OpenAPI extraction requires JVM compiler APIs.
+ *
+ * @param inputDir The directory containing Kotlin source code.
+ * @param outputFile The destination path for the generated OpenAPI specification.
+ * @return A failed [Result] containing [CddError.UnsupportedPlatformOperationError].
+ */
+actual fun generateToOpenApi(inputDir: String, outputFile: String): Result<Unit> {
+  return CddError.UnsupportedPlatformOperationError("generateToOpenApi", "WASM").toFailure()
 }
 
-actual fun generateSdkCode(inputJson: String, outputDir: String, packageName: String) {
-  throw RuntimeException("generateSdkCode is not supported on WASM")
+/**
+ * Generates basic SDK models and client stubs on WASM from an OpenAPI specification string.
+ *
+ * @param inputJson The raw OpenAPI JSON specification content.
+ * @param outputDir The root directory where SDK files should be generated.
+ * @param packageName The target Kotlin package name for generated models and client.
+ * @return A [Result] indicating success or a [CddError].
+ */
+actual fun generateSdkCode(
+    inputJson: String,
+    outputDir: String,
+    packageName: String
+): Result<Unit> {
+  val parser = openapi.OpenApiParser()
+  val doc =
+      parser.parseDocumentStringResult(inputJson).getOrElse {
+        return Result.failure(it)
+      }
+  val definition =
+      (doc as? openapi.OpenApiDocument.OpenApi)?.definition
+          ?: return CddError.OpenApiParseError("Not an OpenAPI document").toFailure()
+
+  val pkgPath = packageName.replace(".", "/")
+  val schemas = definition.components?.schemas.orEmpty()
+  for ((name, _) in schemas) {
+    writeToFile(
+            "$outputDir/composeApp/src/commonMain/kotlin/$pkgPath/models/$name.kt",
+            "package $packageName.models\n\nimport kotlinx.serialization.Serializable\n\n/** Model $name. */\n@Serializable\ndata class $name(val id: String? = null)\n")
+        .getOrElse {
+          return Result.failure(it)
+        }
+  }
+  if (definition.paths.isNotEmpty()) {
+    writeToFile(
+            "$outputDir/composeApp/src/commonMain/kotlin/$pkgPath/api/ApiClient.kt",
+            "package $packageName.api\n\n/** Generated API Client. */\nclass ApiClient\n")
+        .getOrElse {
+          return Result.failure(it)
+        }
+  }
+  return Result.success(Unit)
 }
 
+/**
+ * Returns a failed [Result] with [CddError.UnsupportedPlatformOperationError] when server
+ * generation is invoked on WASM.
+ *
+ * @param inputJson The raw OpenAPI JSON specification content.
+ * @param outputDir The root directory where server files should be generated.
+ * @param packageName The target Kotlin package name for generated server modules.
+ * @param withTests Whether to generate test suites.
+ * @return A failed [Result] containing [CddError.UnsupportedPlatformOperationError].
+ */
 actual fun generateServerCode(
     inputJson: String,
     outputDir: String,
     packageName: String,
     withTests: Boolean
-) {
-  throw RuntimeException("generateServerCode is not supported on WASM")
+): Result<Unit> {
+  return CddError.UnsupportedPlatformOperationError("generateServerCode", "WASM").toFailure()
 }
 
-actual fun performSync(inputDir: String, truth: String) {
-  throw RuntimeException("performSync is not supported on WASM")
+/**
+ * Returns a failed [Result] with [CddError.UnsupportedPlatformOperationError] when PSI
+ * synchronization is invoked on WASM.
+ *
+ * @param inputDir The project directory to synchronize.
+ * @param truth The source of truth identifier.
+ * @return A failed [Result] containing [CddError.UnsupportedPlatformOperationError].
+ */
+actual fun performSync(inputDir: String, truth: String): Result<Unit> {
+  return CddError.UnsupportedPlatformOperationError("performSync", "WASM").toFailure()
 }

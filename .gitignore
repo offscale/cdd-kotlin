@@ -4,6 +4,8 @@ build/
 out/
 bin/
 out.json
+out.txt
+test-output.txt
 test.json
 spec.json
 petstore.json
@@ -15,7 +17,7 @@ prism.log
 patch*.py
 run_*.sh
 !scripts/run_slow.sh
-test*.kt
+/test*.kt
 test*.js
 
 # Gradle
@@ -151,7 +153,7 @@ target/
 *.swp
 *.swo
 .DS_Store
-*.bak
+*.bak*
 .cache/
 .pytest_cache/
 .mypy_cache/

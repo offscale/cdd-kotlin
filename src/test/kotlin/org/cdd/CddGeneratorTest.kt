@@ -1,7 +1,7 @@
 package org.cdd
 
 import java.nio.file.Path
-import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 
@@ -13,12 +13,12 @@ class CddGeneratorTest {
     outDir.mkdirs()
 
     val config1 = Config(inputPath = "invalid.json", outputDir = outDir.absolutePath)
-    assertThrows(RuntimeException::class.java) { CddGenerator.generateSdk(config1) }
+    assertTrue(CddGenerator.generateSdk(config1).isFailure)
 
     val config2 = Config(inputPath = "missing.json", outputDir = outDir.absolutePath)
-    assertThrows(RuntimeException::class.java) { CddGenerator.generateSdk(config2) }
+    assertTrue(CddGenerator.generateSdk(config2).isFailure)
 
     val config3 = Config(inputPath = "   ", outputDir = outDir.absolutePath)
-    assertThrows(RuntimeException::class.java) { CddGenerator.generateSdk(config3) }
+    assertTrue(CddGenerator.generateSdk(config3).isFailure)
   }
 }

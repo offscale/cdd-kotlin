@@ -1,6 +1,10 @@
+/**
+ * Bi-directional synchronization CLI entrypoint for aligning code definitions and OpenAPI specs.
+ */
 package org.cdd
 
 import getEnvVar
+import performSync
 
 /** Provides the Bi-Directional Synchronization API. */
 object SyncCli {
@@ -8,7 +12,7 @@ object SyncCli {
    * Synchronizes code definitions based on a source of truth.
    *
    * @param args Command-line arguments.
-   * @return Exit code (0 for success).
+   * @return Exit code (0 for success, 1 for error).
    */
   fun sync(args: Array<String>): Int {
     var truth = ""
@@ -31,7 +35,12 @@ object SyncCli {
     }
 
     println("Syncing $inputDir using truth: $truth")
-    // Implementation logic will delegate to the generator
-    return 0
+    return performSync(inputDir, truth)
+        .fold(
+            onSuccess = { 0 },
+            onFailure = { e ->
+              println("Synchronization failed: ${e.message}")
+              1
+            })
   }
 }

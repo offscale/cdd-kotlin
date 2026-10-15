@@ -1,3 +1,4 @@
+/** Unit test generator for Exposed DAOs and DaoFactory implementations. */
 package psi
 
 import domain.SchemaDefinition
@@ -13,42 +14,29 @@ class DaoTestGenerator {
    */
   fun generateDaoTests(packageName: String, schemas: List<SchemaDefinition>): Map<String, String> {
     val results = mutableMapOf<String, String>()
-    val modelSchemas =
-        schemas.filter {
-          it.type == "object" &&
-              it.enumValues == null &&
-              it.anyOf.isEmpty() &&
-              it.oneOf.isEmpty() &&
-              it.anyOfSchemas.isEmpty() &&
-              it.oneOfSchemas.isEmpty() &&
-              !it.safeName.contains("ExternalAccount") &&
-              !it.safeName.contains("PaymentSource")
+    val modelSchemas = filterModelSchemas(schemas)
+
+    results["dao/DaoFactoryTest.kt"] =
+        buildKotlinFile("$packageName.dao") {
+          import("$packageName.models.*", "kotlin.test.*", "kotlin.test.Test")
+          raw(generateFactoryTest(modelSchemas))
         }
 
-    // Test DaoFactory
-    val factorySb = StringBuilder()
-    factorySb.append("package $packageName.dao\n\n")
-    factorySb.append("import $packageName.models.*\n")
-    factorySb.append("import kotlin.test.*\n")
-    factorySb.append("import kotlin.test.Test\n\n")
-    factorySb.append(generateFactoryTest(modelSchemas))
-    results["dao/DaoFactoryTest.kt"] = factorySb.toString()
-
-    // Test Concrete DAOs (Ephemeral SQLite)
     for (schema in modelSchemas) {
-      val name = schema.safeName.replaceFirstChar { it.uppercase() }
-      val sb = StringBuilder()
-      sb.append("package $packageName.dao\n\n")
-      sb.append("import $packageName.models.*\n")
-      sb.append("import org.jetbrains.exposed.sql.Database\n")
-      sb.append("import org.jetbrains.exposed.sql.SchemaUtils\n")
-      sb.append("import org.jetbrains.exposed.sql.transactions.transaction\n")
-      sb.append("import kotlin.test.*\n")
-      sb.append("import kotlin.test.BeforeTest\n")
-      sb.append("import kotlin.test.Test\n")
-      sb.append("import kotlinx.coroutines.runBlocking\n\n")
-      sb.append(generateConcreteDaoTest(schema))
-      results["dao/Concrete${name}DaoTest.kt"] = sb.toString()
+      val name = capitalizeName(schema.safeName)
+      results["dao/Concrete${name}DaoTest.kt"] =
+          buildKotlinFile("$packageName.dao") {
+            import(
+                "$packageName.models.*",
+                "org.jetbrains.exposed.sql.Database",
+                "org.jetbrains.exposed.sql.SchemaUtils",
+                "org.jetbrains.exposed.sql.transactions.transaction",
+                "kotlin.test.*",
+                "kotlin.test.BeforeTest",
+                "kotlin.test.Test",
+                "kotlinx.coroutines.runBlocking")
+            raw(generateConcreteDaoTest(schema))
+          }
     }
 
     return results
@@ -64,8 +52,8 @@ class DaoTestGenerator {
     sb.append("    fun `create with true returns concrete DAOs`() {\n")
     sb.append("        val config = DaoFactory.create(useConcrete = true)\n")
     for (schema in schemas) {
-      val name = schema.safeName.replaceFirstChar { it.uppercase() }
-      val lowerName = name.replaceFirstChar { it.lowercase() }
+      val name = capitalizeName(schema.safeName)
+      val lowerName = decapitalizeName(name)
       sb.append("        assertTrue(config.${lowerName}Dao is Concrete${name}Dao)\n")
     }
     sb.append("    }\n\n")
@@ -74,8 +62,8 @@ class DaoTestGenerator {
     sb.append("    fun `create with false returns stub DAOs`() {\n")
     sb.append("        val config = DaoFactory.create(useConcrete = false)\n")
     for (schema in schemas) {
-      val name = schema.safeName.replaceFirstChar { it.uppercase() }
-      val lowerName = name.replaceFirstChar { it.lowercase() }
+      val name = capitalizeName(schema.safeName)
+      val lowerName = decapitalizeName(name)
       sb.append("        assertTrue(config.${lowerName}Dao is Stub${name}Dao)\n")
     }
     sb.append("    }\n")
@@ -85,7 +73,7 @@ class DaoTestGenerator {
 
   private fun generateConcreteDaoTest(schema: SchemaDefinition): String {
     val sb = StringBuilder()
-    val name = schema.safeName.replaceFirstChar { it.uppercase() }
+    val name = capitalizeName(schema.safeName)
     val tableName = "${name}Table"
 
     sb.append("/**\n")

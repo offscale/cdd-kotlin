@@ -1,3 +1,9 @@
+/**
+ * Endpoint, operation, parameter, header, response, link, and path-item OpenAPI domain models.
+ *
+ * Defines [HttpMethod], [ParameterLocation], [ParameterStyle], [EndpointParameter], [Header],
+ * [EndpointResponse], [Link], [EndpointDefinition], and [PathItem].
+ */
 package domain
 
 /**
@@ -161,7 +167,7 @@ data class EndpointParameter(
     val reference: ReferenceObject? = null,
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
+    val extensions: Map<String, OpenApiValue> = emptyMap()
 ) {
   val safeName: String
     get() {
@@ -270,7 +276,7 @@ data class Header(
     val reference: ReferenceObject? = null,
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
+    val extensions: Map<String, OpenApiValue> = emptyMap()
 )
 
 /**
@@ -334,7 +340,7 @@ data class EndpointResponse(
     val reference: ReferenceObject? = null,
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
+    val extensions: Map<String, OpenApiValue> = emptyMap()
 )
 
 /**
@@ -370,12 +376,12 @@ data class Link(
      * identified via `operationRef`. The key is the parameter name to be used, whereas the value
      * can be a constant or an expression to be evaluated.
      */
-    val parameters: Map<String, Any?> = emptyMap(),
+    val parameters: Map<String, OpenApiValue> = emptyMap(),
 
     /**
      * A literal value or {expression} to use as a request body when calling the target operation.
      */
-    val requestBody: Any? = null,
+    val requestBody: OpenApiValue? = null,
 
     /** A description of the link. CommonMark syntax MAY be used for rich text representation. */
     val description: String? = null,
@@ -384,8 +390,28 @@ data class Link(
     val server: Server? = null,
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
-)
+    val extensions: Map<String, OpenApiValue> = emptyMap()
+) {
+  /** Strongly-typed [LinkRequestBody] view of [requestBody], or `null` if absent. */
+  val typedRequestBody: LinkRequestBody?
+    get() =
+        when (val rb = requestBody) {
+          null -> null
+          is OpenApiString ->
+              if (rb.value.startsWith("$") || rb.value.contains("{$"))
+                  LinkRequestBody.Expression(rb.value)
+              else LinkRequestBody.Literal(rb)
+          else -> LinkRequestBody.Literal(rb)
+        }
+
+  /** Strongly-typed [OpenApiValue] map view of [parameters]. */
+  val typedParameters: Map<String, OpenApiValue>
+    get() = parameters
+
+  /** Strongly-typed [OpenApiValue] map view of [extensions]. */
+  val typedExtensions: Map<String, OpenApiValue>
+    get() = extensions
+}
 
 /**
  * Describes a single API operation on a path.
@@ -466,7 +492,7 @@ data class EndpointDefinition(
     /** Swagger 2.0: A list of MIME types the operation can consume. */
     val consumes: List<String> = emptyList(),
 
-    /** Swagger 2.0: A list of MIME types the operation can produce. */
+    /** Swagger 2.0: The list of MIME types the operation can produce. */
     val produces: List<String> = emptyList(),
 
     /** Swagger 2.0: The transfer protocol for the operation. */
@@ -497,7 +523,7 @@ data class EndpointDefinition(
     val servers: List<Server> = emptyList(),
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
+    val extensions: Map<String, OpenApiValue> = emptyMap()
 ) {
   /**
    * Returns the raw HTTP method token for this operation. For standard methods, this is the enum
@@ -573,5 +599,5 @@ data class PathItem(
     val servers: List<Server> = emptyList(),
 
     /** Specification extensions (keys starting with `x-`). */
-    val extensions: Map<String, Any?> = emptyMap()
+    val extensions: Map<String, OpenApiValue> = emptyMap()
 )

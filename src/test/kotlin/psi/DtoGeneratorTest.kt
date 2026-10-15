@@ -2,6 +2,10 @@ package psi
 
 import domain.Discriminator
 import domain.ExternalDocumentation
+import domain.OpenApiArray
+import domain.OpenApiInt
+import domain.OpenApiObject
+import domain.OpenApiString
 import domain.SchemaDefinition
 import domain.SchemaProperty
 import domain.Xml
@@ -15,13 +19,6 @@ import org.junit.jupiter.api.TestInstance
 class DtoGeneratorTest {
   @Test
   fun testSchemaPropertyToDocValueExhaustive() {
-    val generator = DtoGenerator()
-    val method =
-        DtoGenerator::class
-            .java
-            .getDeclaredMethod("schemaPropertyToDocValue", domain.SchemaProperty::class.java)
-    method.isAccessible = true
-
     val schema =
         domain.SchemaProperty(
             booleanSchema = null,
@@ -37,7 +34,7 @@ class DtoGeneratorTest {
             minLength = 1,
             maxLength = 2,
             pattern = "pat",
-            enumValues = listOf("A"),
+            enumValues = listOf(OpenApiString("A")),
             minimum = 1.0,
             maximum = 2.0,
             multipleOf = 3.0,
@@ -59,8 +56,8 @@ class DtoGeneratorTest {
             defs = mapOf("a" to domain.SchemaProperty(types = setOf("string"))),
             description = "desc",
             title = "title",
-            defaultValue = "def",
-            constValue = "const",
+            defaultValue = OpenApiString("def"),
+            constValue = OpenApiString("const"),
             deprecated = true,
             readOnly = true,
             writeOnly = true,
@@ -73,8 +70,8 @@ class DtoGeneratorTest {
             ifSchema = domain.SchemaProperty(types = setOf("string")),
             thenSchema = domain.SchemaProperty(types = setOf("string")),
             elseSchema = domain.SchemaProperty(types = setOf("string")),
-            example = domain.ExampleObject("ex"),
-            examples = listOf("ex"),
+            example = OpenApiString("ex"),
+            examples = listOf(OpenApiString("ex")),
             xml = domain.Xml("name", "ns", "prefix", "text", true, true),
             patternProperties = mapOf("a" to domain.SchemaProperty(types = setOf("string"))),
             propertyNames = domain.SchemaProperty(types = setOf("string")),
@@ -83,21 +80,175 @@ class DtoGeneratorTest {
             unevaluatedProperties = domain.SchemaProperty(types = setOf("string")),
             unevaluatedItems = domain.SchemaProperty(types = setOf("string")),
             contentSchema = domain.SchemaProperty(types = setOf("string")),
-            customKeywords = mapOf("x-key" to "val"),
-            extensions = mapOf("x-ext" to "val"))
+            customKeywords = mapOf("x-key" to OpenApiString("val")),
+            extensions = mapOf("x-ext" to OpenApiString("val")))
 
-    val result = method.invoke(generator, schema) as Map<String, Any?>
+    val result = psi.dto.SchemaDocTagWriter.schemaPropertyToDocValue(schema) as Map<*, *>
     org.junit.jupiter.api.Assertions.assertTrue(result.isNotEmpty())
 
     // Also test booleanSchema
     val boolSchema = domain.SchemaProperty(booleanSchema = true)
-    val result2 = method.invoke(generator, boolSchema) as Boolean
+    val result2 = psi.dto.SchemaDocTagWriter.schemaPropertyToDocValue(boolSchema) as Boolean
     org.junit.jupiter.api.Assertions.assertTrue(result2)
 
     // Also test dynamicRef
-    val dynRefSchema = domain.SchemaProperty(dynamicRef = "ref")
-    val result3 = method.invoke(generator, dynRefSchema) as Map<String, Any?>
+    val dynRefSchema = domain.SchemaProperty(dynamicRef = "#/defs/a")
+    val result3 = psi.dto.SchemaDocTagWriter.schemaPropertyToDocValue(dynRefSchema) as Map<*, *>
     org.junit.jupiter.api.Assertions.assertTrue(result3.isNotEmpty())
+
+    // Test empty/minimal SchemaProperty and multi-type SchemaProperty in schemaPropertyToDocValue
+    val emptySchema =
+        domain.SchemaProperty(
+            types = setOf("string", "null"),
+            externalDocs =
+                domain.ExternalDocumentation(url = "https://example.com", description = null),
+            discriminator =
+                domain.Discriminator(
+                    propertyName = "kind", mapping = mapOf("a" to "A"), defaultMapping = "A"),
+            xml = domain.Xml(),
+            customKeywords = mapOf("type" to OpenApiString("ignored")))
+    val emptyResult = psi.dto.SchemaDocTagWriter.schemaPropertyToDocValue(emptySchema) as Map<*, *>
+    org.junit.jupiter.api.Assertions.assertFalse(emptyResult.containsKey("xml"))
+    org.junit.jupiter.api.Assertions.assertEquals(listOf("null", "string"), emptyResult["type"])
+
+    val noTypeSchema = domain.SchemaProperty(types = emptySet())
+    val noTypeResult =
+        psi.dto.SchemaDocTagWriter.schemaPropertyToDocValue(noTypeSchema) as Map<*, *>
+    org.junit.jupiter.api.Assertions.assertFalse(noTypeResult.containsKey("type"))
+
+    // Test buildClassKDoc and buildPropertyKDoc branches (if/then/else, XML fields, blank strings,
+    // externalDocs without desc, discriminator without mapping)
+    val fullClassDef =
+        SchemaDefinition(
+            name = "FullKDoc",
+            type = "object",
+            description = "   ",
+            title = "   ",
+            comment = "   ",
+            schemaId = "   ",
+            schemaDialect = "   ",
+            anchor = "   ",
+            dynamicAnchor = "   ",
+            dynamicRef = "   ",
+            externalDocs = ExternalDocumentation(url = "https://example.com", description = null),
+            discriminator =
+                Discriminator(propertyName = "t", mapping = emptyMap(), defaultMapping = null),
+            defaultValue = domain.OpenApiNull,
+            constValue = domain.OpenApiBoolean(true),
+            example = domain.OpenApiNumber(1.5, "1.5"),
+            examples = emptyMap(),
+            examplesList = emptyList(),
+            enumValues = emptyList(),
+            ifSchema = SchemaProperty("string"),
+            thenSchema = SchemaProperty("string"),
+            elseSchema = SchemaProperty("string"),
+            xml =
+                Xml(
+                    name = "n",
+                    namespace = "ns",
+                    prefix = "p",
+                    nodeType = "element",
+                    attribute = true,
+                    wrapped = true),
+            properties =
+                mapOf(
+                    "p1" to
+                        SchemaProperty(
+                            types = setOf("string"),
+                            description = "   ",
+                            title = "   ",
+                            comment = "   ",
+                            schemaId = "   ",
+                            schemaDialect = "   ",
+                            anchor = "   ",
+                            dynamicAnchor = "   ",
+                            dynamicRef = "   ",
+                            externalDocs =
+                                ExternalDocumentation(
+                                    url = "https://example.com", description = null),
+                            discriminator =
+                                Discriminator(
+                                    propertyName = "t",
+                                    mapping = emptyMap(),
+                                    defaultMapping = null),
+                            examples = emptyList<domain.OpenApiValue>(),
+                            enumValues = listOf(OpenApiString("v")),
+                            xml = Xml()),
+                    "p2" to
+                        SchemaProperty(
+                            type = "string",
+                            xml =
+                                Xml(
+                                    name = "n",
+                                    namespace = "ns",
+                                    prefix = "p",
+                                    nodeType = "element",
+                                    attribute = true,
+                                    wrapped = true))))
+    val fullClassText = generator.generateDto("com.kdoc", fullClassDef).text
+    assertTrue(fullClassText.contains("@if"))
+    assertTrue(fullClassText.contains("@then"))
+    assertTrue(fullClassText.contains("@else"))
+    assertTrue(fullClassText.contains("@xmlName n"))
+    assertTrue(fullClassText.contains("@default null"))
+    assertTrue(fullClassText.contains("@const true"))
+    assertTrue(fullClassText.contains("@example 1.5"))
+
+    val xmlEmptyDef = SchemaDefinition(name = "XmlEmpty", type = "object", xml = Xml())
+    org.junit.jupiter.api.Assertions.assertEquals(
+        "", psi.dto.SchemaDocTagWriter.buildClassKDoc(xmlEmptyDef))
+
+    // looksLikeRef branches (.json, .yaml, ./, /, #)
+    val compDef =
+        SchemaDefinition(
+            name = "CompRefs",
+            type = "object",
+            anyOfSchemas = listOf(SchemaProperty("string")),
+            allOfSchemas = listOf(SchemaProperty("string")),
+            oneOf = listOf("./rel.json", "sub/path", "model.json", "model.yaml", "SimpleName"),
+            anyOf = emptyList(),
+            allOf = emptyList(),
+            properties =
+                mapOf(
+                    "minProp" to
+                        SchemaProperty(
+                            types = setOf("string"),
+                            defaultValue = domain.OpenApiBoolean(false),
+                            constValue = OpenApiArray(listOf(OpenApiInt(1L))),
+                            example = OpenApiObject(mapOf("k" to OpenApiString("v"))),
+                            minLength = 1,
+                            maxLength = 10,
+                            pattern = "^a$",
+                            minimum = 1.0,
+                            maximum = 10.0,
+                            multipleOf = 1.0,
+                            exclusiveMinimum = 0.0,
+                            exclusiveMaximum = 11.0,
+                            minItems = 1,
+                            maxItems = 5,
+                            uniqueItems = true,
+                            minProperties = 1,
+                            maxProperties = 5,
+                            minContains = 1,
+                            maxContains = 2)))
+    val compKDoc = psi.dto.SchemaDocTagWriter.buildClassKDoc(compDef)
+    val compTextRefs =
+        psi.dto.SchemaDocTagWriter.buildClassKDoc(
+            SchemaDefinition(
+                name = "CompTextRefs",
+                type = "object",
+                anyOf = listOf("AnyA"),
+                allOf = listOf("AllA")))
+    assertTrue(compTextRefs.contains("@anyOf"))
+    assertTrue(compTextRefs.contains("@allOf"))
+    assertTrue(compKDoc.contains("./rel.json"))
+    assertTrue(compKDoc.contains("sub/path"))
+    assertTrue(compKDoc.contains("model.json"))
+    assertTrue(compKDoc.contains("model.yaml"))
+    assertTrue(compKDoc.contains("#/components/schemas/SimpleName"))
+    val propKDoc =
+        psi.dto.SchemaDocTagWriter.buildPropertyKDoc(compDef.properties.getValue("minProp"))
+    assertTrue(propKDoc.contains("@minLength 1"))
   }
 
   private val generator = DtoGenerator()
@@ -442,12 +593,17 @@ class DtoGeneratorTest {
         SchemaDefinition(
             name = "CustomKeywords",
             type = "object",
-            customKeywords = mapOf("vendorKeyword" to "alpha"),
+            customKeywords = mapOf("vendorKeyword" to OpenApiString("alpha")),
             properties =
                 mapOf(
                     "name" to
                         SchemaProperty(
-                            type = "string", customKeywords = mapOf("custom" to listOf("a", "b")))))
+                            type = "string",
+                            customKeywords =
+                                mapOf(
+                                    "custom" to
+                                        OpenApiArray(
+                                            listOf(OpenApiString("a"), OpenApiString("b")))))))
 
     val text = generator.generateDto("com.custom", schema).text
 
@@ -459,7 +615,9 @@ class DtoGeneratorTest {
   fun `generateDto creates Enum class with SerialName mappings`() {
     val schema =
         SchemaDefinition(
-            name = "SortArgs", type = "string", enumValues = listOf("ascending", "descending"))
+            name = "SortArgs",
+            type = "string",
+            enumValues = listOf(OpenApiString("ascending"), OpenApiString("descending")))
 
     val text = generator.generateDto("com.enums", schema).text
 
@@ -474,7 +632,11 @@ class DtoGeneratorTest {
         SchemaDefinition(
             name = "TrickyEnum",
             type = "string",
-            enumValues = listOf("first-value", "123", "Value With Space"))
+            enumValues =
+                listOf(
+                    OpenApiString("first-value"),
+                    OpenApiString("123"),
+                    OpenApiString("Value With Space")))
 
     val text = generator.generateDto("com.enums", schema).text
 
@@ -485,7 +647,11 @@ class DtoGeneratorTest {
 
   @Test
   fun `generateDto uses typealias for non-string enums and preserves values`() {
-    val schema = SchemaDefinition(name = "Level", type = "integer", enumValues = listOf(1, 2, 3))
+    val schema =
+        SchemaDefinition(
+            name = "Level",
+            type = "integer",
+            enumValues = listOf(OpenApiInt(1L), OpenApiInt(2L), OpenApiInt(3L)))
 
     val text = generator.generateDto("com.enums", schema).text
 
@@ -493,6 +659,52 @@ class DtoGeneratorTest {
         text.contains("typealias Level = Int"), "Non-string enums should not generate enum class")
     assertTrue(text.contains("@enum 1"))
     assertTrue(text.contains("@enum 2"))
+
+    val objWithNonStringEnum =
+        SchemaDefinition(
+            name = "ObjEnum",
+            type = "object",
+            enumValues = listOf(OpenApiObject(mapOf("id" to OpenApiInt(1L)))),
+            properties = mapOf("id" to SchemaProperty(type = "integer")))
+    val objEnumText = generator.generateDto("com.enums", objWithNonStringEnum).text
+    assertTrue(objEnumText.contains("data class ObjEnum"))
+
+    val primWithProps =
+        SchemaDefinition(
+            name = "StringWithProps",
+            type = "string",
+            properties = mapOf("id" to SchemaProperty(type = "integer")))
+    assertTrue(
+        generator
+            .generateDto("com.enums", primWithProps)
+            .text
+            .contains("data class StringWithProps"))
+
+    // Test filterModelSchemas branches
+    val filtered =
+        filterModelSchemas(
+            listOf(
+                SchemaDefinition("Obj", type = "object"),
+                SchemaDefinition(
+                    "EnumObj", type = "object", enumValues = listOf(OpenApiString("a"))),
+                SchemaDefinition("AnyOfObj", type = "object", anyOf = listOf("A")),
+                SchemaDefinition("OneOfObj", type = "object", oneOf = listOf("A")),
+                SchemaDefinition(
+                    "AnyOfSchObj",
+                    type = "object",
+                    anyOfSchemas = listOf(SchemaProperty("string"))),
+                SchemaDefinition(
+                    "OneOfSchObj",
+                    type = "object",
+                    oneOfSchemas = listOf(SchemaProperty("string"))),
+                SchemaDefinition("ExternalAccount", type = "object"),
+                SchemaDefinition("PaymentSource", type = "object")))
+    org.junit.jupiter.api.Assertions.assertEquals(1, filtered.size)
+
+    // Test double dispose on PsiInfrastructure
+    PsiInfrastructure.dispose()
+    PsiInfrastructure.dispose()
+    org.junit.jupiter.api.Assertions.assertNotNull(PsiInfrastructure.createPsiFactory())
   }
 
   @Test
@@ -554,8 +766,9 @@ class DtoGeneratorTest {
         SchemaDefinition(
             name = "ExampleUser",
             type = "object",
-            example = mapOf("name" to "John"),
-            properties = mapOf("name" to SchemaProperty(type = "string", example = "John")))
+            example = OpenApiObject(mapOf("name" to OpenApiString("John"))),
+            properties =
+                mapOf("name" to SchemaProperty(type = "string", example = OpenApiString("John"))))
 
     val text = generator.generateDto("com.ex", schema).text
 
@@ -569,7 +782,10 @@ class DtoGeneratorTest {
         SchemaDefinition(
             name = "ExampleMap",
             type = "object",
-            examples = mapOf("valid" to mapOf("id" to 1), "invalid" to emptyMap<String, Any>()))
+            examples =
+                mapOf(
+                    "valid" to OpenApiObject(mapOf("id" to OpenApiInt(1L))),
+                    "invalid" to OpenApiObject(emptyMap())))
 
     val text = generator.generateDto("com.ex", schema).text
 
@@ -581,7 +797,9 @@ class DtoGeneratorTest {
   fun `generateDto includes examples list in KDoc`() {
     val schema =
         SchemaDefinition(
-            name = "ExampleList", type = "object", examplesList = listOf("alpha", "beta"))
+            name = "ExampleList",
+            type = "object",
+            examplesList = listOf(OpenApiString("alpha"), OpenApiString("beta")))
 
     val text = generator.generateDto("com.ex", schema).text
 
@@ -644,7 +862,11 @@ class DtoGeneratorTest {
             name = "ExampleProp",
             type = "object",
             properties =
-                mapOf("count" to SchemaProperty(types = setOf("integer"), examples = listOf(1, 2))))
+                mapOf(
+                    "count" to
+                        SchemaProperty(
+                            types = setOf("integer"),
+                            examples = listOf(OpenApiInt(1L), OpenApiInt(2L)))))
 
     val text = generator.generateDto("com.examples", schema).text
 
@@ -674,8 +896,8 @@ class DtoGeneratorTest {
             name = "Annotated",
             type = "object",
             title = "Annotated schema",
-            defaultValue = mapOf("id" to 1),
-            constValue = mapOf("id" to 1),
+            defaultValue = OpenApiObject(mapOf("id" to OpenApiInt(1L))),
+            constValue = OpenApiObject(mapOf("id" to OpenApiInt(1L))),
             schemaId = "https://example.com/schemas/Annotated",
             schemaDialect = "https://json-schema.org/draft/2020-12/schema",
             anchor = "annotated",
@@ -689,8 +911,8 @@ class DtoGeneratorTest {
                         SchemaProperty(
                             type = "integer",
                             title = "Identifier",
-                            defaultValue = 1,
-                            constValue = 1,
+                            defaultValue = OpenApiInt(1L),
+                            constValue = OpenApiInt(1L),
                             schemaId = "https://example.com/schemas/Identifier",
                             schemaDialect = "https://json-schema.org/draft/2020-12/schema",
                             anchor = "id",
@@ -737,7 +959,9 @@ class DtoGeneratorTest {
 
   @Test
   fun `generateDto sanitizes empty enum values to Unknown`() {
-    val schema = SchemaDefinition(name = "EdgeEnum", type = "string", enumValues = listOf("!!!"))
+    val schema =
+        SchemaDefinition(
+            name = "EdgeEnum", type = "string", enumValues = listOf(OpenApiString("!!!")))
 
     val text = generator.generateDto("com.enums", schema).text
 

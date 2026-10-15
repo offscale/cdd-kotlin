@@ -1,8 +1,13 @@
 package openapi
 
 import domain.*
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
+/**
+ * Direct nested schema validation tests for [OpenApiValidator] asserting exact issue paths,
+ * messages, and severities.
+ */
 class OpenApiValidatorDirectCoverageTest {
   @Test
   fun testDirect() {
@@ -42,9 +47,31 @@ class OpenApiValidatorDirectCoverageTest {
             info = Info("t", "1"),
             components = Components(schemas = mapOf("A" to def)))
 
-    println("NESTED ITEMS: ${nested.items}")
-    println("NESTED PREFIX ITEMS: ${nested.prefixItems}")
-    OpenApiValidator().validate(openApiDef)
-    println("SUCCESS")
+    val issues = OpenApiValidator().validate(openApiDef)
+    assertTrue(issues.isNotEmpty())
+    assertTrue(
+        issues.any {
+          it.severity == OpenApiIssueSeverity.ERROR &&
+              it.path == "$.components.schemas.A.properties.p.${"$"}id" &&
+              it.message.contains("valid URI")
+        })
+    assertTrue(
+        issues.any {
+          it.severity == OpenApiIssueSeverity.ERROR &&
+              it.path == "$.components.schemas.A.properties.p.${"$"}dynamicRef" &&
+              it.message.contains("valid URI")
+        })
+    assertTrue(
+        issues.any {
+          it.severity == OpenApiIssueSeverity.ERROR &&
+              it.path == "$.components.schemas.A.properties.p.${"$"}ref" &&
+              it.message.contains("valid URI")
+        })
+    assertTrue(
+        issues.any {
+          it.severity == OpenApiIssueSeverity.WARNING &&
+              it.path == "$.components.schemas.A.properties.p.${"$"}schema" &&
+              it.message.contains("not a recognized schema dialect")
+        })
   }
 }

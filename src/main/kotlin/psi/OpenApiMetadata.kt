@@ -1,3 +1,4 @@
+/** Root-level OpenAPI metadata model and merge/assembly helpers for Kotlin KDoc round-tripping. */
 package psi
 
 import domain.Callback
@@ -11,6 +12,7 @@ import domain.Info
 import domain.Link
 import domain.MediaTypeObject
 import domain.OpenApiDefinition
+import domain.OpenApiValue
 import domain.PathItem
 import domain.RequestBody
 import domain.SchemaDefinition
@@ -18,10 +20,15 @@ import domain.SecurityRequirement
 import domain.SecurityScheme
 import domain.Server
 import domain.Tag
+import psi.metadata.ComponentsMetadataCodec
 
 /**
  * Root-level OpenAPI metadata captured from interface-level KDoc. This mirrors the OpenAPI Object
  * fields that can be round-tripped from Kotlin.
+ *
+ * Encoders and decoders per domain area are provided by [psi.metadata.InfoMetadataCodec],
+ * [psi.metadata.ComponentsMetadataCodec], [psi.metadata.SecurityMetadataCodec], and
+ * [psi.metadata.TagsMetadataCodec].
  */
 data class OpenApiMetadata(
     /** OpenAPI version string (e.g., "3.2.0"). */
@@ -52,10 +59,10 @@ data class OpenApiMetadata(
     val externalDocs: ExternalDocumentation? = null,
 
     /** Root-level extensions (x- fields). */
-    val extensions: Map<String, Any?> = emptyMap(),
+    val extensions: Map<String, OpenApiValue> = emptyMap(),
 
     /** Extensions applied to the root Paths Object (x- fields). */
-    val pathsExtensions: Map<String, Any?> = emptyMap(),
+    val pathsExtensions: Map<String, OpenApiValue> = emptyMap(),
 
     /**
      * When true, serialize an explicit empty Paths Object (`paths: {}`). This preserves ACL-style
@@ -73,7 +80,7 @@ data class OpenApiMetadata(
     val webhooks: Map<String, PathItem> = emptyMap(),
 
     /** Extensions applied to the root Webhooks Object (x- fields). */
-    val webhooksExtensions: Map<String, Any?> = emptyMap(),
+    val webhooksExtensions: Map<String, OpenApiValue> = emptyMap(),
 
     /**
      * When true, serialize an explicit empty Webhooks Object (`webhooks: {}`). This preserves
@@ -114,7 +121,7 @@ data class OpenApiMetadata(
     val componentMediaTypes: Map<String, MediaTypeObject> = emptyMap(),
 
     /** Specification extensions applied to the Components Object (x- fields). */
-    val componentsExtensions: Map<String, Any?> = emptyMap()
+    val componentsExtensions: Map<String, OpenApiValue> = emptyMap()
 )
 
 /**
@@ -122,87 +129,10 @@ data class OpenApiMetadata(
  *
  * @param base Optional base components to merge into. Metadata keys override base keys on
  *   conflicts.
+ * @return The merged [Components], or `null` if empty.
  */
-fun OpenApiMetadata.toComponents(base: Components? = null): Components? {
-  val hasMetadataComponents =
-      securitySchemes.isNotEmpty() ||
-          componentSchemas.isNotEmpty() ||
-          componentExamples.isNotEmpty() ||
-          componentLinks.isNotEmpty() ||
-          componentCallbacks.isNotEmpty() ||
-          componentParameters.isNotEmpty() ||
-          componentResponses.isNotEmpty() ||
-          componentRequestBodies.isNotEmpty() ||
-          componentHeaders.isNotEmpty() ||
-          componentPathItems.isNotEmpty() ||
-          componentMediaTypes.isNotEmpty() ||
-          componentsExtensions.isNotEmpty()
-
-  if (base == null && !hasMetadataComponents) return null
-
-  val seed = base ?: Components()
-  val mergedSchemas = LinkedHashMap<String, SchemaDefinition>()
-  mergedSchemas.putAll(seed.schemas)
-  mergedSchemas.putAll(componentSchemas)
-
-  val mergedSecuritySchemes = LinkedHashMap<String, SecurityScheme>()
-  mergedSecuritySchemes.putAll(seed.securitySchemes)
-  mergedSecuritySchemes.putAll(securitySchemes)
-
-  val mergedExamples = LinkedHashMap<String, ExampleObject>()
-  mergedExamples.putAll(seed.examples)
-  mergedExamples.putAll(componentExamples)
-
-  val mergedLinks = LinkedHashMap<String, Link>()
-  mergedLinks.putAll(seed.links)
-  mergedLinks.putAll(componentLinks)
-
-  val mergedCallbacks = LinkedHashMap<String, Callback>()
-  mergedCallbacks.putAll(seed.callbacks)
-  mergedCallbacks.putAll(componentCallbacks)
-
-  val mergedParameters = LinkedHashMap<String, EndpointParameter>()
-  mergedParameters.putAll(seed.parameters)
-  mergedParameters.putAll(componentParameters)
-
-  val mergedResponses = LinkedHashMap<String, EndpointResponse>()
-  mergedResponses.putAll(seed.responses)
-  mergedResponses.putAll(componentResponses)
-
-  val mergedRequestBodies = LinkedHashMap<String, RequestBody>()
-  mergedRequestBodies.putAll(seed.requestBodies)
-  mergedRequestBodies.putAll(componentRequestBodies)
-
-  val mergedHeaders = LinkedHashMap<String, Header>()
-  mergedHeaders.putAll(seed.headers)
-  mergedHeaders.putAll(componentHeaders)
-
-  val mergedPathItems = LinkedHashMap<String, PathItem>()
-  mergedPathItems.putAll(seed.pathItems)
-  mergedPathItems.putAll(componentPathItems)
-
-  val mergedMediaTypes = LinkedHashMap<String, MediaTypeObject>()
-  mergedMediaTypes.putAll(seed.mediaTypes)
-  mergedMediaTypes.putAll(componentMediaTypes)
-
-  val mergedExtensions = LinkedHashMap<String, Any?>()
-  mergedExtensions.putAll(seed.extensions)
-  mergedExtensions.putAll(componentsExtensions.filterKeys { it.startsWith("x-") })
-
-  return seed.copy(
-      schemas = mergedSchemas,
-      securitySchemes = mergedSecuritySchemes,
-      examples = mergedExamples,
-      links = mergedLinks,
-      callbacks = mergedCallbacks,
-      parameters = mergedParameters,
-      responses = mergedResponses,
-      requestBodies = mergedRequestBodies,
-      headers = mergedHeaders,
-      pathItems = mergedPathItems,
-      mediaTypes = mergedMediaTypes,
-      extensions = mergedExtensions)
-}
+fun OpenApiMetadata.toComponents(base: Components? = null): Components? =
+    ComponentsMetadataCodec.toComponents(this, base)
 
 /**
  * Builds OpenAPI metadata from a full [OpenApiDefinition].
@@ -212,6 +142,9 @@ fun OpenApiMetadata.toComponents(base: Components? = null): Components? {
  *
  * @param includePathItems When true, lifts path-level metadata into [OpenApiMetadata.pathItems].
  * @param includeComponents When true, copies non-schema component maps into metadata.
+ * @param includeWebhooks When true, copies webhooks into metadata.
+ * @param includeComponentSchemas When true, copies `components.schemas` into metadata.
+ * @return The constructed [OpenApiMetadata].
  */
 fun OpenApiDefinition.toMetadata(
     includePathItems: Boolean = true,
@@ -219,11 +152,11 @@ fun OpenApiDefinition.toMetadata(
     includeWebhooks: Boolean = true,
     includeComponentSchemas: Boolean = false
 ): OpenApiMetadata {
-  val componentSource = if (includeComponents) components else null
-  val pathItemMeta = if (includePathItems) extractPathItemMetadata(paths) else emptyMap()
+  val comps = (if (includeComponents) components else null) ?: Components()
+  val pathItemMeta =
+      if (includePathItems) ComponentsMetadataCodec.extractPathItemMetadata(paths) else emptyMap()
   val webhookItems = if (includeWebhooks) webhooks else emptyMap()
-  val componentSchemas =
-      if (includeComponentSchemas) componentSource?.schemas.orEmpty() else emptyMap()
+  val componentSchemas = if (includeComponentSchemas) comps.schemas else emptyMap()
 
   return OpenApiMetadata(
       openapi = openapi,
@@ -242,44 +175,16 @@ fun OpenApiDefinition.toMetadata(
       webhooks = webhookItems,
       webhooksExtensions = webhooksExtensions,
       webhooksExplicitEmpty = webhooksExplicitEmpty,
-      securitySchemes = componentSource?.securitySchemes.orEmpty(),
+      securitySchemes = comps.securitySchemes,
       componentSchemas = componentSchemas,
-      componentExamples = componentSource?.examples.orEmpty(),
-      componentLinks = componentSource?.links.orEmpty(),
-      componentCallbacks = componentSource?.callbacks.orEmpty(),
-      componentParameters = componentSource?.parameters.orEmpty(),
-      componentResponses = componentSource?.responses.orEmpty(),
-      componentRequestBodies = componentSource?.requestBodies.orEmpty(),
-      componentHeaders = componentSource?.headers.orEmpty(),
-      componentPathItems = componentSource?.pathItems.orEmpty(),
-      componentMediaTypes = componentSource?.mediaTypes.orEmpty(),
-      componentsExtensions = componentSource?.extensions.orEmpty())
-}
-
-private fun extractPathItemMetadata(paths: Map<String, PathItem>): Map<String, PathItem> {
-  if (paths.isEmpty()) return emptyMap()
-  val result = LinkedHashMap<String, PathItem>()
-  paths.forEach { (path, item) ->
-    val metadata =
-        PathItem(
-            ref = item.ref,
-            summary = item.summary,
-            description = item.description,
-            parameters = item.parameters,
-            servers = item.servers,
-            extensions = item.extensions)
-    if (metadata.hasPathMetadata()) {
-      result[path] = metadata
-    }
-  }
-  return result
-}
-
-private fun PathItem.hasPathMetadata(): Boolean {
-  return ref != null ||
-      summary != null ||
-      description != null ||
-      parameters.isNotEmpty() ||
-      servers.isNotEmpty() ||
-      extensions.isNotEmpty()
+      componentExamples = comps.examples,
+      componentLinks = comps.links,
+      componentCallbacks = comps.callbacks,
+      componentParameters = comps.parameters,
+      componentResponses = comps.responses,
+      componentRequestBodies = comps.requestBodies,
+      componentHeaders = comps.headers,
+      componentPathItems = comps.pathItems,
+      componentMediaTypes = comps.mediaTypes,
+      componentsExtensions = comps.extensions)
 }

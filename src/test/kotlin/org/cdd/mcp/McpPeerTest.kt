@@ -45,7 +45,9 @@ class McpPeerTest {
       JsonObject(emptyMap())
     }
 
-    peer.onRequest("errorMethod") { params -> throw RuntimeException("custom error") }
+    peer.onRequestResult("errorMethod") { _ ->
+      kotlin.Result.failure(RuntimeException("custom error"))
+    }
 
     transport.simulateReceive(
         Json.parseToJsonElement("""{"jsonrpc":"2.0", "method": "testNotif", "params": {}}"""))
@@ -94,10 +96,113 @@ class McpPeerTest {
 
     transport.simulateReceive(JsonPrimitive("invalid"))
 
-    // Test coverage for empty/stubbed methods
+    // Test coverage for pagination, root boundary, uri resolution, and tool approval
     peer.handlePagination("cursor")
+    org.junit.jupiter.api.Assertions.assertEquals("cursor", peer.lastCursor)
+    org.junit.jupiter.api.Assertions.assertNull(peer.handlePagination(null))
+    org.junit.jupiter.api.Assertions.assertNull(peer.handlePagination("   "))
     assertTrue(peer.checkRootBoundary("uri"))
-    org.junit.jupiter.api.Assertions.assertEquals("uri", peer.resolveUri("uri"))
+    assertTrue(peer.checkRootBoundary("file:///tmp/test"))
+    org.junit.jupiter.api.Assertions.assertFalse(peer.checkRootBoundary("file:///tmp/../secret"))
+    org.junit.jupiter.api.Assertions.assertFalse(peer.checkRootBoundary("http://evil.com/data"))
+    peer.allowedRoots.clear()
+    assertTrue(peer.checkRootBoundary("http://allowed-when-empty.com"))
+    org.junit.jupiter.api.Assertions.assertEquals("uri", peer.resolveUri("  uri  "))
     assertTrue(peer.checkToolApproval("toolName"))
+    org.junit.jupiter.api.Assertions.assertFalse(peer.checkToolApproval("   "))
+    peer.deniedTools.add("blockedTool")
+    org.junit.jupiter.api.Assertions.assertFalse(peer.checkToolApproval("blockedTool"))
+
+    // Test sendRequest and matching response callback
+    var receivedReply: JsonElement? = null
+    peer.sendRequest("req-99", "ping") { reply -> receivedReply = reply }
+    transport.simulateReceive(
+        Json.parseToJsonElement("""{"jsonrpc":"2.0", "id": "req-99", "result": {"ok": true}}"""))
+    org.junit.jupiter.api.Assertions.assertNotNull(receivedReply)
+
+    // Test request without params and handler returning failure with null message
+    peer.onRequestResult("nullMsgError") { kotlin.Result.failure(RuntimeException()) }
+    transport.simulateReceive(
+        Json.parseToJsonElement("""{"jsonrpc":"2.0", "id": "4", "method": "testMethod"}"""))
+    transport.simulateReceive(
+        Json.parseToJsonElement("""{"jsonrpc":"2.0", "id": "5", "method": "nullMsgError"}"""))
+
+    // Test notification without params, unknown notification, and object with neither id nor method
+    transport.simulateReceive(
+        Json.parseToJsonElement("""{"jsonrpc":"2.0", "method": "testNotif"}"""))
+    transport.simulateReceive(
+        Json.parseToJsonElement("""{"jsonrpc":"2.0", "method": "unknownNotif"}"""))
+    transport.simulateReceive(Json.parseToJsonElement("""{"jsonrpc":"2.0"}"""))
+
+    // Test notifications/cancelled handler (with non-JsonObject params as well)
+    transport.simulateReceive(
+        Json.parseToJsonElement(
+            """{"jsonrpc":"2.0", "method": "notifications/cancelled", "params": {"requestId": "cancel-me"}}"""))
+    transport.simulateReceive(
+        Json.parseToJsonElement(
+            """{"jsonrpc":"2.0", "method": "notifications/cancelled", "params": {}}"""))
+    transport.simulateReceive(
+        Json.parseToJsonElement(
+            """{"jsonrpc":"2.0", "method": "notifications/cancelled", "params": [1]}"""))
+  }
+
+  @Test
+  fun testStdioTransportAndMcpClientGenerator() {
+    val unconfigured = StdioTransportImpl()
+    unconfigured.close()
+    unconfigured.simulateReceive(JsonObject(emptyMap()))
+    val unconfLines = ArrayDeque(listOf("""{"jsonrpc":"2.0","method":"ping"}""", "{bad", null))
+    unconfigured.startReading { unconfLines.removeFirstOrNull() }
+    unconfigured.startReadingResult {
+      kotlin.Result.failure(RuntimeException("unconfigured reader error"))
+    }
+
+    val stdio = StdioTransportImpl()
+    val received = mutableListOf<JsonElement>()
+    val errors = mutableListOf<Exception>()
+    var closed = false
+
+    stdio.onReceive { received.add(it) }
+    stdio.onError { errors.add(it) }
+    stdio.onClose { closed = true }
+    stdio.send(JsonObject(emptyMap()))
+    stdio.simulateReceive(JsonObject(emptyMap()))
+    org.junit.jupiter.api.Assertions.assertEquals(1, received.size)
+
+    val lines = ArrayDeque(listOf("", """{"jsonrpc":"2.0","method":"ping"}""", "{bad json", null))
+    stdio.startReading { lines.removeFirstOrNull() }
+    org.junit.jupiter.api.Assertions.assertEquals(2, received.size)
+    org.junit.jupiter.api.Assertions.assertEquals(1, errors.size)
+    assertTrue(closed)
+
+    var closed2 = false
+    stdio.onClose { closed2 = true }
+    stdio.startReadingResult { kotlin.Result.failure(RuntimeException("reader error")) }
+    org.junit.jupiter.api.Assertions.assertEquals(2, errors.size)
+    assertTrue(closed2)
+
+    val files =
+        McpClientGenerator.generateMcpFiles(
+            "org.example",
+            domain.OpenApiDefinition(
+                info = domain.Info("T", "1"),
+                paths =
+                    mapOf(
+                        "/users/{id}" to
+                            domain.PathItem(
+                                get =
+                                    domain.EndpointDefinition(
+                                        path = "/users/{id}",
+                                        method = domain.HttpMethod.GET,
+                                        operationId = "")))))
+    assertTrue(files["McpToolAdapter.kt"]!!.contains("get_users_id"))
+
+    val filesEmptyPaths =
+        McpClientGenerator.generateMcpFiles(
+            "org.example", domain.OpenApiDefinition(info = domain.Info("T", "1")))
+    assertTrue(filesEmptyPaths["McpServer.kt"]!!.contains("T"))
+
+    val filesNullDef = McpClientGenerator.generateMcpFiles("org.example", null)
+    assertTrue(filesNullDef["McpServer.kt"]!!.contains("GeneratedMcpServer"))
   }
 }

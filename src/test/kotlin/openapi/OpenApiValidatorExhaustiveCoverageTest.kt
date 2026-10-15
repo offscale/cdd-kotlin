@@ -1,6 +1,7 @@
 package openapi
 
 import domain.*
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class OpenApiValidatorExhaustiveCoverageTest {
@@ -32,6 +33,12 @@ class OpenApiValidatorExhaustiveCoverageTest {
             ifSchema = SchemaProperty(type = "inner15"),
             thenSchema = SchemaProperty(type = "inner16"),
             elseSchema = SchemaProperty(type = "inner17"),
+            defs =
+                mapOf(
+                    "nestedDef" to
+                        SchemaProperty(
+                            type = "string",
+                            defs = mapOf("innerDef" to SchemaProperty(type = "string")))),
             properties = mapOf("p" to SchemaProperty(type = "inner18")),
             discriminator = Discriminator(propertyName = "missing", defaultMapping = "missing"),
             xml = Xml(name = "ignored", nodeType = "text"))
@@ -68,10 +75,23 @@ class OpenApiValidatorExhaustiveCoverageTest {
             type = "string",
             schema = SchemaProperty(type = "string35"),
             content = mapOf("application/json" to MediaTypeObject()),
-            example = ExampleObject(value = "1"),
-            examples = mapOf("e" to ExampleObject(value = "1")),
+            example = ExampleObject(value = OpenApiString("1")),
+            examples = mapOf("e" to ExampleObject(value = OpenApiString("1"))),
             style = ParameterStyle.MATRIX,
             reference = ReferenceObject("#/components/headers/Missing"))
+
+    val invalidHeaderNoRef =
+        Header(
+            type = "string",
+            schema = SchemaProperty(type = "string35"),
+            content =
+                mapOf(
+                    "application/json" to MediaTypeObject(),
+                    "application/xml" to MediaTypeObject()),
+            example = ExampleObject(value = OpenApiString("1")),
+            examples = mapOf("e" to ExampleObject(value = OpenApiString("1"))),
+            style = ParameterStyle.MATRIX,
+            explode = true)
 
     val invalidParam =
         EndpointParameter(
@@ -79,7 +99,11 @@ class OpenApiValidatorExhaustiveCoverageTest {
             location = ParameterLocation.HEADER,
             style = ParameterStyle.MATRIX,
             explode = true,
-            type = "string")
+            type = "string",
+            content =
+                mapOf(
+                    "application/json" to MediaTypeObject(),
+                    "application/xml" to MediaTypeObject()))
 
     val invalidParam2 =
         EndpointParameter(
@@ -111,6 +135,7 @@ class OpenApiValidatorExhaustiveCoverageTest {
     val invalidMediaType =
         MediaTypeObject(
             ref = "#/components/mediaTypes/Missing",
+            reference = ReferenceObject("#/components/mediaTypes/Missing"),
             schema = SchemaProperty(type = "string36"),
             encoding =
                 mapOf(
@@ -123,12 +148,31 @@ class OpenApiValidatorExhaustiveCoverageTest {
                             prefixEncoding = listOf(EncodingObject()),
                             itemEncoding = EncodingObject())))
 
+    val invalidMediaTypeNoRef =
+        MediaTypeObject(
+            schema = SchemaProperty(type = "string36"),
+            encoding =
+                mapOf(
+                    "invalid header" to
+                        EncodingObject(
+                            headers =
+                                mapOf(
+                                    "invalid header" to Header(type = "string"),
+                                    "content-type" to Header(type = "string")),
+                            encoding = mapOf("nested" to EncodingObject()),
+                            prefixEncoding = listOf(EncodingObject()),
+                            itemEncoding = EncodingObject())))
+
     val invalidExample =
         ExampleObject(
             ref = "#/components/examples/Missing",
-            value = "1",
+            value = OpenApiString("1"),
             serializedValue = "1",
-            externalValue = "1")
+            externalValue = "1",
+            extensions = mapOf("x-ext" to OpenApiBoolean(true)))
+
+    val invalidExampleNoRef =
+        ExampleObject(value = OpenApiString("1"), serializedValue = "1", externalValue = "1")
 
     val invalidScheme =
         SecurityScheme(
@@ -146,23 +190,59 @@ class OpenApiValidatorExhaustiveCoverageTest {
                         OAuthFlow(
                             deviceAuthorizationUrl = "", tokenUrl = "", refreshUrl = "http://bad")))
 
+    val invalidApiKeyScheme =
+        SecurityScheme(
+            type = "apiKey",
+            name = "k",
+            `in` = "header",
+            oauth2MetadataUrl = "https://example.com/meta",
+            openIdConnectUrl = "https://example.com/oidc",
+            flows = OAuthFlows())
+
     val invalidLink =
         Link(
             ref = "#/components/links/Missing",
+            reference = ReferenceObject("#/components/links/Missing"),
             operationId = "op",
             operationRef = "ref",
-            parameters = mapOf("a" to "b"))
+            parameters = mapOf("a" to OpenApiString("b")))
+
+    val invalidLinkWithServer =
+        Link(ref = "#/components/links/Missing", server = Server(url = "https://example.com"))
+
+    val invalidLinkWithBody =
+        Link(ref = "#/components/links/Missing", requestBody = OpenApiString("body"))
+
+    val invalidLinkNoRef =
+        Link(
+            operationId = "op",
+            parameters =
+                mapOf(
+                    "a" to OpenApiString("\$request.body#/a~2b"),
+                    "b" to OpenApiString("\$request.body#/~"),
+                    "c" to OpenApiString("\$url"),
+                    "d" to OpenApiString("\$method"),
+                    "e" to OpenApiString("\$statusCode"),
+                    "f" to OpenApiString("\$response.path.id"),
+                    "g" to OpenApiString("\$request.body#notSlash"),
+                    "h" to OpenApiString("\$request.body#/a~0~1b"),
+                    "i" to OpenApiString("\$request.bodynotpound")))
+
+    val invalidLinkBoth = Link(operationId = "op", operationRef = "ref")
 
     val def =
         OpenApiDefinition(
             openapi = "3.1.0",
+            self = "openapi.json",
             info = Info("T", "1"),
+            tags =
+                listOf(
+                    Tag(name = "t1", externalDocs = ExternalDocumentation(url = "http://bad url"))),
             paths =
                 mapOf(
-                    "/test" to
+                    "/test" to PathItem(ref = "#/components/pathItems/Missing", summary = "S"),
+                    "/test2" to
                         PathItem(
-                            ref = "#/components/pathItems/Missing",
-                            summary = "S",
                             delete = invalidOperation,
                             options = invalidOperation,
                             head = invalidOperation,
@@ -172,27 +252,92 @@ class OpenApiValidatorExhaustiveCoverageTest {
                             additionalOperations =
                                 mapOf(
                                     "GET" to invalidOperation,
-                                    "invalid method" to invalidOperation))),
+                                    "invalid method" to invalidOperation)),
+                    "/emptySiblingCheck" to PathItem(ref = "#/components/pathItems/Missing")),
             components =
                 Components(
                     schemas = mapOf("A" to invalidSchemaDef),
-                    headers = mapOf("invalid header" to invalidHeader),
-                    mediaTypes = mapOf("M" to invalidMediaType),
-                    examples = mapOf("E" to invalidExample),
-                    securitySchemes = mapOf("S" to invalidScheme),
-                    links = mapOf("L" to invalidLink),
+                    headers =
+                        mapOf(
+                            "invalid header" to invalidHeader,
+                            "valid-header" to invalidHeaderNoRef),
+                    requestBodies =
+                        mapOf(
+                            "RBRef" to
+                                RequestBody(
+                                    reference =
+                                        ReferenceObject(
+                                            "other.json#/components/requestBodies/Missing")),
+                            "RBEmpty" to RequestBody()),
+                    mediaTypes =
+                        mapOf(
+                            "M" to invalidMediaType,
+                            "M2" to invalidMediaTypeNoRef,
+                            "M3" to
+                                MediaTypeObject(
+                                    ref = "#/components/mediaTypes/Missing",
+                                    extensions = mapOf("x-ext" to OpenApiInt(1L))),
+                            "M4" to MediaTypeObject(ref = "#/components/mediaTypes/Missing")),
+                    examples = mapOf("E" to invalidExample, "E2" to invalidExampleNoRef),
+                    securitySchemes = mapOf("S" to invalidScheme, "S2" to invalidApiKeyScheme),
+                    links =
+                        mapOf(
+                            "L" to invalidLink,
+                            "L2" to invalidLinkNoRef,
+                            "L3" to invalidLinkWithServer,
+                            "L4" to Link(ref = "#/components/links/Missing")),
                     responses =
-                        mapOf("R" to EndpointResponse("200", links = mapOf("L" to invalidLink)))))
+                        mapOf(
+                            "R" to
+                                EndpointResponse(
+                                    "200",
+                                    description = "ok",
+                                    links =
+                                        mapOf(
+                                            "L" to invalidLink,
+                                            "L2" to invalidLinkNoRef,
+                                            "L3" to invalidLinkWithServer,
+                                            "L4" to invalidLinkWithBody,
+                                            "L5" to Link(ref = "#/components/links/Missing"),
+                                            "L6" to invalidLinkBoth),
+                                    content = mapOf("application/json" to invalidMediaTypeNoRef)))))
 
-    validator.validate(def)
+    val issues = validator.validate(def, "https://example.com/base/")
+    val issuesNoSelf = validator.validate(def.copy(self = null), null)
+    assertTrue(issuesNoSelf.isNotEmpty())
+    assertTrue(validator.rules.isNotEmpty())
+    assertTrue(issues.isNotEmpty())
+    assertTrue(
+        issues.any {
+          it.severity == OpenApiIssueSeverity.ERROR &&
+              it.path == "$.components.schemas.A.${"$"}id" &&
+              it.message.contains("valid URI")
+        })
+    assertTrue(
+        issues.any {
+          it.severity == OpenApiIssueSeverity.ERROR &&
+              it.path.contains("components.securitySchemes.S") &&
+              it.message.contains("valid URL")
+        })
+    assertTrue(
+        issues.any {
+          it.severity == OpenApiIssueSeverity.ERROR && it.path.contains("components.examples.E")
+        })
 
     // Additional hex branch coverage for UriUtils
     val badHexSchema = SchemaDefinition(name = "H", type = "string", ref = "bad%XX%00")
-    validator.validate(
-        OpenApiDefinition(
-            openapi = "3.1.0",
-            info = Info("T", "1"),
-            components = Components(schemas = mapOf("H" to badHexSchema))))
+    val hexIssues =
+        validator.validate(
+            OpenApiDefinition(
+                openapi = "3.1.0",
+                info = Info("T", "1"),
+                components = Components(schemas = mapOf("H" to badHexSchema))))
+    assertTrue(
+        hexIssues.any {
+          it.severity == OpenApiIssueSeverity.ERROR &&
+              it.path == "$.components.schemas.H.${"$"}ref" &&
+              it.message.contains("valid URI")
+        })
   }
 
   @Test
@@ -200,6 +345,9 @@ class OpenApiValidatorExhaustiveCoverageTest {
     val validator = OpenApiValidator()
     val json = java.io.File("src/test/resources/invalid_openapi_exhaustive.json").readText()
     val def = OpenApiParser().parseString(json)
-    validator.validate(def)
+    val issues = validator.validate(def)
+    assertTrue(issues.isNotEmpty())
+    assertTrue(issues.any { it.severity == OpenApiIssueSeverity.ERROR })
+    assertTrue(issues.all { it.path.startsWith("$") && it.message.isNotBlank() })
   }
 }

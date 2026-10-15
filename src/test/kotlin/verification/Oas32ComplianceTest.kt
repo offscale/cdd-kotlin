@@ -80,8 +80,8 @@ class Oas32ComplianceTest {
     val link =
         Link(
             operationId = "getUser",
-            parameters = mapOf("userId" to "\$response.body#/id"),
-            requestBody = "\$request.body",
+            parameters = mapOf("userId" to OpenApiString("\$response.body#/id")),
+            requestBody = OpenApiString("\$request.body"),
             description = "Get the user associated with this resource")
 
     val response = EndpointResponse(statusCode = "200", links = mapOf("UserLink" to link))
@@ -91,8 +91,8 @@ class Oas32ComplianceTest {
 
     val actualLink = response.links["UserLink"]
     assertEquals("getUser", actualLink?.operationId)
-    assertEquals("\$response.body#/id", actualLink?.parameters?.get("userId"))
-    assertEquals("\$request.body", actualLink?.requestBody)
+    assertEquals(OpenApiString("\$response.body#/id"), actualLink?.parameters?.get("userId"))
+    assertEquals(OpenApiString("\$request.body"), actualLink?.requestBody)
   }
 
   @Test
