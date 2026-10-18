@@ -1,3 +1,4 @@
+/** Unit and integration tests in [OpenApiPathFlattenerTest]. */
 package domain
 
 import org.junit.jupiter.api.Assertions.assertEquals

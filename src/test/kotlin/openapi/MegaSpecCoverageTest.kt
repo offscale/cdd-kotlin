@@ -1,3 +1,4 @@
+/** Unit and integration tests in [MegaSpecCoverageTest]. */
 package openapi
 
 import java.io.File

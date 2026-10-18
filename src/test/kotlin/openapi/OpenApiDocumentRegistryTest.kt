@@ -1,3 +1,4 @@
+/** Unit and integration tests in [OpenApiDocumentRegistryTest]. */
 package openapi
 
 import domain.EndpointDefinition

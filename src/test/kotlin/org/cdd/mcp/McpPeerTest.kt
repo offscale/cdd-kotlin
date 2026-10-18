@@ -1,3 +1,4 @@
+/** Unit and integration tests in [McpPeerTest]. */
 package org.cdd.mcp
 
 import kotlinx.serialization.json.Json

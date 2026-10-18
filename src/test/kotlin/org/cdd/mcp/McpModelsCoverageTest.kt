@@ -1,3 +1,4 @@
+/** Unit and integration tests in [McpModelsCoverageTest]. */
 package org.cdd.mcp
 
 import kotlinx.serialization.KSerializer

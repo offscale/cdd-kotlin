@@ -1,3 +1,4 @@
+/** Unit and integration tests in [DtoParserNumericConstraintsTest]. */
 package psi
 
 import org.junit.jupiter.api.Assertions.assertEquals

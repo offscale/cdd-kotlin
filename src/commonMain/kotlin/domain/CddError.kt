@@ -166,6 +166,68 @@ sealed interface CddError {
     override val message: String
       get() = "Failed to dispatch webhook to $targetUrl: $reason"
   }
+
+  /**
+   * Error indicating a syntax or structural error while parsing an Arazzo 1.1.0 document.
+   *
+   * @property message Description of the Arazzo parse failure.
+   * @property location Optional JSON pointer or path location where the error occurred.
+   */
+  data class ArazzoParseError(override val message: String, val location: String? = null) :
+      CddError
+
+  /**
+   * Error indicating that an Arazzo 1.1.0 specification failed semantic validation.
+   *
+   * @property issues List of validation error descriptions.
+   */
+  data class ArazzoValidationError(val issues: List<String>) : CddError {
+    override val message: String
+      get() = "Arazzo validation failed with ${issues.size} issue(s): ${issues.joinToString("; ")}"
+  }
+
+  /**
+   * Error indicating a syntax or evaluation failure in an Arazzo runtime expression.
+   *
+   * @property expression The raw runtime expression string.
+   * @property reason Explanation of why parsing or evaluation failed.
+   */
+  data class RuntimeExpressionError(val expression: String, val reason: String) : CddError {
+    override val message: String
+      get() = "Runtime expression error in '$expression': $reason"
+  }
+
+  /**
+   * Error indicating a failure while evaluating an Arazzo criterion condition or selector.
+   *
+   * @property condition The criterion condition or selector expression.
+   * @property reason Explanation of the evaluation failure.
+   */
+  data class CriterionEvaluationError(val condition: String, val reason: String) : CddError {
+    override val message: String
+      get() = "Criterion evaluation error in '$condition': $reason"
+  }
+
+  /**
+   * Error indicating a failure during Arazzo workflow or step orchestration.
+   *
+   * @property workflowId Identifier of the workflow being executed.
+   * @property stepId Optional identifier of the step where the failure occurred.
+   * @property reason Explanation of the workflow execution failure.
+   */
+  data class WorkflowExecutionError(
+      val workflowId: String,
+      val stepId: String? = null,
+      val reason: String
+  ) : CddError {
+    override val message: String
+      get() =
+          if (stepId != null) {
+            "Workflow '$workflowId' failed at step '$stepId': $reason"
+          } else {
+            "Workflow '$workflowId' failed: $reason"
+          }
+  }
 }
 
 /**

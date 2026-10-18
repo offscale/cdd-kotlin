@@ -1,3 +1,4 @@
+/** Unit and integration tests in [ExhaustiveRealWorldTest]. */
 package openapi
 
 import org.junit.jupiter.api.Assertions.assertTrue

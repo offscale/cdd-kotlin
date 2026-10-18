@@ -1,3 +1,4 @@
+/** Unit and integration tests in [NetworkGeneratorTest]. */
 package psi
 
 import domain.Callback

@@ -22,6 +22,10 @@ The CLI—at a minimum—has:
 - `cdd-kotlin from_openapi to_sdk -i spec.json --no-github-actions --no-installable-package --tests`
 - `cdd-kotlin from_openapi to_server -i spec.json`
 - `cdd-kotlin to_openapi -f path/to/code`
+- `cdd-kotlin from_arazzo to_sdk -i workflow.arazzo.json`
+- `cdd-kotlin from_arazzo to_sdk_cli -i workflow.arazzo.json`
+- `cdd-kotlin from_arazzo to_server -i workflow.arazzo.json`
+- `cdd-kotlin to_arazzo -f path/to/code`
 - `cdd-kotlin to_docs_json --no-imports --no-wrapping -i spec.json`
 - `cdd-kotlin mcp` (Run the Model Context Protocol server via stdio)
 
@@ -101,6 +105,15 @@ Generate code from an OpenAPI specification.
 ### `to_openapi`
 Generate an OpenAPI specification from source code.
 * **Usage:** `cdd-kotlin to_openapi -i <src_directory_or_file> -o <out.json>`
+
+### `from_arazzo`
+Generate workflow SDK, CLI, or Server code from an Arazzo 1.1.0 specification.
+* **Usage:** `cdd-kotlin from_arazzo [target] -i <workflow.arazzo.json> -o <target_directory> [flags]`
+* **Targets:** `to_sdk`, `to_sdk_cli`, `to_server`
+
+### `to_arazzo`
+Generate an Arazzo 1.1.0 specification from Kotlin workflow source code.
+* **Usage:** `cdd-kotlin to_arazzo -i <src_directory_or_file> -o <out.arazzo.json>`
 
 ### `mcp`
 Run the Model Context Protocol server via stdio.

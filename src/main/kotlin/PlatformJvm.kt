@@ -215,9 +215,107 @@ actual fun generateServerCode(
  * Synchronizes project code definitions in [inputDir] against [truth] on the JVM platform.
  *
  * @param inputDir Target project directory.
- * @param truth Source of truth identifier (`class`, `sqlalchemy`, or `function`).
+ * @param truth Source of truth identifier (`class`, `sqlalchemy`, `function`, or `arazzo`).
  * @return A [Result] indicating success or a [CddError].
  */
 actual fun performSync(inputDir: String, truth: String): Result<Unit> {
   return psi.SyncGenerator.synchronize(inputDir, truth)
+}
+
+/**
+ * Parses Kotlin workflow source files in [inputDir] and writes an Arazzo 1.1.0 specification to
+ * [outputFile].
+ *
+ * @param inputDir Directory or `.kt` file containing Kotlin workflow code.
+ * @param outputFile Output path for the generated Arazzo 1.1.0 specification.
+ * @return A [Result] indicating success or a [CddError].
+ */
+actual fun generateToArazzo(inputDir: String, outputFile: String): Result<Unit> {
+  return psi.arazzo.ArazzoApiGenerator.generateToArazzoResult(inputDir, outputFile)
+}
+
+/**
+ * Generates Kotlin Multiplatform Client SDK (and optional CLI) workflow source files from an Arazzo
+ * 1.1.0 specification string.
+ *
+ * @param inputSpec Raw Arazzo 1.1.0 JSON or YAML specification content.
+ * @param outputDir Target directory for generated SDK/CLI files.
+ * @param packageName Base Kotlin package name.
+ * @param includeCli Whether to also emit `WorkflowCli.kt` reusing `WorkflowOrchestrator`.
+ * @return A [Result] indicating success or a [CddError].
+ */
+actual fun generateArazzoSdkCode(
+    inputSpec: String,
+    outputDir: String,
+    packageName: String,
+    includeCli: Boolean
+): Result<Unit> {
+  val definition =
+      arazzo.ArazzoParser().parseStringResult(inputSpec).getOrElse {
+        return Result.failure(it)
+      }
+  val pkgPath = packageName.replace(".", "/")
+  val sdkFiles =
+      psi.arazzo.WorkflowSdkGenerator.generateWorkflowSdkSourcesResult(packageName, definition)
+          .getOrThrow()
+  for ((fileName, src) in sdkFiles) {
+    writeToFile("$outputDir/composeApp/src/commonMain/kotlin/$pkgPath/workflows/$fileName", src)
+        .getOrElse {
+          return Result.failure(it)
+        }
+  }
+  if (includeCli) {
+    val cliSrc =
+        psi.arazzo.WorkflowCliGenerator.generateWorkflowCliSourceResult(packageName, definition)
+            .getOrThrow()
+    writeToFile("$outputDir/composeApp/src/commonMain/kotlin/$pkgPath/cli/WorkflowCli.kt", cliSrc)
+        .getOrElse {
+          return Result.failure(it)
+        }
+  }
+  return Result.success(Unit)
+}
+
+/**
+ * Generates Ktor server workflow routes, stateful mock server, and E2E integration tests from an
+ * Arazzo 1.1.0 specification string.
+ *
+ * @param inputSpec Raw Arazzo 1.1.0 JSON or YAML specification content.
+ * @param outputDir Target directory for generated server and test files.
+ * @param packageName Base Kotlin package name.
+ * @param withTests Whether to emit `WorkflowE2ETest.kt` into `server/src/test/kotlin`.
+ * @return A [Result] indicating success or a [CddError].
+ */
+actual fun generateArazzoServerCode(
+    inputSpec: String,
+    outputDir: String,
+    packageName: String,
+    withTests: Boolean
+): Result<Unit> {
+  val definition =
+      arazzo.ArazzoParser().parseStringResult(inputSpec).getOrElse {
+        return Result.failure(it)
+      }
+  val pkgPath = packageName.replace(".", "/")
+  val serverFiles =
+      psi.arazzo.WorkflowServerGenerator.generateWorkflowServerSourcesResult(
+              packageName, definition)
+          .getOrThrow()
+  for ((fileName, src) in serverFiles) {
+    val targetPath =
+        when (fileName) {
+          "WorkflowE2ETest.kt" ->
+              if (withTests) "$outputDir/server/src/test/kotlin/$pkgPath/server/$fileName" else null
+          "WorkflowModels.kt",
+          "WorkflowOrchestrator.kt" ->
+              "$outputDir/server/src/main/kotlin/$pkgPath/workflows/$fileName"
+          else -> "$outputDir/server/src/main/kotlin/$pkgPath/server/$fileName"
+        }
+    if (targetPath != null) {
+      writeToFile(targetPath, src).getOrElse {
+        return Result.failure(it)
+      }
+    }
+  }
+  return Result.success(Unit)
 }

@@ -9,7 +9,7 @@ plugins {
 
 group = "org.cdd"
 
-version = "0.0.2"
+version = "0.0.4"
 
 repositories { mavenCentral() }
 
@@ -64,9 +64,16 @@ tasks.withType<Test>().configureEach { useJUnitPlatform() }
 tasks.register("checkDocCoverage") {
   group = "verification"
   description =
-      "Fails if public/expect/actual classes, interfaces, objects, enums, typealiases, or functions lack KDoc."
+      "Fails if files, public/expect/actual classes, interfaces, objects, enums, typealiases, functions, or function arguments lack KDoc."
 
   doLast {
+    val allKotlinFiles =
+        fileTree("src/commonMain/kotlin") { include("**/*.kt") } +
+            fileTree("src/main/kotlin") { include("**/*.kt") } +
+            fileTree("src/wasmMain/kotlin") { include("**/*.kt") } +
+            fileTree("src/test/kotlin") { include("**/*.kt") } +
+            fileTree("src/wasmTest/kotlin") { include("**/*.kt") }
+
     val sourceFiles =
         fileTree("src/commonMain/kotlin") { include("**/*.kt") } +
             fileTree("src/main/kotlin") { include("**/*.kt") } +
@@ -75,7 +82,7 @@ tasks.register("checkDocCoverage") {
     val missing = mutableListOf<String>()
     var coveredCount = 0
 
-    sourceFiles.forEach { file ->
+    allKotlinFiles.forEach { file ->
       val lines = file.readLines()
       val firstContentLine =
           lines.firstOrNull { it.trim().isNotEmpty() && !it.trim().startsWith("@file:") }?.trim()
@@ -84,9 +91,15 @@ tasks.register("checkDocCoverage") {
       } else {
         missing.add("${file.path}:1: missing file-level KDoc header")
       }
+    }
+
+    sourceFiles.forEach { file ->
+      val lines = file.readLines()
       var inRawString = false
       var inKDoc = false
       var lastKDocEnd = -1
+      var lastKDocText = ""
+      val currentKDocLines = mutableListOf<String>()
 
       fun isAnnotation(line: String): Boolean = line.trim().startsWith("@")
 
@@ -109,10 +122,15 @@ tasks.register("checkDocCoverage") {
 
         if (line.contains("/**")) {
           inKDoc = true
+          currentKDocLines.clear()
+        }
+        if (inKDoc) {
+          currentKDocLines.add(line)
         }
         if (inKDoc && line.contains("*/")) {
           inKDoc = false
           lastKDocEnd = index
+          lastKDocText = currentKDocLines.joinToString("\n")
         }
 
         val trimmed = line.trim()
@@ -130,26 +148,92 @@ tasks.register("checkDocCoverage") {
                 !Regex("""^\s*(private|internal|protected)\s+""").containsMatchIn(line)
 
         if (isPublicFunction || isPublicClassOrTypealias) {
+          var hasKDoc = false
+          var kdocBlock = lastKDocText
           if (line.contains("/**")) {
-            coveredCount++
+            hasKDoc = true
+            kdocBlock = line
+          } else {
+            var j = index - 1
+            while (j >= 0) {
+              val back = lines[j].trim()
+              if (back.isEmpty() || isAnnotation(back)) {
+                j--
+                continue
+              }
+              if (j == lastKDocEnd) {
+                hasKDoc = true
+              }
+              break
+            }
+          }
+
+          if (!hasKDoc) {
+            missing.add("${file.path}:${index + 1}: ${trimmed}")
             return@forEachIndexed
           }
+          coveredCount++
 
-          var j = index - 1
-          while (j >= 0) {
-            val back = lines[j].trim()
-            if (back.isEmpty() || isAnnotation(back)) {
-              j--
-              continue
+          if (isPublicFunction && !trimmed.startsWith("fun interface ")) {
+            val sigBuilder = StringBuilder(line)
+            var k = index + 1
+            while (!sigBuilder.toString().contains(")") && k < lines.size) {
+              sigBuilder.append(" ").append(lines[k].trim())
+              k++
             }
-            if (j == lastKDocEnd) {
-              coveredCount++
-              return@forEachIndexed
+            val sig = sigBuilder.toString()
+            val paramMatch =
+                Regex(
+                        """fun\s+(?:<[^>]+>\s+)?(?:[A-Za-z0-9_.<>?]+\.)?[A-Za-z0-9_]+\s*\(([^)]*)\)""")
+                    .find(sig)
+            if (paramMatch != null) {
+              val paramsStr = paramMatch.groupValues[1].trim()
+              if (paramsStr.isNotEmpty()) {
+                var depth = 0
+                val parts = mutableListOf<String>()
+                val cur = StringBuilder()
+                for (ch in paramsStr) {
+                  when (ch) {
+                    '<',
+                    '(' -> {
+                      depth++
+                      cur.append(ch)
+                    }
+                    '>',
+                    ')' -> {
+                      depth--
+                      cur.append(ch)
+                    }
+                    ',' ->
+                        if (depth == 0) {
+                          parts.add(cur.toString().trim())
+                          cur.clear()
+                        } else {
+                          cur.append(ch)
+                        }
+                    else -> cur.append(ch)
+                  }
+                }
+                if (cur.isNotEmpty()) parts.add(cur.toString().trim())
+                for (part in parts) {
+                  val pm =
+                      Regex(
+                              """^(?:(?:vararg|noinline|crossinline|val|var)\s+)*([A-Za-z0-9_]+)\s*:""")
+                          .find(part)
+                  if (pm != null) {
+                    val paramName = pm.groupValues[1]
+                    if (!kdocBlock.contains("@param $paramName") &&
+                        !kdocBlock.contains("[$paramName]")) {
+                      missing.add(
+                          "${file.path}:${index + 1}: missing @param $paramName on ${trimmed}")
+                    } else {
+                      coveredCount++
+                    }
+                  }
+                }
+              }
             }
-            break
           }
-
-          missing.add("${file.path}:${index + 1}: ${trimmed}")
         }
       }
     }

@@ -15,6 +15,11 @@ object OpenApiPathBuilder {
    * - Custom methods are placed in [PathItem.additionalOperations].
    * - Path-level parameters are not inferred by default; when [liftCommonPathMetadata] is true,
    *   parameters shared by all operations are lifted to the Path Item.
+   *
+   * @param endpoints Flat list of [EndpointDefinition]s to group.
+   * @param liftCommonPathMetadata Whether to lift shared parameters/summary/servers to the
+   *   [PathItem].
+   * @return Map of path strings to constructed [PathItem]s.
    */
   fun buildPaths(
       endpoints: List<EndpointDefinition>,

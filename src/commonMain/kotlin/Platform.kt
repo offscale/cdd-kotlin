@@ -69,7 +69,51 @@ expect fun generateServerCode(
  * Performs bi-directional synchronization of code definitions in [inputDir] against [truth].
  *
  * @param inputDir The project directory to synchronize.
- * @param truth The source of truth (`class`, `sqlalchemy`, or `function`).
+ * @param truth The source of truth (`class`, `sqlalchemy`, `function`, or `arazzo`).
  * @return A [Result] indicating success or a [domain.CddError].
  */
 expect fun performSync(inputDir: String, truth: String): Result<Unit>
+
+/**
+ * Parses Kotlin workflow source files in [inputDir] and generates an Arazzo 1.1.0 specification at
+ * [outputFile].
+ *
+ * @param inputDir Directory or `.kt` file containing Kotlin workflow code.
+ * @param outputFile Destination `.json` or `.yaml` path for the generated Arazzo specification.
+ * @return A [Result] indicating success or a [domain.CddError].
+ */
+expect fun generateToArazzo(inputDir: String, outputFile: String): Result<Unit>
+
+/**
+ * Generates Kotlin Multiplatform Client SDK (and optional Client SDK CLI) workflow code from an
+ * Arazzo 1.1.0 specification string.
+ *
+ * @param inputSpec Raw Arazzo 1.1.0 JSON or YAML specification content.
+ * @param outputDir Root directory where SDK/CLI files should be generated.
+ * @param packageName Target Kotlin package name.
+ * @param includeCli Whether to also generate the Client SDK CLI (`WorkflowCli.kt`) reusing the SDK.
+ * @return A [Result] indicating success or a [domain.CddError].
+ */
+expect fun generateArazzoSdkCode(
+    inputSpec: String,
+    outputDir: String,
+    packageName: String,
+    includeCli: Boolean
+): Result<Unit>
+
+/**
+ * Generates Ktor Server workflow routes, stateful mock server, and E2E integration tests from an
+ * Arazzo 1.1.0 specification string.
+ *
+ * @param inputSpec Raw Arazzo 1.1.0 JSON or YAML specification content.
+ * @param outputDir Root directory where server and test files should be generated.
+ * @param packageName Target Kotlin package name.
+ * @param withTests Whether to generate the E2E workflow test suite.
+ * @return A [Result] indicating success or a [domain.CddError].
+ */
+expect fun generateArazzoServerCode(
+    inputSpec: String,
+    outputDir: String,
+    packageName: String,
+    withTests: Boolean
+): Result<Unit>

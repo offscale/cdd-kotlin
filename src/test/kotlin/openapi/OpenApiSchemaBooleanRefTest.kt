@@ -1,3 +1,4 @@
+/** Unit and integration tests in [OpenApiSchemaBooleanRefTest]. */
 package openapi
 
 import com.fasterxml.jackson.core.JsonFactory

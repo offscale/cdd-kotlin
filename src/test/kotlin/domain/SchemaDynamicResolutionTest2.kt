@@ -1,3 +1,4 @@
+/** Unit and integration tests in [SchemaDynamicResolutionTest2]. */
 package domain
 
 import org.junit.jupiter.api.Assertions.*

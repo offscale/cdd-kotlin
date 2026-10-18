@@ -1,3 +1,4 @@
+/** Unit and integration tests in [OpenApiMetadataTest]. */
 package psi
 
 import domain.*

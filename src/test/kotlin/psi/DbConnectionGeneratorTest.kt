@@ -1,3 +1,4 @@
+/** Unit and integration tests in [DbConnectionGeneratorTest]. */
 package psi
 
 import domain.SchemaDefinition

@@ -1,3 +1,4 @@
+/** Unit and integration tests in [UiGeneratorTest]. */
 package psi
 
 import domain.SchemaDefinition

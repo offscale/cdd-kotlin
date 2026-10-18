@@ -1,3 +1,4 @@
+/** Unit and integration tests in [CliCoverageTest]. */
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File

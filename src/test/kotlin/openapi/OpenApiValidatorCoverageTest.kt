@@ -1,3 +1,4 @@
+/** Unit and integration tests in [OpenApiValidatorCoverageTest]. */
 package openapi
 
 import domain.*

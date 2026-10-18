@@ -1,3 +1,4 @@
+/** Unit and integration tests in [DtoGeneratorBooleanRefTest]. */
 package psi
 
 import domain.SchemaDefinition

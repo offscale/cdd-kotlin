@@ -1,3 +1,4 @@
+/** Unit and integration tests in [JsonValueAndErrorTest]. */
 package domain
 
 import kotlinx.serialization.json.JsonArray
@@ -260,6 +261,36 @@ class JsonValueAndErrorTest {
     assertEquals("http://cb", webhookErr.targetUrl)
     assertEquals("Timeout", webhookErr.reason)
     assertEquals("Failed to dispatch webhook to http://cb: Timeout", webhookErr.message)
+
+    val arazzoParseErr = CddError.ArazzoParseError("Bad arazzo", "workflows[0]")
+    assertEquals("Bad arazzo", arazzoParseErr.message)
+    assertEquals("workflows[0]", arazzoParseErr.location)
+    assertNull(CddError.ArazzoParseError("Default loc").location)
+
+    val arazzoValErr = CddError.ArazzoValidationError(listOf("Missing workflows", "Cycle"))
+    assertEquals(listOf("Missing workflows", "Cycle"), arazzoValErr.issues)
+    assertEquals(
+        "Arazzo validation failed with 2 issue(s): Missing workflows; Cycle", arazzoValErr.message)
+
+    val rtExprErr = CddError.RuntimeExpressionError("\$bad", "Unknown root")
+    assertEquals("\$bad", rtExprErr.expression)
+    assertEquals("Unknown root", rtExprErr.reason)
+    assertEquals("Runtime expression error in '\$bad': Unknown root", rtExprErr.message)
+
+    val critErr = CddError.CriterionEvaluationError("a == b", "Failed compare")
+    assertEquals("a == b", critErr.condition)
+    assertEquals("Failed compare", critErr.reason)
+    assertEquals("Criterion evaluation error in 'a == b': Failed compare", critErr.message)
+
+    val wfStepErr = CddError.WorkflowExecutionError("wf1", "step1", "Step failed")
+    assertEquals("wf1", wfStepErr.workflowId)
+    assertEquals("step1", wfStepErr.stepId)
+    assertEquals("Step failed", wfStepErr.reason)
+    assertEquals("Workflow 'wf1' failed at step 'step1': Step failed", wfStepErr.message)
+
+    val wfNoStepErr = CddError.WorkflowExecutionError(workflowId = "wf1", reason = "Aborted")
+    assertNull(wfNoStepErr.stepId)
+    assertEquals("Workflow 'wf1' failed: Aborted", wfNoStepErr.message)
 
     val failedResult: Result<String> = platErr.toFailure()
     assertTrue(failedResult.isFailure)

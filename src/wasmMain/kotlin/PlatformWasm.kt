@@ -462,3 +462,71 @@ actual fun generateServerCode(
 actual fun performSync(inputDir: String, truth: String): Result<Unit> {
   return CddError.UnsupportedPlatformOperationError("performSync", "WASM").toFailure()
 }
+
+/**
+ * Returns a failed [Result] with [CddError.UnsupportedPlatformOperationError] when PSI-based
+ * Kotlin-to-Arazzo extraction is invoked on WASM.
+ *
+ * @param inputDir Directory containing Kotlin source code.
+ * @param outputFile Destination path for the generated Arazzo specification.
+ * @return A failed [Result] containing [CddError.UnsupportedPlatformOperationError].
+ */
+actual fun generateToArazzo(inputDir: String, outputFile: String): Result<Unit> {
+  return CddError.UnsupportedPlatformOperationError("generateToArazzo", "WASM").toFailure()
+}
+
+/**
+ * Generates basic Arazzo workflow stubs on WASM from an Arazzo 1.1.0 specification string.
+ *
+ * @param inputSpec Raw Arazzo 1.1.0 JSON or YAML specification content.
+ * @param outputDir Root directory where SDK files should be generated.
+ * @param packageName Target Kotlin package name.
+ * @param includeCli Whether to also emit a CLI stub.
+ * @return A [Result] indicating success or a [CddError].
+ */
+actual fun generateArazzoSdkCode(
+    inputSpec: String,
+    outputDir: String,
+    packageName: String,
+    includeCli: Boolean
+): Result<Unit> {
+  val definition =
+      arazzo.ArazzoParser().parseStringResult(inputSpec).getOrElse {
+        return Result.failure(it)
+      }
+  val pkgPath = packageName.replace(".", "/")
+  writeToFile(
+          "$outputDir/composeApp/src/commonMain/kotlin/$pkgPath/workflows/WorkflowOrchestrator.kt",
+          "package $packageName.workflows\n\n/** Generated WorkflowOrchestrator for ${definition.info.title}. */\nclass WorkflowOrchestrator\n")
+      .getOrElse {
+        return Result.failure(it)
+      }
+  if (includeCli) {
+    writeToFile(
+            "$outputDir/composeApp/src/commonMain/kotlin/$pkgPath/cli/WorkflowCli.kt",
+            "package $packageName.cli\n\n/** Generated WorkflowCli for ${definition.info.title}. */\nclass WorkflowCli\n")
+        .getOrElse {
+          return Result.failure(it)
+        }
+  }
+  return Result.success(Unit)
+}
+
+/**
+ * Returns a failed [Result] with [CddError.UnsupportedPlatformOperationError] when Arazzo server
+ * generation is invoked on WASM.
+ *
+ * @param inputSpec Raw Arazzo 1.1.0 JSON or YAML specification content.
+ * @param outputDir Root directory where server files should be generated.
+ * @param packageName Target Kotlin package name.
+ * @param withTests Whether to generate test suites.
+ * @return A failed [Result] containing [CddError.UnsupportedPlatformOperationError].
+ */
+actual fun generateArazzoServerCode(
+    inputSpec: String,
+    outputDir: String,
+    packageName: String,
+    withTests: Boolean
+): Result<Unit> {
+  return CddError.UnsupportedPlatformOperationError("generateArazzoServerCode", "WASM").toFailure()
+}

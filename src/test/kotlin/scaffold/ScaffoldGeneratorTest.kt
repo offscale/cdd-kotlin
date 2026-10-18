@@ -1,3 +1,4 @@
+/** Unit and integration tests in [ScaffoldGeneratorTest]. */
 package scaffold
 
 import domain.Contact

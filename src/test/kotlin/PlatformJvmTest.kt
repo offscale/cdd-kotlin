@@ -1,3 +1,4 @@
+/** Unit and integration tests in [PlatformJvmTest]. */
 package platform
 
 import getEnvVar

@@ -1,3 +1,4 @@
+/** Unit and integration tests in [DtoGeneratorTest]. */
 package psi
 
 import domain.Discriminator

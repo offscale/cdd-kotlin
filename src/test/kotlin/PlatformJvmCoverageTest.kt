@@ -1,3 +1,4 @@
+/** Unit and integration tests in [PlatformJvmCoverageTest]. */
 import java.io.File
 import java.nio.file.Files
 import org.junit.jupiter.api.Assertions.assertEquals

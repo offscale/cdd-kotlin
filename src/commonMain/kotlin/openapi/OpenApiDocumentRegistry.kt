@@ -39,7 +39,32 @@ class OpenApiDocumentRegistry {
         registerInternal(document.schema.schemaId, document)
         registerInternal(resolveRelative(document.schema.schemaId, normalizedBase), document)
       }
+      is OpenApiDocument.Arazzo -> {
+        registerInternal(document.definition.self, document)
+        registerInternal(resolveRelative(document.definition.self, normalizedBase), document)
+      }
     }
+  }
+
+  /**
+   * Register an Arazzo 1.1.0 Specification document.
+   *
+   * @param definition The [domain.ArazzoDefinition] to register.
+   * @param baseUri Optional base URI for resolving relative references.
+   */
+  fun registerArazzo(definition: domain.ArazzoDefinition, baseUri: String?) {
+    registerDocument(OpenApiDocument.Arazzo(definition), baseUri)
+  }
+
+  /**
+   * Resolve an Arazzo 1.1.0 Specification document by base URI.
+   *
+   * @param baseUri The base URI to look up.
+   * @return The registered [domain.ArazzoDefinition], or `null` if not found or not an Arazzo
+   *   document.
+   */
+  fun resolveArazzo(baseUri: String?): domain.ArazzoDefinition? {
+    return (resolve(baseUri) as? OpenApiDocument.Arazzo)?.definition
   }
 
   /**

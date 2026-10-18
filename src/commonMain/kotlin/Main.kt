@@ -41,6 +41,10 @@ fun runCli(args: Array<String>): Int {
     println("\nSubcommands:")
     println("  from_openapi    Generate code from an OpenAPI specification.")
     println("  to_openapi      Generate an OpenAPI specification from source code.")
+    println(
+        "  from_arazzo     Generate SDK, CLI, or Server code from an Arazzo 1.1.0 specification.")
+    println(
+        "  to_arazzo       Generate an Arazzo 1.1.0 specification from Kotlin workflow source code.")
     println("  mcp             Run the Model Context Protocol server via stdio.")
     println("  serve_json_rpc  Run the JSON RPC server via stdio.")
     println(
@@ -54,12 +58,24 @@ fun runCli(args: Array<String>): Int {
         "  cdd-kotlin from_openapi to_sdk_cli -i spec.json -o target_directory [--no-github-actions] [--no-installable-package] [--tests]")
     println(
         "  cdd-kotlin from_openapi to_sdk -i spec.json -o target_directory [--no-github-actions] [--no-installable-package] [--tests]")
+    println(
+        "  cdd-kotlin from_arazzo to_sdk -i arazzo.json -o target_directory [--no-github-actions] [--no-installable-package] [--tests]")
+    println("  cdd-kotlin to_arazzo -i src_directory -o arazzo.json")
     return 0
   }
 
   if (args.contains("--version")) {
-    println("0.0.2")
+    println("0.0.4")
     return 0
+  }
+
+  if (args[0] == "from_arazzo") {
+    val target = if (args.size > 1 && !args[1].startsWith("-")) args[1] else "to_sdk"
+    return org.cdd.CddCli.generateFromArazzo(args, target)
+  }
+
+  if (args[0] == "to_arazzo") {
+    return org.cdd.CddCli.generateToArazzo(args)
   }
 
   val command =

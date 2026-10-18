@@ -1,6 +1,7 @@
 /** Programmatic and CLI command dispatcher for the CDD (Compiler Driven Development) toolchain. */
 package org.cdd
 
+import generateToArazzo
 import generateToOpenApi
 import getEnvVar
 import kotlinx.serialization.json.Json
@@ -73,7 +74,7 @@ object CddCli {
         if (target == "to_server") {
           CddGenerator.generateServer(config)
         } else {
-          CddGenerator.generateSdk(config)
+          CddGenerator.generateSdk(config, includeCli = target == "to_sdk_cli")
         }
     return generationResult.fold(
         onSuccess = { 0 },
@@ -81,6 +82,95 @@ object CddCli {
           println("Failed to generate code: ${e.message}")
           1
         })
+  }
+
+  /**
+   * Generates Client SDK, Client SDK CLI, or Server code from an Arazzo 1.1.0 specification.
+   *
+   * @param args Command-line arguments.
+   * @param target The generation target (`to_sdk`, `to_sdk_cli`, or `to_server`).
+   * @return Exit code (0 for success, 1 for error).
+   */
+  fun generateFromArazzo(args: Array<String>, target: String = "to_sdk"): Int {
+    var outputDir = getEnvVar("CDD_OUTPUT") ?: "out"
+    var inputFile = getEnvVar("CDD_INPUT") ?: ""
+    var noGithubActions =
+        getEnvVar("CDD_NO_GITHUB_ACTIONS") == "true" || getEnvVar("CDD_NO_GITHUB_ACTIONS") == "1"
+    var noInstallablePackage =
+        getEnvVar("CDD_NO_INSTALLABLE_PACKAGE") == "true" ||
+            getEnvVar("CDD_NO_INSTALLABLE_PACKAGE") == "1"
+    var tests = getEnvVar("CDD_TESTS") == "true" || getEnvVar("CDD_TESTS") == "1"
+    var i = 1
+    while (i < args.size) {
+      val arg = args[i]
+      if (arg == "-o" || arg == "--output") {
+        if (i + 1 < args.size) outputDir = args[++i]
+      } else if (arg == "-i" || arg == "--input") {
+        if (i + 1 < args.size) inputFile = args[++i]
+      } else if (arg == "--no-github-actions") {
+        noGithubActions = true
+      } else if (arg == "--no-installable-package") {
+        noInstallablePackage = true
+      } else if (arg == "--tests") {
+        tests = true
+      }
+      i++
+    }
+    if (inputFile.isEmpty()) {
+      println("Missing -i <arazzo.json|yaml>")
+      return 1
+    }
+    val config =
+        Config(
+            inputPath = inputFile,
+            outputDir = outputDir,
+            noGithubActions = noGithubActions,
+            noInstallablePackage = noInstallablePackage,
+            tests = tests)
+    val generationResult =
+        if (target == "to_server") {
+          CddGenerator.generateArazzoServer(config)
+        } else {
+          CddGenerator.generateArazzoSdk(config, includeCli = target == "to_sdk_cli")
+        }
+    return generationResult.fold(
+        onSuccess = { 0 },
+        onFailure = { e ->
+          println("Failed to generate from Arazzo: ${e.message}")
+          1
+        })
+  }
+
+  /**
+   * Generates an Arazzo 1.1.0 specification from Kotlin workflow source code.
+   *
+   * @param args Command-line arguments.
+   * @return Exit code (0 for success, 1 for error).
+   */
+  fun generateToArazzo(args: Array<String>): Int {
+    var outputFile = getEnvVar("CDD_OUTPUT") ?: "arazzo.json"
+    var inputPath = getEnvVar("CDD_INPUT") ?: ""
+    var i = 1
+    while (i < args.size) {
+      val arg = args[i]
+      if (arg == "-o" || arg == "--output") {
+        if (i + 1 < args.size) outputFile = args[++i]
+      } else if (arg == "-i" || arg == "--input") {
+        if (i + 1 < args.size) inputPath = args[++i]
+      }
+      i++
+    }
+    if (inputPath.isEmpty()) {
+      println("Missing -i <src>")
+      return 1
+    }
+    return generateToArazzo(inputPath, outputFile)
+        .fold(
+            onSuccess = { 0 },
+            onFailure = { e ->
+              println("Failed to generate Arazzo: ${e.message}")
+              1
+            })
   }
 
   /**

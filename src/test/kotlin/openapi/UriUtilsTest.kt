@@ -1,3 +1,4 @@
+/** Unit and integration tests in [UriUtilsTest]. */
 package openapi
 
 import org.junit.jupiter.api.Assertions.assertEquals

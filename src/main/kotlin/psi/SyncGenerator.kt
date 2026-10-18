@@ -51,6 +51,10 @@ object SyncGenerator {
         }
         println("Synchronized DAOs in $relativePath")
       }
+    } else if (truth == "arazzo" || truth == "workflow") {
+      println("Aligning Arazzo specification and workflow code...")
+      val arazzoOut = File(dir, "arazzo_sync.json")
+      return psi.arazzo.ArazzoApiGenerator.generateToArazzoResult(inputDir, arazzoOut.absolutePath)
     } else if (truth == "dao" || truth == "sqlalchemy") {
       println("Aligning Data Classes to match DAOs/ORM... (Not fully implemented in this phase)")
       // In a fully complete sync, this would parse the Exposed Table definitions

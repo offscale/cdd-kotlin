@@ -57,7 +57,7 @@ class McpPeer(val transport: Transport) {
                       tools = ServerCapabilitiesTools(listChanged = true),
                       resources =
                           ServerCapabilitiesResources(listChanged = true, subscribe = true)),
-              serverInfo = Implementation(name = "cdd-kotlin-mcp", version = "0.0.2"),
+              serverInfo = Implementation(name = "cdd-kotlin-mcp", version = "0.0.4"),
               instructions = "cdd-kotlin MCP server")
 
       jsonEncoder.encodeToJsonElement(InitializeResult.serializer(), result)

@@ -1,3 +1,4 @@
+/** Unit and integration tests in [ComprehensiveCoverageTest]. */
 package openapi
 
 import java.io.File

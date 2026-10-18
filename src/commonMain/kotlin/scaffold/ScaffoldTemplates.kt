@@ -12,6 +12,9 @@ object ScaffoldTemplates {
   /**
    * Generates the content for gradle/libs.versions.toml. Defines versions for Kotlin, Compose,
    * Ktor, and Serialization.
+   *
+   * @param isServer Whether to include server-side dependencies.
+   * @return The generated TOML catalog content.
    */
   fun createVersionCatalog(isServer: Boolean = false): String {
     val serverVersions =
@@ -96,6 +99,8 @@ $serverLibs
    * Generates the root settings.gradle.kts file.
    *
    * @param projectName The name of the project to include.
+   * @param isServer Whether the project is a server project.
+   * @return The generated settings.gradle.kts content.
    */
   fun createSettingsGradle(projectName: String, isServer: Boolean = false): String {
     val includes = if (isServer) "include(\":server\")" else "include(\":composeApp\")"
@@ -341,6 +346,8 @@ $serverLibs
    *
    * @param namespace The package name.
    * @param info Optional Info metadata.
+   * @param withTests Whether to include the `jvmTest` source set configuration.
+   * @return The generated server build.gradle.kts content.
    */
   fun createServerBuildGradle(namespace: String, info: Info?, withTests: Boolean = false): String {
     val testBlock =

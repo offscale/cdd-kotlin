@@ -1,3 +1,4 @@
+/** Unit and integration tests in [DtoParserTest]. */
 package psi
 
 import domain.OpenApiArray

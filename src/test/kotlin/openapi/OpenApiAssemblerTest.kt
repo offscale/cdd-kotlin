@@ -1,3 +1,4 @@
+/** Unit and integration tests in [OpenApiAssemblerTest]. */
 package openapi
 
 import domain.Components

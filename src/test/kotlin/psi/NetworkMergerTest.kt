@@ -1,3 +1,4 @@
+/** Unit and integration tests in [NetworkMergerTest]. */
 package psi
 
 import domain.EndpointDefinition

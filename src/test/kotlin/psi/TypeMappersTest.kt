@@ -1,3 +1,4 @@
+/** Unit and integration tests in [TypeMappersTest]. */
 package psi
 
 import domain.OpenApiArray

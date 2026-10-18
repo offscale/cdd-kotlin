@@ -90,6 +90,7 @@ class OpenApiWriter {
         when (document) {
           is OpenApiDocument.OpenApi -> openApiToMap(document.definition)
           is OpenApiDocument.Schema -> schemaRootToValue(document.schema)
+          is OpenApiDocument.Arazzo -> arazzo.ArazzoWriter().toOpenApiObject(document.definition)
         }
     val element = OpenApiValues.fromAny(tree).toJsonElement()
     return if (resolved == Format.JSON) {

@@ -1,3 +1,4 @@
+/** Unit and integration tests in [MainTest]. */
 import java.io.File
 import java.nio.file.Path
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -401,6 +402,138 @@ class MainTest {
       assertTrue(
           File(outDir, "composeApp/src/commonMain/kotlin/org/example/api/ApiClient.kt").exists())
       assertTrue(File(outDir, "build.gradle.kts").exists())
+    }
+  }
+
+  @Test
+  fun `from_arazzo to_sdk, to_sdk_cli, to_server, to_arazzo, and sync arazzo work end-to-end`(
+      @TempDir tempDir: Path
+  ) {
+    withUserDir(tempDir) {
+      val arazzoSpec =
+          """
+          {
+            "arazzo": "1.1.0",
+            "info": {
+              "title": "Petstore Workflows",
+              "version": "1.0.0"
+            },
+            "sourceDescriptions": [
+              {
+                "name": "petstore",
+                "url": "./petstore.json",
+                "type": "openapi"
+              }
+            ],
+            "workflows": [
+              {
+                "workflowId": "adoptPet",
+                "summary": "Adopt a pet",
+                "steps": [
+                  {
+                    "stepId": "findPet",
+                    "operationId": "findPetsByStatus"
+                  }
+                ]
+              }
+            ]
+          }
+          """
+              .trimIndent()
+      val specFile = tempDir.resolve("arazzo.json").toFile()
+      specFile.writeText(arazzoSpec)
+
+      val sdkOut = tempDir.resolve("arazzo_sdk").toFile()
+      assertEquals(
+          0,
+          runCli(
+              arrayOf(
+                  "from_arazzo",
+                  "to_sdk_cli",
+                  "-i",
+                  specFile.absolutePath,
+                  "-o",
+                  sdkOut.absolutePath)))
+      assertTrue(
+          File(
+                  sdkOut,
+                  "composeApp/src/commonMain/kotlin/org/example/workflows/WorkflowOrchestrator.kt")
+              .exists())
+      assertTrue(
+          File(sdkOut, "composeApp/src/commonMain/kotlin/org/example/cli/WorkflowCli.kt").exists())
+
+      // Default target when flags follow from_arazzo directly
+      val sdkDefaultOut = tempDir.resolve("arazzo_sdk_default").toFile()
+      assertEquals(
+          0,
+          runCli(
+              arrayOf(
+                  "from_arazzo",
+                  "-i",
+                  specFile.absolutePath,
+                  "-o",
+                  sdkDefaultOut.absolutePath,
+                  "--no-github-actions",
+                  "--no-installable-package",
+                  "--tests")))
+
+      val srvOut = tempDir.resolve("arazzo_srv").toFile()
+      assertEquals(
+          0,
+          runCli(
+              arrayOf(
+                  "from_arazzo",
+                  "to_server",
+                  "-i",
+                  specFile.absolutePath,
+                  "-o",
+                  srvOut.absolutePath,
+                  "--tests")))
+      assertTrue(
+          File(srvOut, "server/src/main/kotlin/org/example/server/WorkflowRoutes.kt").exists())
+      assertTrue(
+          File(srvOut, "server/src/test/kotlin/org/example/server/WorkflowE2ETest.kt").exists())
+
+      val roundTripArazzo = tempDir.resolve("roundtrip.arazzo.json").toFile()
+      assertEquals(
+          0,
+          runCli(
+              arrayOf("to_arazzo", "-i", sdkOut.absolutePath, "-o", roundTripArazzo.absolutePath)))
+      assertTrue(roundTripArazzo.exists())
+      assertTrue(roundTripArazzo.readText().contains("adoptPet"))
+
+      assertEquals(0, runCli(arrayOf("sync", "-i", sdkOut.absolutePath, "--truth", "arazzo")))
+      assertTrue(File(sdkOut, "arazzo_sync.json").exists())
+
+      // Auto-detection via from_openapi when an Arazzo spec is passed
+      val autoSdkOut = tempDir.resolve("auto_sdk").toFile()
+      assertEquals(
+          0,
+          runCli(
+              arrayOf(
+                  "from_openapi",
+                  "to_sdk",
+                  "-i",
+                  specFile.absolutePath,
+                  "-o",
+                  autoSdkOut.absolutePath)))
+      val autoSrvOut = tempDir.resolve("auto_srv").toFile()
+      assertEquals(
+          0,
+          runCli(
+              arrayOf(
+                  "from_openapi",
+                  "to_server",
+                  "-i",
+                  specFile.absolutePath,
+                  "-o",
+                  autoSrvOut.absolutePath)))
+
+      // Error branches
+      assertEquals(1, runCli(arrayOf("from_arazzo")))
+      assertEquals(1, runCli(arrayOf("from_arazzo", "-i", "/nonexistent/invalid.json")))
+      assertEquals(1, runCli(arrayOf("to_arazzo")))
+      assertEquals(1, runCli(arrayOf("to_arazzo", "-i", "/nonexistent/dir")))
     }
   }
 }

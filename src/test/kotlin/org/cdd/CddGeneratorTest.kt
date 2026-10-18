@@ -1,3 +1,4 @@
+/** Unit and integration tests in [CddGeneratorTest]. */
 package org.cdd
 
 import java.nio.file.Path

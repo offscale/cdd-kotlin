@@ -1,3 +1,4 @@
+/** Unit and integration tests in [DaoGeneratorTest]. */
 package psi
 
 import domain.SchemaDefinition

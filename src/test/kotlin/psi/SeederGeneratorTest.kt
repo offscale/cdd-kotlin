@@ -1,3 +1,4 @@
+/** Unit and integration tests in [SeederGeneratorTest]. */
 package psi
 
 import domain.SchemaDefinition

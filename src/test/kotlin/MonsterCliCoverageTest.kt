@@ -1,3 +1,4 @@
+/** Unit and integration tests in [MonsterCliCoverageTest]. */
 import java.io.File
 import java.nio.file.Files
 import org.junit.jupiter.api.Assertions.assertEquals

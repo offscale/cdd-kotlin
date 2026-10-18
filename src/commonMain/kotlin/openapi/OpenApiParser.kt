@@ -195,6 +195,9 @@ class OpenApiParser {
       root: JsonNode,
       baseUri: String?,
   ): Result<OpenApiDocument> {
+    if (root.has("arazzo")) {
+      return arazzo.ArazzoParser().parseJsonObjectResult(root).map { OpenApiDocument.Arazzo(it) }
+    }
     val isOpenApi = root.has("openapi") or root.has("swagger")
     return if (isOpenApi) {
       Result.success(OpenApiDocument.OpenApi(parseOpenApi(root, baseUri)))
@@ -207,10 +210,7 @@ class OpenApiParser {
       root: JsonNode,
       baseUri: String?,
   ): OpenApiDocument {
-    val isOpenApi = root.has("openapi") or root.has("swagger")
-    return if (isOpenApi) {
-      OpenApiDocument.OpenApi(parseOpenApi(root, baseUri))
-    } else {
+    return parseDocumentResult(root, baseUri).getOrElse {
       OpenApiDocument.Schema(SchemaNodeParser.parseSchemaRoot(root))
     }
   }

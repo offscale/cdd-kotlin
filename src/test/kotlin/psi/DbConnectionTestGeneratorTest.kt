@@ -1,3 +1,4 @@
+/** Unit and integration tests in [DbConnectionTestGeneratorTest]. */
 package psi
 
 import org.junit.jupiter.api.Assertions.assertTrue

@@ -14,7 +14,13 @@ class UiGenerator {
 
   private val psiFactory = PsiInfrastructure.createPsiFactory()
 
-  /** Generates a Kotlin file containing the Composable Form. */
+  /**
+   * Generates a Kotlin file containing the Composable Form.
+   *
+   * @param packageName Target package name.
+   * @param schema The [SchemaDefinition] to build a form for.
+   * @return The generated [KtFile].
+   */
   fun generateForm(packageName: String, schema: SchemaDefinition): KtFile {
     val className = schema.safeName
     val formName = "${className}Form"
@@ -105,7 +111,13 @@ class UiGenerator {
     return psiFactory.createFile("$formName.kt", content)
   }
 
-  /** Generates a Kotlin file containing the Composable Data Grid. */
+  /**
+   * Generates a Kotlin file containing the Composable Data Grid.
+   *
+   * @param packageName Target package name.
+   * @param schema The [SchemaDefinition] to build a grid for.
+   * @return The generated [KtFile].
+   */
   fun generateGrid(packageName: String, schema: SchemaDefinition): KtFile {
     val className = schema.safeName
     val gridName = "${className}Grid"
@@ -232,7 +244,16 @@ class UiGenerator {
     return psiFactory.createFile("$gridName.kt", content)
   }
 
-  /** Generates a Full Screen Composable that fetches data from an API and displays it in a Grid. */
+  /**
+   * Generates a Full Screen Composable that fetches data from an API and displays it in a Grid.
+   *
+   * @param packageName Target package name.
+   * @param screenName Composable screen function name.
+   * @param schema The [SchemaDefinition] displayed on the screen.
+   * @param apiClassName Name of the generated API client class.
+   * @param listOperationId Name of the list endpoint method on [apiClassName].
+   * @return The generated [KtFile].
+   */
   fun generateScreen(
       packageName: String,
       screenName: String,

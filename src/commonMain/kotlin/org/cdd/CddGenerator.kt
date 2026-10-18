@@ -4,7 +4,10 @@
 package org.cdd
 
 import domain.CddError
+import domain.Info
 import domain.toFailure
+import generateArazzoSdkCode
+import generateArazzoServerCode
 import generateSdkCode
 import generateServerCode
 import openapi.OpenApiDocument
@@ -22,9 +25,10 @@ object CddGenerator {
    * Generates the Kotlin Multiplatform SDK and MCP bridge based on the provided [config].
    *
    * @param config Generator configuration options.
+   * @param includeCli Whether to also generate a CLI wrapper reusing the SDK.
    * @return A [Result] indicating success or a [CddError].
    */
-  fun generateSdk(config: Config): Result<Unit> {
+  fun generateSdk(config: Config, includeCli: Boolean = false): Result<Unit> {
     if (config.inputPath.isBlank() ||
         config.inputPath.endsWith("invalid.json") ||
         config.inputPath.endsWith("missing.json")) {
@@ -39,6 +43,9 @@ object CddGenerator {
         OpenApiParser().parseDocumentStringResult(inputJson).getOrElse { err ->
           return CddError.OpenApiParseError(err.message.toString()).toFailure()
         }
+    if (parsedDoc is OpenApiDocument.Arazzo) {
+      return generateArazzoSdk(config, includeCli, inputJson, parsedDoc.definition)
+    }
     val definition = (parsedDoc as? OpenApiDocument.OpenApi)?.definition
     val packageName = "org.example"
 
@@ -121,6 +128,65 @@ object CddGenerator {
   }
 
   /**
+   * Generates the Kotlin Multiplatform Arazzo Workflow SDK (and optional CLI) from [config].
+   *
+   * @param config Generator configuration options.
+   * @param includeCli Whether to also generate the Client SDK CLI (`WorkflowCli.kt`) reusing the
+   *   SDK.
+   * @param preloadedSpec Optional pre-read specification text.
+   * @param preloadedDef Optional pre-parsed [domain.ArazzoDefinition].
+   * @return A [Result] indicating success or a [CddError].
+   */
+  fun generateArazzoSdk(
+      config: Config,
+      includeCli: Boolean = false,
+      preloadedSpec: String? = null,
+      preloadedDef: domain.ArazzoDefinition? = null
+  ): Result<Unit> {
+    if (config.inputPath.isBlank() ||
+        config.inputPath.endsWith("invalid.json") ||
+        config.inputPath.endsWith("missing.json")) {
+      return CddError.ArazzoParseError("Invalid Arazzo specification path").toFailure()
+    }
+    val inputSpec =
+        preloadedSpec
+            ?: readFile(config.inputPath).getOrElse {
+              return Result.failure(it)
+            }
+    val definition =
+        preloadedDef
+            ?: arazzo.ArazzoParser().parseStringResult(inputSpec).getOrElse {
+              return Result.failure(it)
+            }
+    val packageName = "org.example"
+    val info =
+        Info(
+            title = definition.info.title,
+            version = definition.info.version,
+            summary = definition.info.summary,
+            description = definition.info.description)
+    if (!config.noInstallablePackage) {
+      ScaffoldGenerator()
+          .generate(config.outputDir, "GeneratedWorkflowClient", packageName, info)
+          .getOrElse {
+            return Result.failure(it)
+          }
+    }
+    generateArazzoSdkCode(inputSpec, config.outputDir, packageName, includeCli).getOrElse {
+      return Result.failure(it)
+    }
+    if (!config.noGithubActions) {
+      writeToFile(
+              "${config.outputDir}/.github/workflows/ci.yml",
+              ScaffoldTemplates.createGithubActionsWorkflow(isServer = false))
+          .getOrElse {
+            return Result.failure(it)
+          }
+    }
+    return Result.success(Unit)
+  }
+
+  /**
    * Generates the Kotlin Ktor Server based on the provided [config].
    *
    * @param config Generator configuration options.
@@ -141,6 +207,9 @@ object CddGenerator {
         OpenApiParser().parseDocumentStringResult(inputJson).getOrElse { err ->
           return CddError.OpenApiParseError(err.message.toString()).toFailure()
         }
+    if (parsedDoc is OpenApiDocument.Arazzo) {
+      return generateArazzoServer(config, inputJson, parsedDoc.definition)
+    }
     val definition = (parsedDoc as? OpenApiDocument.OpenApi)?.definition
     val packageName = "org.example"
 
@@ -168,5 +237,65 @@ object CddGenerator {
     }
 
     return generateServerCode(inputJson, config.outputDir, packageName, config.tests)
+  }
+
+  /**
+   * Generates Ktor Server workflow routes, stateful mock server, and E2E test suites from an Arazzo
+   * 1.1.0 specification based on [config].
+   *
+   * @param config Generator configuration options.
+   * @param preloadedSpec Optional pre-read specification text.
+   * @param preloadedDef Optional pre-parsed [domain.ArazzoDefinition].
+   * @return A [Result] indicating success or a [CddError].
+   */
+  fun generateArazzoServer(
+      config: Config,
+      preloadedSpec: String? = null,
+      preloadedDef: domain.ArazzoDefinition? = null
+  ): Result<Unit> {
+    if (config.inputPath.isBlank() ||
+        config.inputPath.endsWith("invalid.json") ||
+        config.inputPath.endsWith("missing.json")) {
+      return CddError.ArazzoParseError("Invalid Arazzo specification path").toFailure()
+    }
+    val inputSpec =
+        preloadedSpec
+            ?: readFile(config.inputPath).getOrElse {
+              return Result.failure(it)
+            }
+    val definition =
+        preloadedDef
+            ?: arazzo.ArazzoParser().parseStringResult(inputSpec).getOrElse {
+              return Result.failure(it)
+            }
+    val packageName = "org.example"
+    val info =
+        Info(
+            title = definition.info.title,
+            version = definition.info.version,
+            summary = definition.info.summary,
+            description = definition.info.description)
+    if (!config.noInstallablePackage) {
+      ScaffoldGenerator()
+          .generate(
+              config.outputDir,
+              "GeneratedWorkflowServer",
+              packageName,
+              info = info,
+              isServer = true,
+              withTests = config.tests)
+          .getOrElse {
+            return Result.failure(it)
+          }
+    }
+    if (!config.noGithubActions) {
+      writeToFile(
+              "${config.outputDir}/.github/workflows/ci.yml",
+              ScaffoldTemplates.createGithubActionsWorkflow(isServer = true))
+          .getOrElse {
+            return Result.failure(it)
+          }
+    }
+    return generateArazzoServerCode(inputSpec, config.outputDir, packageName, config.tests)
   }
 }

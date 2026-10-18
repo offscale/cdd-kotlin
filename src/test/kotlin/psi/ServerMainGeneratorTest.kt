@@ -1,3 +1,4 @@
+/** Unit and integration tests in [ServerMainGeneratorTest]. */
 package psi
 
 import domain.SchemaDefinition

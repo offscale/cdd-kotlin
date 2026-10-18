@@ -1,3 +1,4 @@
+/** Unit and integration tests in [OpenApiValidatorGeneratedTest]. */
 package openapi
 
 import domain.*

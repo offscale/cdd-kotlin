@@ -1,3 +1,4 @@
+/** Unit and integration tests in [ApiGeneratorTest]. */
 package psi
 
 import java.io.File

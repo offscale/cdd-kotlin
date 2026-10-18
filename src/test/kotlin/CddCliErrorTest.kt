@@ -1,3 +1,4 @@
+/** Unit and integration tests in [CddCliErrorTest]. */
 import java.nio.file.Files
 import org.cdd.CddCli
 import org.junit.jupiter.api.Assertions.assertEquals

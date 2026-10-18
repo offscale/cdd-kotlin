@@ -1,3 +1,4 @@
+/** Unit and integration tests in [SyncGeneratorTest]. */
 package psi
 
 import java.io.File

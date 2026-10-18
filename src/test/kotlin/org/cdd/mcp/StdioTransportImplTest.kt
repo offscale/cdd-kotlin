@@ -1,3 +1,4 @@
+/** Unit and integration tests in [StdioTransportImplTest]. */
 package org.cdd.mcp
 
 import kotlinx.serialization.json.Json

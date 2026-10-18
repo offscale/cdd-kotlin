@@ -1,3 +1,4 @@
+/** Unit and integration tests in [JsonRpcTest]. */
 package org.cdd.mcp
 
 import kotlinx.serialization.json.JsonNull

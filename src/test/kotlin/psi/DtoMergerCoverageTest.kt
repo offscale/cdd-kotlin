@@ -1,3 +1,4 @@
+/** Unit and integration tests in [DtoMergerCoverageTest]. */
 package psi
 
 import domain.SchemaDefinition

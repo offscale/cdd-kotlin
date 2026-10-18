@@ -99,7 +99,7 @@ fun buildDynamicAnchorScope(root: SchemaProperty): DynamicAnchorScope {
   val scopeBySchema = LinkedHashMap<IdentityKey<SchemaProperty>, List<DynamicAnchorResource>>()
   val resourceCache = LinkedHashMap<IdentityKey<SchemaProperty>, DynamicAnchorResource>()
 
-  /** Local helper doc */
+  /** @param node Schema node to compute dynamic anchors for. */
   fun resourceFor(node: SchemaProperty): DynamicAnchorResource {
     val key = IdentityKey(node)
     return resourceCache[key]
@@ -112,7 +112,10 @@ fun buildDynamicAnchorScope(root: SchemaProperty): DynamicAnchorScope {
         }
   }
 
-  /** Local helper doc */
+  /**
+   * @param node Current schema node.
+   * @param stack Active dynamic anchor resource stack.
+   */
   fun traverse(node: SchemaProperty, stack: List<DynamicAnchorResource>) {
     val isNewResource = !node.schemaId.isNullOrBlank()
     val nextStack =

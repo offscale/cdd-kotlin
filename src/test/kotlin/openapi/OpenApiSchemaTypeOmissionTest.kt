@@ -1,3 +1,4 @@
+/** Unit and integration tests in [OpenApiSchemaTypeOmissionTest]. */
 package openapi
 
 import com.fasterxml.jackson.core.JsonFactory

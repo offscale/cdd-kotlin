@@ -26,6 +26,9 @@ object TypeMappers {
    * number, boolean, array. Handles Dual Types (["string", "null"]) as Nullable Kotlin types.
    * Handles Binary Data (base64 encoded strings) as ByteArray. Resolves references via
    * [ReferenceResolver].
+   *
+   * @param prop The [SchemaProperty] to map.
+   * @return The mapped Kotlin type string.
    */
   fun mapType(prop: SchemaProperty): String {
     return mapType(prop, null)
@@ -35,7 +38,9 @@ object TypeMappers {
    * Maps an OpenAPI Schema Property to a Kotlin type string, with optional dynamic reference
    * resolution support.
    *
+   * @param prop The [SchemaProperty] to map.
    * @param dynamicRefResolver Optional resolver for `$dynamicRef` targets, scoped to the property.
+   * @return The mapped Kotlin type string.
    */
   fun mapType(
       prop: SchemaProperty,
@@ -202,6 +207,9 @@ object TypeMappers {
    * Maps a Kotlin type string (PSI representation) back to an OpenAPI Schema Property. e.g.
    * "List<String>?" -> types: ["array", "null"], items: { types: ["string"] } e.g. "ByteArray" ->
    * types: ["string"], contentEncoding: "base64" (OAS 3.1 style)
+   *
+   * @param typeString The Kotlin type string to reverse-map.
+   * @return The reconstructed [SchemaProperty].
    */
   fun kotlinToSchemaProperty(typeString: String): SchemaProperty {
     val isNullable = typeString.contains("?")
