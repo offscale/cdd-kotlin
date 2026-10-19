@@ -1,6 +1,9 @@
 @echo off
 setlocal enabledelayedexpansion
 
+if "%~1"=="deps" goto install_deps
+if "%~1"=="build" goto build
+if "%~1"=="test" goto test
 if "%~1"=="build_wasm" goto build_wasm
 if "%~1"=="run" goto run
 if "%~1"=="install_deps" goto install_deps
@@ -10,8 +13,16 @@ echo Unknown target %1
 exit /b 1
 
 :help
-echo Available targets: build_wasm, run, install_deps
+echo Available targets: deps, build, test, build_wasm, run, install_deps
 exit /b 0
+
+:build
+python scripts\run_with_fallback.py gradle assemble
+exit /b %ERRORLEVEL%
+
+:test
+python scripts\run_with_fallback.py gradle check
+exit /b %ERRORLEVEL%
 
 :build_wasm
 python scripts\run_with_fallback.py gradle --gradle-user-home .gradle_home assemble

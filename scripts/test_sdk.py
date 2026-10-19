@@ -4,12 +4,15 @@ import os
 import shutil
 import subprocess
 
+
 def main():
     if len(sys.argv) < 2:
         sys.exit("Usage: test_sdk.py <spec_file> [base_path]")
 
     spec_file = sys.argv[1]
-    if ("stripe.json" in spec_file or "mega_spec.json" in spec_file) and os.environ.get("RUN_SLOW_TESTS") != "1":
+    if ("stripe.json" in spec_file or "mega_spec.json" in spec_file) and os.environ.get(
+        "RUN_SLOW_TESTS"
+    ) != "1":
         print(f"Skipping slow test for {spec_file} because RUN_SLOW_TESTS is not 1")
         sys.exit(0)
 
@@ -22,7 +25,13 @@ def main():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     run_with_fallback = os.path.join(script_dir, "run_with_fallback.py")
 
-    cmd_generate = [sys.executable, run_with_fallback, "gradle", "run", f"--args=from_openapi to_sdk -i {spec_file} --output {out_dir} --tests"]
+    cmd_generate = [
+        sys.executable,
+        run_with_fallback,
+        "gradle",
+        "run",
+        f"--args=from_openapi to_sdk -i {spec_file} --output {out_dir} --tests",
+    ]
     if subprocess.run(cmd_generate).returncode != 0:
         sys.exit("Failed to generate SDK.")
 
@@ -31,7 +40,7 @@ def main():
     android_home = os.environ.get("ANDROID_HOME")
     home = os.path.expanduser("~")
     mac_sdk = os.path.join(home, "Library", "Android", "sdk")
-    
+
     if os.path.isdir(mac_sdk):
         with open("local.properties", "w") as f:
             f.write(f"sdk.dir={mac_sdk}\n")
@@ -42,6 +51,7 @@ def main():
     cmd_test = [sys.executable, run_with_fallback, "gradle", "allTests"]
     if subprocess.run(cmd_test).returncode != 0:
         sys.exit("Tests failed!")
+
 
 if __name__ == "__main__":
     main()

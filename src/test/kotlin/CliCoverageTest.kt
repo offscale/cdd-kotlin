@@ -155,16 +155,38 @@ class CliCoverageTest {
 
   @Test
   fun testCliMainHelp() {
-    val args = arrayOf("--help")
-    val exitCode = runCli(args)
-    assertEquals(0, exitCode)
+    val helpInvocations =
+        listOf(
+            arrayOf("--help"),
+            arrayOf("-h"),
+            arrayOf("from_openapi", "--help"),
+            arrayOf("from_openapi", "to_sdk", "--help"),
+            arrayOf("from_openapi", "to_sdk_cli", "--help"),
+            arrayOf("from_openapi", "to_server", "--help"),
+            arrayOf("to_sdk", "--help"),
+            arrayOf("to_sdk_cli", "--help"),
+            arrayOf("to_server", "--help"),
+            arrayOf("to_openapi", "--help"),
+            arrayOf("from_arazzo", "--help"),
+            arrayOf("from_arazzo", "to_sdk", "--help"),
+            arrayOf("from_arazzo", "to_sdk_cli", "--help"),
+            arrayOf("from_arazzo", "to_server", "--help"),
+            arrayOf("to_arazzo", "--help"),
+            arrayOf("sync", "--help"),
+            arrayOf("to_docs_json", "--help"),
+            arrayOf("serve_json_rpc", "--help"),
+            arrayOf("mcp", "--help"),
+            arrayOf("demo", "--help"),
+            arrayOf("unknown", "--help"))
+    for (args in helpInvocations) {
+      assertEquals(0, runCli(args))
+    }
   }
 
   @Test
   fun testCliMainVersion() {
-    val args = arrayOf("--version")
-    val exitCode = runCli(args)
-    assertEquals(0, exitCode)
+    assertEquals(0, runCli(arrayOf("--version")))
+    assertEquals(0, runCli(arrayOf("-v")))
   }
 
   @Test

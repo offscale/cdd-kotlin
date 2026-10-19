@@ -3,7 +3,15 @@ build_wasm:
 	mkdir -p bin
 	cp build/compileSync/wasmWasi/main/productionExecutable/optimized/cdd-kotlin.wasm bin/cdd-kotlin.wasm
 
-.PHONY: run install_deps
+.PHONY: deps build test run install_deps
+deps: install_deps
+
+build:
+	python3 scripts/run_with_fallback.py gradle assemble
+
+test:
+	python3 scripts/run_with_fallback.py gradle check
+
 run:
 	python3 scripts/run_with_fallback.py gradle run "--args=$(filter-out $@,$(MAKECMDGOALS))"
 
