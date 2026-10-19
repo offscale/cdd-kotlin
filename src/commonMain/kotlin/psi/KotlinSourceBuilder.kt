@@ -74,14 +74,15 @@ fun decapitalizeName(name: String): String =
  */
 fun filterModelSchemas(schemas: List<SchemaDefinition>): List<SchemaDefinition> {
   return schemas.filter {
-    it.type == "object" &&
+    it.booleanSchema == null &&
+        it.ref == null &&
+        it.type == "object" &&
         it.enumValues == null &&
         it.anyOf.isEmpty() &&
         it.oneOf.isEmpty() &&
         it.anyOfSchemas.isEmpty() &&
         it.oneOfSchemas.isEmpty() &&
-        !it.safeName.contains("ExternalAccount") &&
-        !it.safeName.contains("PaymentSource")
+        !(it.properties.isEmpty() && it.additionalProperties != null)
   }
 }
 

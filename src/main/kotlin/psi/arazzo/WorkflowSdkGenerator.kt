@@ -14,6 +14,7 @@ import domain.SchemaProperty
 import domain.StepObject
 import domain.SuccessActionType
 import domain.Workflow
+import domain.mapResult
 import org.jetbrains.kotlin.psi.KtFile
 import psi.PsiInfrastructure
 import psi.TypeMappers
@@ -63,15 +64,15 @@ object WorkflowSdkGenerator {
   fun generateWorkflowSdkKtFilesResult(
       packageName: String,
       definition: ArazzoDefinition
-  ): Result<Map<String, KtFile>> {
-    val sources = generateWorkflowSdkSourcesResult(packageName, definition).getOrThrow()
-    val factory = PsiInfrastructure.createPsiFactory()
-    val ktFiles = LinkedHashMap<String, KtFile>()
-    for ((name, src) in sources) {
-      ktFiles[name] = factory.createFile(name, src)
-    }
-    return Result.success(ktFiles)
-  }
+  ): Result<Map<String, KtFile>> =
+      generateWorkflowSdkSourcesResult(packageName, definition).mapResult { sources ->
+        val factory = PsiInfrastructure.createPsiFactory()
+        val ktFiles = LinkedHashMap<String, KtFile>()
+        for ((name, src) in sources) {
+          ktFiles[name] = factory.createFile(name, src)
+        }
+        ktFiles
+      }
 
   /**
    * Generates `WorkflowModels.kt` containing `@Serializable` input and output data classes for

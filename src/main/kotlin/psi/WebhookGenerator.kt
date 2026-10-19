@@ -11,8 +11,10 @@ class WebhookGenerator {
    *
    * @param packageName The package namespace.
    * @param schemas The schemas (for type context if needed).
+   * @return The generated Webhook module Kotlin source code.
    */
   fun generateWebhookModule(packageName: String, schemas: List<SchemaDefinition>): String {
+    val registeredEvents = schemas.joinToString(", ") { "\"${it.safeName}\"" }
     return buildKotlinFile("$packageName.webhooks") {
       import(
           "io.ktor.client.HttpClient",
@@ -31,7 +33,7 @@ class WebhookGenerator {
           "kotlinx.coroutines.launch")
       kdoc("Routes for the Administrative Webhook Triggers.")
       block("fun Route.webhookRoutes()") {
-        line("val client = HttpClient(CIO)")
+        line("val registeredWebhookSchemas = listOf<String>($registeredEvents)")
         line()
         block("route(\"/_mock/trigger-webhook\")") {
           block("post(\"/{webhookName}\")") {
@@ -45,11 +47,15 @@ class WebhookGenerator {
             line()
             line("// Fire and forget the webhook payload")
             block("launch") {
-              block("client.post(targetUrl)") {
-                line("contentType(ContentType.Application.Json)")
-                line(
-                    "setBody(\"\"\"{\\\"event\\\": \\\"\$webhookName\\\", \\\"timestamp\\\": 123456789}\"\"\")")
+              line("val client = HttpClient(CIO)")
+              block("try") {
+                block("client.post(targetUrl)") {
+                  line("contentType(ContentType.Application.Json)")
+                  line(
+                      "setBody(\"\"\"{\\\"event\\\": \\\"\$webhookName\\\", \\\"registered\\\": \${registeredWebhookSchemas.contains(webhookName)}, \\\"timestamp\\\": 123456789}\"\"\")")
+                }
               }
+              block("finally") { line("client.close()") }
             }
             line(
                 "call.respondText(\"Webhook dispatched to \$targetUrl\", status = HttpStatusCode.Accepted)")

@@ -62,8 +62,8 @@ class MainTest {
         """
             .trimIndent()
     // In the default Node WASI test runner without preopened directories, writeToFile returns a
-    // FileIoError failure Result rather(than throwing).
-    val sdkRes = generateArazzoSdkCode(validArazzo, "wasm_arazzo_out", "org.example", true)
-    assertTrue(sdkRes.isSuccess || sdkRes.isFailure)
+    // FileIoError failure Result rather than throwing.
+    val sdkRes = generateArazzoSdkCode(validArazzo, "/unmounted_wasi_dir/out", "org.example", true)
+    assertTrue(sdkRes.isFailure)
   }
 }

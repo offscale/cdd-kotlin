@@ -222,6 +222,10 @@ object McpClientGenerator {
                 private val router: McpExecutionRouter = McpExecutionRouter(),
                 private val authBridge: McpAuthBridge = McpAuthBridge()
             ) {
+              /** Most recent bridged `Authorization` header value. */
+              var lastAuthorizationHeader: String = ""
+                private set
+
               /**
                * Executes a proxied request for [toolName].
                *
@@ -230,7 +234,7 @@ object McpClientGenerator {
                * @return True if the proxy call is permitted and routed.
                */
               fun proxy(toolName: String = "", token: String? = null): Boolean {
-                authBridge.bridge(token)
+                lastAuthorizationHeader = authBridge.bridge(token)
                 return router.route(toolName)
               }
             }

@@ -41,13 +41,14 @@ class UiGenerator {
 
     val stateDefinitions =
         schema.properties.entries.joinToString("\n    ") { (name, prop) ->
-          val stateInit = "initialState?.$name"
+          val safeName = escapeKotlinKeyword(name)
+          val stateInit = "initialState?.$safeName"
           val isBool = isBoolean(prop)
           val isString = prop.types.contains("string")
           val fallback = if (isBool) "false" else "\"\""
           val conversion = if (isBool || isString) "" else ".toString()"
 
-          "var $name by remember { mutableStateOf($stateInit$conversion ?: $fallback) }"
+          "var $safeName by remember { mutableStateOf($stateInit$conversion ?: $fallback) }"
         }
 
     val inputFields =
@@ -58,19 +59,20 @@ class UiGenerator {
     val constructorArgs =
         schema.properties.entries.joinToString(",\n                                    ") {
             (name, prop) ->
+          val safeName = escapeKotlinKeyword(name)
           val isInt = prop.types.contains("integer")
           val isNum = prop.types.contains("number")
           val isBool = prop.types.contains("boolean")
 
           val value =
               when {
-                isInt && prop.format == "int64" -> "$name.toLongOrNull() ?: 0L"
-                isInt -> "$name.toIntOrNull() ?: 0"
-                isNum -> "$name.toDoubleOrNull() ?: 0.0"
-                isBool -> name
-                else -> name
+                isInt && prop.format == "int64" -> "$safeName.toLongOrNull() ?: 0L"
+                isInt -> "$safeName.toIntOrNull() ?: 0"
+                isNum -> "$safeName.toDoubleOrNull() ?: 0.0"
+                isBool -> safeName
+                else -> safeName
               }
-          "$name = $value"
+          "$safeName = $value"
         }
 
     val content =
@@ -168,10 +170,11 @@ class UiGenerator {
     val rowCells =
         validProps
             .map { (name, prop) ->
+              val safeName = escapeKotlinKeyword(name)
               val displayCode =
                   when {
-                    prop.types.contains("array") -> "item.$name.joinToString(\", \")"
-                    else -> "item.$name.toString()"
+                    prop.types.contains("array") -> "item.$safeName.joinToString(\", \")"
+                    else -> "item.$safeName.toString()"
                   }
               """ 
             Text( 
@@ -187,7 +190,8 @@ class UiGenerator {
         validProps
             .mapNotNull { (name, prop) ->
               if (prop.types.contains("array")) return@mapNotNull null
-              "\"$name\" -> sorted.sortedBy { it.$name }"
+              val safeName = escapeKotlinKeyword(name)
+              "\"$name\" -> sorted.sortedBy { it.$safeName }"
             }
             .joinToString("\n                        ")
 
@@ -281,11 +285,13 @@ class UiGenerator {
             @Composable
             fun $screenName(api: $apiClassName) { 
                 var items by remember { mutableStateOf<List<$modelName>>(emptyList()) } 
+                var selectedItem by remember { mutableStateOf<$modelName?>(null) }
                 var isLoading by remember { mutableStateOf(true) } 
                 var error by remember { mutableStateOf<String?>(null) } 
+                var retryCount by remember { mutableStateOf(0) }
                 
                 // Fetch Data Effect
-                LaunchedEffect(Unit) { 
+                LaunchedEffect(Unit, retryCount) { 
                     api.$listOperationId().fold(
                         onSuccess = { 
                             items = it
@@ -309,7 +315,7 @@ class UiGenerator {
                                 Button(onClick = { 
                                     isLoading = true
                                     error = null
-                                    // Retry logic would go here
+                                    retryCount++
                                 }) { 
                                     Text("Retry") 
                                 } 
@@ -318,7 +324,7 @@ class UiGenerator {
                         else -> { 
                             $gridName( 
                                 items = items, 
-                                onItemClick = { /* Handle Click */ } 
+                                onItemClick = { selectedItem = it } 
                             ) 
                         } 
                     } 
@@ -332,6 +338,7 @@ class UiGenerator {
 
   private fun generateInput(name: String, prop: SchemaProperty, isRequired: Boolean): String {
     val label = capitalizeName(name)
+    val safeName = escapeKotlinKeyword(name)
     val modifier = "Modifier.fillMaxWidth()"
 
     return when {
@@ -339,8 +346,8 @@ class UiGenerator {
           """ 
                 Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { 
                     Checkbox( 
-                        checked = $name, 
-                        onCheckedChange = { $name = it } 
+                        checked = $safeName, 
+                        onCheckedChange = { $safeName = it } 
                     ) 
                     Text("$label") 
                 } 
@@ -349,8 +356,8 @@ class UiGenerator {
       prop.types.any { it == "integer" || it == "number" } ->
           """ 
                 OutlinedTextField( 
-                    value = $name, 
-                    onValueChange = { $name = it }, 
+                    value = $safeName, 
+                    onValueChange = { $safeName = it }, 
                     label = { Text("$label") }, 
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
                     modifier = $modifier, 
@@ -362,8 +369,8 @@ class UiGenerator {
         val requiredMarker = if (isRequired) "*" else ""
         """ 
                 OutlinedTextField( 
-                    value = $name, 
-                    onValueChange = { $name = it }, 
+                    value = $safeName, 
+                    onValueChange = { $safeName = it }, 
                     label = { Text("$label$requiredMarker") }, 
                     modifier = $modifier, 
                     singleLine = true

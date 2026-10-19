@@ -3,6 +3,7 @@
  * OpenAPI generation, SDK/server code generation, and synchronization.
  */
 import domain.CddError
+import domain.flatMapResult
 import domain.toFailure
 import java.io.File
 
@@ -255,25 +256,26 @@ actual fun generateArazzoSdkCode(
         return Result.failure(it)
       }
   val pkgPath = packageName.replace(".", "/")
-  val sdkFiles =
-      psi.arazzo.WorkflowSdkGenerator.generateWorkflowSdkSourcesResult(packageName, definition)
-          .getOrThrow()
-  for ((fileName, src) in sdkFiles) {
-    writeToFile("$outputDir/composeApp/src/commonMain/kotlin/$pkgPath/workflows/$fileName", src)
-        .getOrElse {
-          return Result.failure(it)
+  return psi.arazzo.WorkflowSdkGenerator.generateWorkflowSdkSourcesResult(packageName, definition)
+      .flatMapResult { sdkFiles ->
+        for ((fileName, src) in sdkFiles) {
+          writeToFile(
+                  "$outputDir/composeApp/src/commonMain/kotlin/$pkgPath/workflows/$fileName", src)
+              .getOrElse {
+                return@flatMapResult Result.failure(it)
+              }
         }
-  }
-  if (includeCli) {
-    val cliSrc =
-        psi.arazzo.WorkflowCliGenerator.generateWorkflowCliSourceResult(packageName, definition)
-            .getOrThrow()
-    writeToFile("$outputDir/composeApp/src/commonMain/kotlin/$pkgPath/cli/WorkflowCli.kt", cliSrc)
-        .getOrElse {
-          return Result.failure(it)
+        if (includeCli) {
+          psi.arazzo.WorkflowCliGenerator.generateWorkflowCliSourceResult(packageName, definition)
+              .flatMapResult { cliSrc ->
+                writeToFile(
+                    "$outputDir/composeApp/src/commonMain/kotlin/$pkgPath/cli/WorkflowCli.kt",
+                    cliSrc)
+              }
+        } else {
+          Result.success(Unit)
         }
-  }
-  return Result.success(Unit)
+      }
 }
 
 /**
@@ -297,25 +299,26 @@ actual fun generateArazzoServerCode(
         return Result.failure(it)
       }
   val pkgPath = packageName.replace(".", "/")
-  val serverFiles =
-      psi.arazzo.WorkflowServerGenerator.generateWorkflowServerSourcesResult(
-              packageName, definition)
-          .getOrThrow()
-  for ((fileName, src) in serverFiles) {
-    val targetPath =
-        when (fileName) {
-          "WorkflowE2ETest.kt" ->
-              if (withTests) "$outputDir/server/src/test/kotlin/$pkgPath/server/$fileName" else null
-          "WorkflowModels.kt",
-          "WorkflowOrchestrator.kt" ->
-              "$outputDir/server/src/main/kotlin/$pkgPath/workflows/$fileName"
-          else -> "$outputDir/server/src/main/kotlin/$pkgPath/server/$fileName"
+  return psi.arazzo.WorkflowServerGenerator.generateWorkflowServerSourcesResult(
+          packageName, definition)
+      .flatMapResult { serverFiles ->
+        for ((fileName, src) in serverFiles) {
+          val targetPath =
+              when (fileName) {
+                "WorkflowE2ETest.kt" ->
+                    if (withTests) "$outputDir/server/src/test/kotlin/$pkgPath/server/$fileName"
+                    else null
+                "WorkflowModels.kt",
+                "WorkflowOrchestrator.kt" ->
+                    "$outputDir/server/src/main/kotlin/$pkgPath/workflows/$fileName"
+                else -> "$outputDir/server/src/main/kotlin/$pkgPath/server/$fileName"
+              }
+          if (targetPath != null) {
+            writeToFile(targetPath, src).getOrElse {
+              return@flatMapResult Result.failure(it)
+            }
+          }
         }
-    if (targetPath != null) {
-      writeToFile(targetPath, src).getOrElse {
-        return Result.failure(it)
+        Result.success(Unit)
       }
-    }
-  }
-  return Result.success(Unit)
 }

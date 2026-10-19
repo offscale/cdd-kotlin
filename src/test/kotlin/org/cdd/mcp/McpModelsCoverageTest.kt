@@ -51,7 +51,12 @@ class McpModelsCoverageTest {
     val encodedAltCompact = jsonCompact.encodeToString(serializer, alternate)
     assertEquals(alternate, jsonCompact.decodeFromString(serializer, encodedAltCompact))
 
-    runCatching { jsonCompact.decodeFromString(serializer, "{}") }
+    val emptyObjResult = runCatching { jsonCompact.decodeFromString(serializer, "{}") }
+    if (emptyObjResult.isSuccess) {
+      assertEquals(primary, emptyObjResult.getOrThrow())
+    } else {
+      assertTrue(emptyObjResult.exceptionOrNull() is kotlinx.serialization.SerializationException)
+    }
 
     assertEquals(primary, duplicate)
     assertEquals(primary.hashCode(), duplicate.hashCode())

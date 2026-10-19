@@ -11,6 +11,7 @@ class SeederTestGenerator {
    *
    * @param packageName The package namespace.
    * @param schemas The list of schemas.
+   * @return The generated DatabaseSeederTest Kotlin source code.
    */
   fun generateSeederTestModule(packageName: String, schemas: List<SchemaDefinition>): String {
     val modelSchemas = filterModelSchemas(schemas)

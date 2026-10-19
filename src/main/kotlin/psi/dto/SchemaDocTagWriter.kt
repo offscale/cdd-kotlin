@@ -371,20 +371,21 @@ object SchemaDocTagWriter {
   }
 
   /**
-   * Converts a [SchemaProperty] into its JSON-serializable KDoc tag value representation.
+   * Converts a [SchemaProperty] into its strongly-typed [OpenApiValue] KDoc tag value
+   * representation.
    *
    * @param schema The schema property to convert.
-   * @return The serializable Boolean or Map representation.
+   * @return The [OpenApiBoolean] or [OpenApiObject] representation.
    */
-  fun schemaPropertyToDocValue(schema: SchemaProperty): Any {
+  fun schemaPropertyToDocValue(schema: SchemaProperty): OpenApiValue {
     schema.booleanSchema?.let {
-      return it
+      return OpenApiBoolean(it)
     }
     schema.ref?.let {
-      return mapOf("\$ref" to it)
+      return OpenApiObject(mapOf("\$ref" to OpenApiString(it)))
     }
     schema.dynamicRef?.let {
-      return mapOf("\$dynamicRef" to it)
+      return OpenApiObject(mapOf("\$dynamicRef" to OpenApiString(it)))
     }
 
     val map = linkedMapOf<String, Any?>()
@@ -494,7 +495,7 @@ object SchemaDocTagWriter {
     }
     map.putExtensions(schema.extensions)
 
-    return map
+    return OpenApiValues.fromAny(map)
   }
 
   private fun MutableMap<String, Any?>.putExtensions(extensions: Map<String, OpenApiValue>) {

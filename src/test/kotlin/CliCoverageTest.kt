@@ -90,9 +90,15 @@ class CliCoverageTest {
 
   @Test
   fun testCliDemo() {
-    val args = arrayOf("demo")
-    val exitCode = runCli(args)
-    assertEquals(0, exitCode)
+    val outDir = Files.createTempDirectory("test_demo_out").toFile()
+    try {
+      val args = arrayOf("demo", "-o", outDir.absolutePath)
+      val exitCode = runCli(args)
+      assertEquals(0, exitCode)
+      assertTrue(File(outDir, "build.gradle.kts").exists())
+    } finally {
+      outDir.deleteRecursively()
+    }
   }
 
   @Test
@@ -126,24 +132,33 @@ class CliCoverageTest {
   @Test
   fun testCliToOpenApi() {
     val outDir = Files.createTempDirectory("test_openapi").toFile()
-    val outFile = File(outDir, "out.json")
-    val args =
-        arrayOf(
-            "to_openapi", "-i", "src/test/kotlin/CliCoverageTest.kt", "-o", outFile.absolutePath)
-    val exitCode = runCli(args)
-    // Might fail depending on logic, but covers lines
-    assertTrue(exitCode >= 0)
-    outDir.deleteRecursively()
+    try {
+      File(outDir, "Sample.kt")
+          .writeText("package org.example.models\ndata class Sample(val id: String)")
+      val outFile = File(outDir, "out.json")
+      val args = arrayOf("to_openapi", "-i", outDir.absolutePath, "-o", outFile.absolutePath)
+      val exitCode = runCli(args)
+      assertEquals(0, exitCode)
+      assertTrue(outFile.exists())
+      assertTrue(outFile.readText().contains("Sample"))
+    } finally {
+      outDir.deleteRecursively()
+    }
   }
 
   @Test
   fun testCliSync() {
     val outDir = Files.createTempDirectory("test_sync").toFile()
-    val args =
-        arrayOf("sync", "-i", "src/test/kotlin/CliCoverageTest.kt", "-o", outDir.absolutePath)
-    val exitCode = runCli(args)
-    assertTrue(exitCode >= 0)
-    outDir.deleteRecursively()
+    try {
+      File(outDir, "Sample.kt")
+          .writeText("package org.example.models\ndata class Sample(val id: Int)")
+      val exitCode = runCli(arrayOf("sync", "--truth", "class", "-i", outDir.absolutePath))
+      assertEquals(0, exitCode)
+      assertTrue(File(outDir, "dao/SampleDao.kt").exists())
+      assertTrue(File(outDir, "openapi_sync.json").exists())
+    } finally {
+      outDir.deleteRecursively()
+    }
   }
 
   @Test
@@ -198,75 +213,98 @@ class CliCoverageTest {
 
   @Test
   fun testMainWrapper() {
-    // test main(args: Array<String>) function directly
+    val origOut = System.out
     val out = ByteArrayOutputStream()
     System.setOut(PrintStream(out))
     try {
       main(arrayOf("--help"))
-    } catch (e: Exception) {}
-    System.setOut(System.out)
+      assertTrue(out.toString().contains("Usage:"))
+    } finally {
+      System.setOut(origOut)
+    }
   }
 
   @Test
   fun testCliToSdkMega() {
     val outDir = Files.createTempDirectory("test_sdk_mega").toFile()
-    val args =
-        arrayOf(
-            "from_openapi",
-            "to_sdk",
-            "-i",
-            "src/test/resources/mega_spec.json",
-            "-o",
-            outDir.absolutePath)
-    val exitCode = runCli(args)
-    assertEquals(0, exitCode)
-    outDir.deleteRecursively()
+    try {
+      val args =
+          arrayOf(
+              "from_openapi",
+              "to_sdk_cli",
+              "-i",
+              "src/test/resources/mega_spec.json",
+              "-o",
+              outDir.absolutePath,
+              "--no-github-actions")
+      val exitCode = runCli(args)
+      assertEquals(0, exitCode)
+      assertTrue(
+          File(outDir, "composeApp/src/commonMain/kotlin/org/example/cli/ApiCli.kt").exists())
+    } finally {
+      outDir.deleteRecursively()
+    }
   }
 
   @Test
   fun testCliToServerMega() {
     val outDir = Files.createTempDirectory("test_server_mega").toFile()
-    val args =
-        arrayOf(
-            "from_openapi",
-            "to_server",
-            "-i",
-            "src/test/resources/mega_spec.json",
-            "-o",
-            outDir.absolutePath)
-    val exitCode = runCli(args)
-    assertEquals(0, exitCode)
-    outDir.deleteRecursively()
+    try {
+      val args =
+          arrayOf(
+              "from_openapi",
+              "to_server",
+              "-i",
+              "src/test/resources/mega_spec.json",
+              "-o",
+              outDir.absolutePath,
+              "--no-github-actions")
+      val exitCode = runCli(args)
+      assertEquals(0, exitCode)
+      assertTrue(File(outDir, "server/src/main/kotlin/org/example/Main.kt").exists())
+    } finally {
+      outDir.deleteRecursively()
+    }
   }
 
   @Test
   fun testCliToSdkStripe() {
     val outDir = Files.createTempDirectory("test_sdk_stripe").toFile()
-    val args =
-        arrayOf(
-            "from_openapi",
-            "to_sdk",
-            "-i",
-            "src/test/resources/stripe.json",
-            "-o",
-            outDir.absolutePath)
-    runCli(args)
-    outDir.deleteRecursively()
+    try {
+      val args =
+          arrayOf(
+              "from_openapi",
+              "to_sdk",
+              "-i",
+              "src/test/resources/stripe.json",
+              "-o",
+              outDir.absolutePath)
+      val exitCode = runCli(args)
+      assertEquals(0, exitCode)
+      assertTrue(File(outDir, "build.gradle.kts").exists())
+    } finally {
+      outDir.deleteRecursively()
+    }
   }
 
   @Test
   fun testCliToServerStripe() {
     val outDir = Files.createTempDirectory("test_server_stripe").toFile()
-    val args =
-        arrayOf(
-            "from_openapi",
-            "to_server",
-            "-i",
-            "src/test/resources/stripe.json",
-            "-o",
-            outDir.absolutePath)
-    runCli(args)
-    outDir.deleteRecursively()
+    try {
+      val args =
+          arrayOf(
+              "from_openapi",
+              "to_server",
+              "-i",
+              "src/test/resources/stripe.json",
+              "-o",
+              outDir.absolutePath)
+      val exitCode = runCli(args)
+      assertEquals(0, exitCode)
+      assertTrue(File(outDir, "server/src/main/kotlin/org/example/Main.kt").exists())
+    } finally {
+      outDir.deleteRecursively()
+    }
   }
 
   @Test
@@ -318,7 +356,8 @@ class CliCoverageTest {
       val sdkSchemaDir = File(outDir, "sdk_schema")
       org.cdd.CddGenerator.generateSdk(
           org.cdd.Config(
-              inputPath = standaloneSchemaFile.absolutePath, outputDir = sdkSchemaDir.absolutePath))
+              inputPath = standaloneSchemaFile.absolutePath, outputDir = sdkSchemaDir.absolutePath),
+          includeCli = true)
       assertTrue(File(sdkSchemaDir, "build.gradle.kts").exists())
 
       val srvSchemaDir = File(outDir, "srv_schema")
@@ -337,6 +376,10 @@ class CliCoverageTest {
           org.cdd.SyncCli.sync(arrayOf("sync", "--truth", "dao", "-i", sdkSchemaDir.absolutePath)))
       assertEquals(
           0,
+          org.cdd.SyncCli.sync(
+              arrayOf("sync", "--truth", "openapi", "--input-dir", sdkSchemaDir.absolutePath)))
+      assertEquals(
+          1,
           org.cdd.SyncCli.sync(
               arrayOf("sync", "--truth", "other", "--input-dir", sdkSchemaDir.absolutePath)))
       assertEquals(
@@ -544,9 +587,14 @@ class CliCoverageTest {
               """{"jsonrpc":"2.0","id":"8","method":"tools/cdd_sync_schema","params":{}}""",
               """{"jsonrpc":"2.0","id":"8b","method":"tools/cdd_sync_schema","params":[1]}""",
               """{"jsonrpc":"2.0","id":"8c","method":"tools/cdd_sync_schema","params":{"inputDir":"   "}}""",
-              """{"jsonrpc":"2.0","id":"9","method":"resources/ast_query","params":{"query":"User"}}""",
+              """{"jsonrpc":"2.0","id":"9","method":"resources/ast_query","params":{"query":"U","spec":${kotlinx.serialization.json.JsonPrimitive(oasSpec)}}}""",
+              """{"jsonrpc":"2.0","id":"9b","method":"resources/ast_query","params":{"query":"*","spec":${kotlinx.serialization.json.JsonPrimitive(oasSpec)}}}""",
+              """{"jsonrpc":"2.0","id":"9c","method":"resources/ast_query","params":{"query":"Other","spec":${kotlinx.serialization.json.JsonPrimitive(oasSpec)}}}""",
+              """{"jsonrpc":"2.0","id":"9d","method":"resources/ast_query","params":{"query":"U","spec":${kotlinx.serialization.json.JsonPrimitive("""{"openapi":"3.2.0","info":{"title":"T","version":"1"}}""")}}}""",
+              """{"jsonrpc":"2.0","id":"9e","method":"resources/ast_query","params":{"query":"U","spec":${kotlinx.serialization.json.JsonPrimitive(schemaOnlySpec)}}}""",
               """{"jsonrpc":"2.0","id":"10","method":"resources/ast_query","params":{}}""",
               """{"jsonrpc":"2.0","id":"10b","method":"resources/ast_query","params":[1]}""",
+              """{"jsonrpc":"2.0","id":"10c","method":"resources/ast_query","params":{"spec":"   "}}""",
               """{"jsonrpc":"2.0","id":"11","method":"router/in_memory_generation","params":{"spec":${kotlinx.serialization.json.JsonPrimitive(oasSpec)}}}""",
               """{"jsonrpc":"2.0","id":"11b","method":"router/in_memory_generation","params":{"spec":${kotlinx.serialization.json.JsonPrimitive(schemaOnlySpec)}}}""",
               """{"jsonrpc":"2.0","id":"12","method":"router/in_memory_generation","params":{}}""",
@@ -554,7 +602,7 @@ class CliCoverageTest {
               """{"jsonrpc":"2.0","id":"12c","method":"router/in_memory_generation","params":{"spec":"   "}}""")) {
         dummyTransport.simulateReceive(kotlinx.serialization.json.Json.parseToJsonElement(msg))
       }
-      assertEquals(23, dummyTransport.sentMessages.size)
+      assertEquals(28, dummyTransport.sentMessages.size)
 
       // Additional Main.kt, SyncCli.kt, CddGenerator.kt, CddCli.kt, PlatformJvm.kt,
       // ScaffoldTemplates.kt branches
@@ -600,13 +648,27 @@ class CliCoverageTest {
       generateSdkCode(minimalSpec, minOutDir.absolutePath, "org.min")
       generateServerCode(minimalSpec, minOutDir.absolutePath, "org.min", false)
 
-      // SyncCli trailing flags and CDD_INPUT_DIR env property
+      // SyncCli trailing flags and CDD_INPUT_DIR / CDD_TRUTH env properties
       System.setProperty("CDD_INPUT_DIR", sdkSchemaDir.absolutePath)
       try {
+        System.setProperty("CDD_TRUTH", "class")
+        assertEquals(0, org.cdd.SyncCli.sync(arrayOf("sync")))
+        System.clearProperty("CDD_TRUTH")
         assertEquals(1, org.cdd.SyncCli.sync(arrayOf("sync", "--truth")))
         assertEquals(0, org.cdd.SyncCli.sync(arrayOf("sync", "--truth", "dao", "--unknown", "-i")))
       } finally {
+        System.clearProperty("CDD_TRUTH")
         System.clearProperty("CDD_INPUT_DIR")
+      }
+      System.setProperty("CDD_OUTPUT", File(outDir, "demo_env_out").absolutePath)
+      try {
+        assertEquals(0, org.cdd.CddCli.generateDemo(arrayOf("demo", "--flag", "-o")))
+        assertEquals(
+            0,
+            org.cdd.CddCli.generateDemo(
+                arrayOf("demo", "--output", File(outDir, "demo_explicit_out").absolutePath)))
+      } finally {
+        System.clearProperty("CDD_OUTPUT")
       }
 
       // CddGenerator server without installable package
@@ -636,7 +698,12 @@ class CliCoverageTest {
         assertEquals(
             0,
             org.cdd.CddCli.generateFromOpenApi(
-                arrayOf("to_sdk", "--unknown", "-o", "-i", "--input-dir")))
+                arrayOf(
+                    "to_sdk",
+                    "--unknown",
+                    "-o",
+                    File(outDir, "env_out").absolutePath,
+                    "--input-dir")))
         assertEquals(0, org.cdd.CddCli.generateFromOpenApi(arrayOf("to_sdk", "-o")))
         assertEquals(0, org.cdd.CddCli.generateFromOpenApi(arrayOf("to_sdk", "-i")))
         assertEquals(0, org.cdd.CddCli.generateFromOpenApi(arrayOf("to_sdk", "--input-dir")))

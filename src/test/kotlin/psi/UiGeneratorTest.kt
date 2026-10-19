@@ -162,9 +162,11 @@ class UiGeneratorTest {
     assertTrue(text.contains("var isLoading by remember { mutableStateOf(true) }"))
 
     // API Call
-    assertTrue(text.contains("LaunchedEffect(Unit)"))
+    assertTrue(text.contains("LaunchedEffect(Unit, retryCount)"))
     assertTrue(text.contains("api.getUsers().fold("))
     assertTrue(text.contains("items = it"))
+    assertTrue(text.contains("retryCount++"))
+    assertTrue(text.contains("onItemClick = { selectedItem = it }"))
 
     // UI Logic
     assertTrue(text.contains("CircularProgressIndicator()")) // Loading

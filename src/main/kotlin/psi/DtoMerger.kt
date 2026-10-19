@@ -41,10 +41,15 @@ class DtoMerger {
             ?: return CddError.PsiMergeError(
                     schema.safeName, "Class ${schema.safeName} must have a primary constructor")
                 .toFailure()
-    val parameterList = primaryConstructor.valueParameterList!!
+    val parameterList =
+        primaryConstructor.valueParameterList
+            ?: return CddError.PsiMergeError(
+                    schema.safeName, "Class ${schema.safeName} must have a parameter list")
+                .toFailure()
 
     // Identify existing properties
-    val existingNames = parameterList.parameters.mapNotNull { it.name }.toSet()
+    val existingNames =
+        parameterList.parameters.mapNotNull { it.name }.map { it.removeSurrounding("`") }.toSet()
 
     // Identify fields to add
     val missingProperties = schema.properties.filterKeys { !existingNames.contains(it) }
@@ -80,8 +85,10 @@ class DtoMerger {
 
       val finalType = if (isNullable) "$baseType?" else baseType
       val defaultVal = if (isNullable) " = null" else ""
+      val safePropName = escapeKotlinKeyword(name)
 
-      sb.append("@kotlinx.serialization.SerialName(\"$name\") val $name: $finalType$defaultVal")
+      sb.append(
+          "@kotlinx.serialization.SerialName(\"$name\") val $safePropName: $finalType$defaultVal")
     }
 
     // Calculate insertion point: The start of the closing parenthesis ')'

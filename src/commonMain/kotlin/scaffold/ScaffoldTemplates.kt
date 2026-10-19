@@ -132,6 +132,7 @@ $serverLibs
    * Generates the root build.gradle.kts file. Sets up the plugins for the overall project context.
    *
    * @param info Optional Info metadata to populate version.
+   * @return The generated root `build.gradle.kts` content.
    */
   fun createRootBuildGradle(info: Info?): String {
     val versionLine =
@@ -155,7 +156,11 @@ $serverLibs
         .trimIndent()
   }
 
-  /** Generates the gradle.properties file used for JVM arguments. */
+  /**
+   * Generates the gradle.properties file used for JVM arguments.
+   *
+   * @return The generated `gradle.properties` content.
+   */
   fun createGradleProperties(): String =
       """
         org.gradle.jvmargs=-Xmx6g -Dfile.encoding=UTF-8
@@ -173,6 +178,7 @@ $serverLibs
    *
    * @param namespace The Android namespace (package name).
    * @param info Optional Info metadata to populate versionName.
+   * @return The generated `composeApp/build.gradle.kts` content.
    */
   fun createAppBuildGradle(namespace: String, info: Info?): String {
     val versionNameStr = if (info != null && info.version.isNotEmpty()) info.version else "1.0"
@@ -290,7 +296,11 @@ $serverLibs
         .trimIndent()
   }
 
-  /** Generates a basic AndroidManifest.xml required for the Android target. */
+  /**
+   * Generates a basic AndroidManifest.xml required for the Android target.
+   *
+   * @return The generated `AndroidManifest.xml` content.
+   */
   fun createAndroidManifest(): String =
       """
         <?xml version="1.0" encoding="utf-8"?>
@@ -319,6 +329,7 @@ $serverLibs
    * Generates a placeholder App.kt file in commonMain to ensure compilation.
    *
    * @param packageName The package definition.
+   * @return The generated `App.kt` source content.
    */
   fun createCommonAppKt(packageName: String): String =
       """

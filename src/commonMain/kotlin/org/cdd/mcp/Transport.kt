@@ -91,6 +91,9 @@ class StdioTransportImpl : StdioTransport {
     startReadingResult { kotlin.Result.success(lineReader()) }
   }
 
+  private fun toException(err: Throwable): Exception =
+      if (err is Exception) err else RuntimeException(err.message, err)
+
   /**
    * Starts reading from a [kotlin.Result]-producing line reader until EOF (`null`) or reader
    * failure.
@@ -111,13 +114,13 @@ class StdioTransportImpl : StdioTransport {
                     JsonRpcParser.parseMessage(line)
                         .fold(
                             onSuccess = { message -> receiveListener?.invoke(message) },
-                            onFailure = { err -> errorListener?.invoke(err as Exception) })
+                            onFailure = { err -> errorListener?.invoke(toException(err)) })
                   }
                   false
                 }
               },
               onFailure = { err ->
-                errorListener?.invoke(err as Exception)
+                errorListener?.invoke(toException(err))
                 true
               })
       if (shouldBreak) break

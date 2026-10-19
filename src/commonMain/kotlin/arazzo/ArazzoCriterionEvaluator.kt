@@ -364,31 +364,32 @@ object ArazzoCriterionEvaluator {
     return RuntimeExpressionEngine.evaluate(trimmed, context)
   }
 
-  private fun compareValues(left: OpenApiValue, right: OpenApiValue, op: String): Result<Boolean> {
+  private fun compareValues(left: OpenApiValue, right: OpenApiValue, op: String): Result<Boolean> =
+      Result.success(compareValuesBoolean(left, right, op))
+
+  private fun compareValuesBoolean(left: OpenApiValue, right: OpenApiValue, op: String): Boolean {
     val leftNum = toDoubleOrNull(left)
     val rightNum = toDoubleOrNull(right)
     if (leftNum != null && rightNum != null) {
-      return Result.success(
-          when (op) {
-            "==" -> leftNum == rightNum
-            "!=" -> leftNum != rightNum
-            "<" -> leftNum < rightNum
-            "<=" -> leftNum <= rightNum
-            ">" -> leftNum > rightNum
-            else -> leftNum >= rightNum
-          })
+      return when (op) {
+        "==" -> leftNum == rightNum
+        "!=" -> leftNum != rightNum
+        "<" -> leftNum < rightNum
+        "<=" -> leftNum <= rightNum
+        ">" -> leftNum > rightNum
+        else -> leftNum >= rightNum
+      }
     }
     val leftStr = valueToString(left)
     val rightStr = valueToString(right)
-    return Result.success(
-        when (op) {
-          "==" -> leftStr == rightStr
-          "!=" -> leftStr != rightStr
-          "<" -> leftStr < rightStr
-          "<=" -> leftStr <= rightStr
-          ">" -> leftStr > rightStr
-          else -> leftStr >= rightStr
-        })
+    return when (op) {
+      "==" -> leftStr == rightStr
+      "!=" -> leftStr != rightStr
+      "<" -> leftStr < rightStr
+      "<=" -> leftStr <= rightStr
+      ">" -> leftStr > rightStr
+      else -> leftStr >= rightStr
+    }
   }
 
   private fun evaluateRegexCondition(
@@ -581,7 +582,7 @@ object ArazzoCriterionEvaluator {
             val expectedVal =
                 resolveSimpleOperand(expectedRaw, null, WorkflowExecutionContext()).getOrNull()
                     ?: return@filter false
-            compareValues(propVal, expectedVal, matchedOp).getOrThrow()
+            compareValuesBoolean(propVal, expectedVal, matchedOp)
           }
         }
     if (matches.isEmpty()) {

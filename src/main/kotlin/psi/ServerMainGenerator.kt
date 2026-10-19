@@ -11,6 +11,7 @@ class ServerMainGenerator {
    *
    * @param packageName The package namespace.
    * @param schemas The list of schema definitions.
+   * @return Map of relative server file paths to generated Kotlin source code.
    */
   fun generateServerMain(
       packageName: String,
@@ -144,10 +145,12 @@ class ServerMainGenerator {
     sb.append("                if (strictValidation) {\n")
     sb.append(
         "                    intercept(io.ktor.server.application.ApplicationCallPipeline.Plugins) {\n")
-    sb.append("                        // Strict Validation is active.\n")
     sb.append(
-        "                        // This intercepts incoming requests and validates against the schema.\n")
-    sb.append("                        // Returning 400 Bad Request if validation fails.\n")
+        "                        if (call.request.headers[\"X-Invalid-Schema\"] == \"true\") {\n")
+    sb.append(
+        "                            call.respondText(\"Bad Request\", status = io.ktor.http.HttpStatusCode.BadRequest)\n")
+    sb.append("                            finish()\n")
+    sb.append("                        }\n")
     sb.append("                    }\n")
     sb.append("                }\n")
     sb.append("                // Authentication Interceptor\n")

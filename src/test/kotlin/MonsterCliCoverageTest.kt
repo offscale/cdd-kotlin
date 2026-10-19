@@ -10,9 +10,9 @@ class MonsterCliCoverageTest {
 
   @Test
   fun testValidJsonSpecsAcrossCommands() {
-    val validJsonSpecs =
-        listOf("monster.json", "invalid_generated.json", "invalid_openapi_exhaustive.json")
-    for (spec in validJsonSpecs) {
+    val validJsonSpecs = listOf("monster.json", "monster.yaml")
+    val edgeCaseSpecs = listOf("invalid_generated.json", "invalid_openapi_exhaustive.json")
+    for (spec in validJsonSpecs + edgeCaseSpecs) {
       val specFile = File("src/test/resources/$spec")
       assertTrue(specFile.exists(), "Expected test resource $spec to exist")
 

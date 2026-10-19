@@ -326,8 +326,18 @@ object CddCli {
    */
   fun generateDemo(args: Array<String>): Int {
     val pwd = getEnvVar("PWD")
-    val outputDir =
-        if (pwd != null && pwd.isNotEmpty()) "$pwd/generated-project" else "generated-project"
+    var outputDir =
+        getEnvVar("CDD_OUTPUT")
+            ?: if (pwd != null && pwd.isNotEmpty()) "$pwd/generated-project"
+            else "generated-project"
+    var i = 1
+    while (i < args.size) {
+      val arg = args[i]
+      if (arg in setOf("-o", "--output") && i + 1 < args.size) {
+        outputDir = args[++i]
+      }
+      i++
+    }
     return scaffold
         .ScaffoldGenerator()
         .generate(outputDir, "demo", "org.example")
@@ -358,14 +368,27 @@ object CddCli {
 
     peer.onRequest("tools/cdd_generate") { params ->
       val spec = params.text("spec")
-      val status =
+      val generatedFiles =
           if (!spec.isNullOrBlank()) {
             val parsed = OpenApiParser().parseDocumentString(spec)
-            if (parsed is OpenApiDocument.OpenApi) "generated" else "schema_only"
+            if (parsed is OpenApiDocument.OpenApi) {
+              org.cdd.mcp.McpClientGenerator.generateMcpFiles("org.example", parsed.definition)
+            } else {
+              emptyMap()
+            }
           } else {
-            "ready"
+            emptyMap()
           }
-      buildJsonObject { put("status", JsonPrimitive(status)) }
+      val status =
+          when {
+            spec.isNullOrBlank() -> "ready"
+            generatedFiles.isNotEmpty() -> "generated"
+            else -> "schema_only"
+          }
+      buildJsonObject {
+        put("status", JsonPrimitive(status))
+        put("fileCount", JsonPrimitive(generatedFiles.size))
+      }
     }
 
     peer.onRequest("tools/cdd_inspect_schema") { params ->
@@ -404,9 +427,24 @@ object CddCli {
 
     peer.onRequest("resources/ast_query") { params ->
       val query = params.text("query") ?: "*"
+      val spec = params.text("spec")
+      val matches =
+          if (!spec.isNullOrBlank()) {
+            val parsed = OpenApiParser().parseDocumentString(spec)
+            val schemaNames =
+                if (parsed is OpenApiDocument.OpenApi) {
+                  val components = parsed.definition.components
+                  if (components != null) components.schemas.keys else emptySet()
+                } else {
+                  emptySet()
+                }
+            schemaNames.filter { query == "*" || it.contains(query, ignoreCase = true) }
+          } else {
+            emptyList()
+          }
       buildJsonObject {
         put("query", JsonPrimitive(query))
-        put("matches", buildJsonArray {})
+        put("matches", buildJsonArray { matches.forEach { add(JsonPrimitive(it)) } })
       }
     }
 

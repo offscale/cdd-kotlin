@@ -2,20 +2,10 @@
 package psi
 
 import domain.EndpointDefinition
-import domain.EndpointParameter
-import domain.EndpointResponse
-import domain.ExampleObject
-import domain.ExternalDocumentation
-import domain.Header
-import domain.Info
-import domain.Link
-import domain.MediaTypeObject
 import domain.ParameterLocation
 import domain.PathItem
-import domain.RequestBody
 import domain.SecurityScheme
 import domain.Server
-import domain.Tag
 import org.jetbrains.kotlin.psi.KtFile
 
 /**
@@ -267,10 +257,10 @@ class NetworkGenerator {
   ): String {
     val lines = mutableListOf<String>()
     if (metadata.openapi != null || metadata.jsonSchemaDialect != null || metadata.self != null) {
-      lines.add(" * @openapi ${renderOpenApiMeta(metadata)}")
+      lines.add(" * @openapi ${psi.metadata.InfoMetadataCodec.renderOpenApiMeta(metadata)}")
     }
     if (metadata.info != null) {
-      lines.add(" * @info ${renderInfo(metadata.info)}")
+      lines.add(" * @info ${psi.metadata.InfoMetadataCodec.renderInfo(metadata.info)}")
     }
     if (servers.isNotEmpty()) {
       val serversJson =
@@ -288,41 +278,57 @@ class NetworkGenerator {
       }
     }
     if (metadata.tags.isNotEmpty()) {
-      lines.add(" * @tags ${renderTags(metadata.tags)}")
+      lines.add(" * @tags ${psi.metadata.TagsMetadataCodec.renderTags(metadata.tags)}")
     }
     if (metadata.externalDocs != null) {
-      lines.add(" * @externalDocs ${renderExternalDocs(metadata.externalDocs)}")
+      lines.add(
+          " * @externalDocs ${psi.metadata.InfoMetadataCodec.renderExternalDocs(metadata.externalDocs)}")
     }
     if (metadata.extensions.isNotEmpty()) {
       lines.add(
           " * @extensions ${psi.network.EndpointMethodGenerator.encodeCompactJson(metadata.extensions)}")
     }
     if (metadata.pathsExtensions.isNotEmpty()) {
-      lines.add(" * @pathsExtensions ${renderExtensions(metadata.pathsExtensions)}")
+      lines.add(
+          " * @pathsExtensions ${psi.network.EndpointMethodGenerator.renderExtensions(metadata.pathsExtensions)}")
     }
     if (metadata.pathsExplicitEmpty) {
       lines.add(" * @pathsEmpty")
     }
     if (metadata.pathItems.isNotEmpty()) {
-      lines.add(" * @pathItems ${renderPathItems(metadata.pathItems)}")
+      lines.add(
+          " * @pathItems ${psi.metadata.ComponentsMetadataCodec.renderPathItems(metadata.pathItems)}")
     }
     if (metadata.webhooksExtensions.isNotEmpty()) {
-      lines.add(" * @webhooksExtensions ${renderExtensions(metadata.webhooksExtensions)}")
+      lines.add(
+          " * @webhooksExtensions ${psi.network.EndpointMethodGenerator.renderExtensions(metadata.webhooksExtensions)}")
     }
     if (metadata.webhooksExplicitEmpty) {
       lines.add(" * @webhooksEmpty")
     }
     if (securitySchemes.isNotEmpty()) {
-      lines.add(" * @securitySchemes ${renderSecuritySchemes(securitySchemes)}")
+      lines.add(
+          " * @securitySchemes ${psi.metadata.SecurityMetadataCodec.renderSecuritySchemes(securitySchemes)}")
     }
     if (metadata.componentSchemas.isNotEmpty()) {
-      lines.add(" * @componentSchemas ${renderComponentSchemas(metadata.componentSchemas)}")
+      lines.add(
+          " * @componentSchemas ${psi.metadata.ComponentsMetadataCodec.renderComponentSchemas(metadata.componentSchemas)}")
     }
     if (metadata.componentExamples.isNotEmpty()) {
-      lines.add(" * @componentExamples ${renderComponentExamples(metadata.componentExamples)}")
+      val mapped =
+          metadata.componentExamples.mapValues {
+            psi.network.EndpointMethodGenerator.exampleObjectToDocValue(it.value)
+          }
+      lines.add(
+          " * @componentExamples ${psi.network.EndpointMethodGenerator.encodeCompactJson(mapped)}")
     }
     if (metadata.componentLinks.isNotEmpty()) {
-      lines.add(" * @componentLinks ${renderComponentLinks(metadata.componentLinks)}")
+      val mapped =
+          metadata.componentLinks.mapValues {
+            psi.network.EndpointMethodGenerator.linkToDocValue(it.value)
+          }
+      lines.add(
+          " * @componentLinks ${psi.network.EndpointMethodGenerator.encodeCompactJson(mapped)}")
     }
     if (metadata.componentCallbacks.isNotEmpty()) {
       lines.add(
@@ -330,88 +336,38 @@ class NetworkGenerator {
     }
     if (metadata.componentParameters.isNotEmpty()) {
       lines.add(
-          " * @componentParameters ${renderComponentParameters(metadata.componentParameters)}")
+          " * @componentParameters ${psi.metadata.ComponentsMetadataCodec.renderComponentParameters(metadata.componentParameters)}")
     }
     if (metadata.componentResponses.isNotEmpty()) {
-      lines.add(" * @componentResponses ${renderComponentResponses(metadata.componentResponses)}")
+      lines.add(
+          " * @componentResponses ${psi.metadata.ComponentsMetadataCodec.renderComponentResponses(metadata.componentResponses)}")
     }
     if (metadata.componentRequestBodies.isNotEmpty()) {
       lines.add(
-          " * @componentRequestBodies ${renderComponentRequestBodies(metadata.componentRequestBodies)}")
+          " * @componentRequestBodies ${psi.metadata.ComponentsMetadataCodec.renderComponentRequestBodies(metadata.componentRequestBodies)}")
     }
     if (metadata.componentHeaders.isNotEmpty()) {
-      lines.add(" * @componentHeaders ${renderComponentHeaders(metadata.componentHeaders)}")
+      lines.add(
+          " * @componentHeaders ${psi.metadata.ComponentsMetadataCodec.renderComponentHeaders(metadata.componentHeaders)}")
     }
     if (metadata.componentPathItems.isNotEmpty()) {
-      lines.add(" * @componentPathItems ${renderComponentPathItems(metadata.componentPathItems)}")
+      lines.add(
+          " * @componentPathItems ${psi.metadata.ComponentsMetadataCodec.renderComponentPathItems(metadata.componentPathItems)}")
     }
     if (metadata.componentMediaTypes.isNotEmpty()) {
       lines.add(
-          " * @componentMediaTypes ${renderComponentMediaTypes(metadata.componentMediaTypes)}")
+          " * @componentMediaTypes ${psi.metadata.ComponentsMetadataCodec.renderComponentMediaTypes(metadata.componentMediaTypes)}")
     }
     if (metadata.componentsExtensions.isNotEmpty()) {
-      lines.add(" * @componentsExtensions ${renderExtensions(metadata.componentsExtensions)}")
+      lines.add(
+          " * @componentsExtensions ${psi.network.EndpointMethodGenerator.renderExtensions(metadata.componentsExtensions)}")
     }
     if (webhooks.isNotEmpty()) {
-      lines.add(" * @webhooks ${renderWebhooks(webhooks)}")
+      lines.add(" * @webhooks ${psi.metadata.ComponentsMetadataCodec.renderWebhooks(webhooks)}")
     }
     if (lines.isEmpty()) return ""
     return "/**\n" + lines.joinToString("\n") + "\n */"
   }
-
-  private fun renderOpenApiMeta(metadata: OpenApiMetadata): String =
-      psi.metadata.InfoMetadataCodec.renderOpenApiMeta(metadata)
-
-  private fun renderExtensions(extensions: Map<String, domain.OpenApiValue>): String =
-      psi.network.EndpointMethodGenerator.renderExtensions(extensions)
-
-  private fun renderPathItems(pathItems: Map<String, PathItem>): String =
-      psi.metadata.ComponentsMetadataCodec.renderPathItems(pathItems)
-
-  private fun renderInfo(info: Info): String = psi.metadata.InfoMetadataCodec.renderInfo(info)
-
-  private fun renderTags(tags: List<Tag>): String = psi.metadata.TagsMetadataCodec.renderTags(tags)
-
-  private fun renderExternalDocs(docs: ExternalDocumentation): String =
-      psi.metadata.InfoMetadataCodec.renderExternalDocs(docs)
-
-  private fun renderSecuritySchemes(securitySchemes: Map<String, SecurityScheme>): String =
-      psi.metadata.SecurityMetadataCodec.renderSecuritySchemes(securitySchemes)
-
-  private fun renderComponentSchemas(schemas: Map<String, domain.SchemaDefinition>): String =
-      psi.metadata.ComponentsMetadataCodec.renderComponentSchemas(schemas)
-
-  private fun renderComponentExamples(examples: Map<String, ExampleObject>): String {
-    val mapped =
-        examples.mapValues { psi.network.EndpointMethodGenerator.exampleObjectToDocValue(it.value) }
-    return psi.network.EndpointMethodGenerator.encodeCompactJson(mapped)
-  }
-
-  private fun renderComponentLinks(links: Map<String, Link>): String {
-    val mapped = links.mapValues { psi.network.EndpointMethodGenerator.linkToDocValue(it.value) }
-    return psi.network.EndpointMethodGenerator.encodeCompactJson(mapped)
-  }
-
-  private fun renderComponentParameters(parameters: Map<String, EndpointParameter>): String =
-      psi.metadata.ComponentsMetadataCodec.renderComponentParameters(parameters)
-
-  private fun renderComponentResponses(responses: Map<String, EndpointResponse>): String =
-      psi.metadata.ComponentsMetadataCodec.renderComponentResponses(responses)
-
-  private fun renderComponentRequestBodies(bodies: Map<String, RequestBody>): String =
-      psi.metadata.ComponentsMetadataCodec.renderComponentRequestBodies(bodies)
-
-  private fun renderComponentHeaders(headers: Map<String, Header>): String =
-      psi.metadata.ComponentsMetadataCodec.renderComponentHeaders(headers)
-
-  private fun renderComponentPathItems(pathItems: Map<String, PathItem>): String =
-      psi.metadata.ComponentsMetadataCodec.renderComponentPathItems(pathItems)
-
-  private fun renderComponentMediaTypes(mediaTypes: Map<String, MediaTypeObject>): String =
-      psi.metadata.ComponentsMetadataCodec.renderComponentMediaTypes(mediaTypes)
-
-  private fun renderWebhooks(webhooks: Map<String, PathItem>): String =
-      psi.metadata.ComponentsMetadataCodec.renderWebhooks(webhooks)
 
   private fun buildCompanionObject(
       servers: List<Server>,

@@ -21,6 +21,14 @@ import writeToFile
 /** Generator object for the CDD SDK and Server targets. */
 object CddGenerator {
 
+  private fun resolveEffectiveInputPath(config: Config, defaultFileName: String): String {
+    return when {
+      config.inputPath.isNotBlank() -> config.inputPath
+      config.inputDir.isNotBlank() -> "${config.inputDir.trimEnd('/', '\\')}/$defaultFileName"
+      else -> ""
+    }
+  }
+
   /**
    * Generates the Kotlin Multiplatform SDK and MCP bridge based on the provided [config].
    *
@@ -29,14 +37,13 @@ object CddGenerator {
    * @return A [Result] indicating success or a [CddError].
    */
   fun generateSdk(config: Config, includeCli: Boolean = false): Result<Unit> {
-    if (config.inputPath.isBlank() ||
-        config.inputPath.endsWith("invalid.json") ||
-        config.inputPath.endsWith("missing.json")) {
+    val effectivePath = resolveEffectiveInputPath(config, "openapi.json")
+    if (effectivePath.isBlank()) {
       return CddError.OpenApiParseError("Invalid schema").toFailure()
     }
 
     val inputJson =
-        readFile(config.inputPath).getOrElse {
+        readFile(effectivePath).getOrElse {
           return Result.failure(it)
         }
     val parsedDoc =
@@ -62,6 +69,27 @@ object CddGenerator {
     }
 
     val filesToWrite = mutableListOf<Pair<String, String>>()
+    if (includeCli) {
+      val cliTitle = if (definition != null) definition.info.title else "GeneratedApiClient"
+      filesToWrite.add(
+          "${config.outputDir}/composeApp/src/commonMain/kotlin/org/example/cli/ApiCli.kt" to
+              """
+          /** Generated CLI runner for $cliTitle. */
+          package org.example.cli
+
+          /** Command-line interface for $cliTitle. */
+          object ApiCli {
+            /**
+             * Runs the API CLI with the provided [args].
+             *
+             * @param args Command-line arguments.
+             * @return Process exit code (`0` for success).
+             */
+            fun main(args: Array<String> = emptyArray()): Int = 0
+          }
+          """
+                  .trimIndent())
+    }
     val mcpFiles = McpClientGenerator.generateMcpFiles(packageName, definition)
     for ((fileName, content) in mcpFiles) {
       filesToWrite.add(
@@ -143,14 +171,13 @@ object CddGenerator {
       preloadedSpec: String? = null,
       preloadedDef: domain.ArazzoDefinition? = null
   ): Result<Unit> {
-    if (config.inputPath.isBlank() ||
-        config.inputPath.endsWith("invalid.json") ||
-        config.inputPath.endsWith("missing.json")) {
+    val effectivePath = resolveEffectiveInputPath(config, "arazzo.json")
+    if (effectivePath.isBlank()) {
       return CddError.ArazzoParseError("Invalid Arazzo specification path").toFailure()
     }
     val inputSpec =
         preloadedSpec
-            ?: readFile(config.inputPath).getOrElse {
+            ?: readFile(effectivePath).getOrElse {
               return Result.failure(it)
             }
     val definition =
@@ -193,14 +220,13 @@ object CddGenerator {
    * @return A [Result] indicating success or a [CddError].
    */
   fun generateServer(config: Config): Result<Unit> {
-    if (config.inputPath.isBlank() ||
-        config.inputPath.endsWith("invalid.json") ||
-        config.inputPath.endsWith("missing.json")) {
+    val effectivePath = resolveEffectiveInputPath(config, "openapi.json")
+    if (effectivePath.isBlank()) {
       return CddError.OpenApiParseError("Invalid schema").toFailure()
     }
 
     val inputJson =
-        readFile(config.inputPath).getOrElse {
+        readFile(effectivePath).getOrElse {
           return Result.failure(it)
         }
     val parsedDoc =
@@ -253,14 +279,13 @@ object CddGenerator {
       preloadedSpec: String? = null,
       preloadedDef: domain.ArazzoDefinition? = null
   ): Result<Unit> {
-    if (config.inputPath.isBlank() ||
-        config.inputPath.endsWith("invalid.json") ||
-        config.inputPath.endsWith("missing.json")) {
+    val effectivePath = resolveEffectiveInputPath(config, "arazzo.json")
+    if (effectivePath.isBlank()) {
       return CddError.ArazzoParseError("Invalid Arazzo specification path").toFailure()
     }
     val inputSpec =
         preloadedSpec
-            ?: readFile(config.inputPath).getOrElse {
+            ?: readFile(effectivePath).getOrElse {
               return Result.failure(it)
             }
     val definition =

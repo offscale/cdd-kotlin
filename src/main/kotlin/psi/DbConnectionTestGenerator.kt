@@ -11,6 +11,7 @@ class DbConnectionTestGenerator {
    *
    * @param packageName The package namespace.
    * @param schemas The list of schemas.
+   * @return The generated DatabaseConnectionTest Kotlin source code.
    */
   fun generateDbConnectionTestModule(packageName: String, schemas: List<SchemaDefinition>): String {
     return buildKotlinFile("$packageName.db") {

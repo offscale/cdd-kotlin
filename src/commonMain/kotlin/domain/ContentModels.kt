@@ -63,19 +63,7 @@ data class ExampleObject(
 
     /** Specification extensions (keys starting with `x-`). */
     val extensions: Map<String, OpenApiValue> = emptyMap()
-) {
-  /** Strongly-typed [OpenApiValue] view of [dataValue], or `null` if absent. */
-  val typedDataValue: OpenApiValue?
-    get() = dataValue
-
-  /** Strongly-typed [OpenApiValue] view of [value], or `null` if absent. */
-  val typedValue: OpenApiValue?
-    get() = value
-
-  /** Strongly-typed [OpenApiValue] map view of [extensions]. */
-  val typedExtensions: Map<String, OpenApiValue>
-    get() = extensions
-}
+)
 
 /**
  * A single encoding definition applied to a single value, with the mapping determined by the Media

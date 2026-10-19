@@ -117,6 +117,16 @@ class OpenApiWriter {
   }
 
   /**
+   * Converts a [SchemaProperty] directly into an [OpenApiValue] AST without round-tripping through
+   * a serialized JSON string.
+   *
+   * @param schema The [SchemaProperty] to convert.
+   * @return The resulting [OpenApiValue] (`OpenApiObject` or `OpenApiBoolean`).
+   */
+  fun schemaToOpenApiValue(schema: SchemaProperty): OpenApiValue =
+      OpenApiValues.fromAny(schemaRootToValue(schema))
+
+  /**
    * Writes the OpenAPI definition to JSON.
    *
    * @param definition The [OpenApiDefinition] to serialize.
@@ -142,9 +152,7 @@ class OpenApiWriter {
     val refBase = normalizeSelfRefBase(definition.self)
     val map = linkedMapOf<String, Any?>()
     val isSwagger2 =
-        (definition.swagger != null) or
-            definition.openapi.startsWith("2") or
-            definition.openapi.startsWith("1")
+        definition.swagger != null || definition.openapi.firstOrNull() in setOf('1', '2')
     if (isSwagger2) {
       map["swagger"] = definition.swagger ?: "2.0"
     } else {
@@ -419,7 +427,7 @@ class OpenApiWriter {
     }
     val map = linkedMapOf<String, Any?>()
     map.putIfNotNull("description", body.description)
-    if (body.content.isNotEmpty() or body.contentPresent) {
+    if (listOf(body.content.isNotEmpty(), body.contentPresent).any { it }) {
       map["content"] = contentToMap(body.content)
     }
     map.putIfTrue("required", body.required)
@@ -598,14 +606,13 @@ class OpenApiWriter {
     return map
   }
 
-  private fun schemaToMap(schema: SchemaDefinition, refBase: String?): Any {
-    schema.booleanSchema?.let {
-      return it
-    }
-    val map = linkedMapOf<String, Any?>()
+  private fun populateSchemaCoreMap(
+      map: MutableMap<String, Any?>,
+      schema: domain.SchemaCore,
+      typeFallback: String?
+  ) {
     schema.ref?.let { map["\$ref"] = it }
     schema.dynamicRef?.let { map["\$dynamicRef"] = it }
-    val typeFallback = if (schema.typeExplicit) schema.type else null
     val typeValue = typeValue(schema.types, typeFallback)
     typeValue?.let { map["type"] = it }
 
@@ -632,9 +639,9 @@ class OpenApiWriter {
     map.putIfNotNull("minProperties", schema.minProperties)
     map.putIfNotNull("maxProperties", schema.maxProperties)
 
-    schema.items?.let { map["items"] = schemaPropertyToMap(it) }
+    map.putSchemaIfNotNull("items", schema.items)
     map.putIfNotEmpty("prefixItems", schema.prefixItems.map { schemaPropertyToMap(it) })
-    schema.contains?.let { map["contains"] = schemaPropertyToMap(it) }
+    map.putSchemaIfNotNull("contains", schema.contains)
     map.putIfNotNull("minContains", schema.minContains)
     map.putIfNotNull("maxContains", schema.maxContains)
     if (schema.properties.isNotEmpty()) {
@@ -644,8 +651,8 @@ class OpenApiWriter {
       map["patternProperties"] =
           schema.patternProperties.mapValues { schemaPropertyToMap(it.value) }
     }
-    schema.propertyNames?.let { map["propertyNames"] = schemaPropertyToMap(it) }
-    schema.additionalProperties?.let { map["additionalProperties"] = schemaPropertyToMap(it) }
+    map.putSchemaIfNotNull("propertyNames", schema.propertyNames)
+    map.putSchemaIfNotNull("additionalProperties", schema.additionalProperties)
     map.putIfNotEmpty("required", schema.required)
     map.putIfNotEmpty("dependentRequired", schema.dependentRequired)
     if (schema.dependentSchemas.isNotEmpty()) {
@@ -662,17 +669,26 @@ class OpenApiWriter {
     schema.externalDocs?.let { map["externalDocs"] = externalDocsToMap(it) }
     schema.discriminator?.let { map["discriminator"] = discriminatorToMap(it) }
     schema.xml?.let { map["xml"] = xmlToMap(it) }
-    schema.unevaluatedProperties?.let { map["unevaluatedProperties"] = schemaPropertyToMap(it) }
-    schema.unevaluatedItems?.let { map["unevaluatedItems"] = schemaPropertyToMap(it) }
-    schema.contentSchema?.let { map["contentSchema"] = schemaPropertyToMap(it) }
+    map.putSchemaIfNotNull("unevaluatedProperties", schema.unevaluatedProperties)
+    map.putSchemaIfNotNull("unevaluatedItems", schema.unevaluatedItems)
+    map.putSchemaIfNotNull("contentSchema", schema.contentSchema)
+    map.putSchemaIfNotNull("not", schema.not)
+    map.putSchemaIfNotNull("if", schema.ifSchema)
+    map.putSchemaIfNotNull("then", schema.thenSchema)
+    map.putSchemaIfNotNull("else", schema.elseSchema)
+    map.putIfNotNull("example", schema.example)
+  }
+
+  private fun schemaToMap(schema: SchemaDefinition, refBase: String?): Any {
+    schema.booleanSchema?.let {
+      return it
+    }
+    val map = linkedMapOf<String, Any?>()
+    val typeFallback = if (schema.typeExplicit) schema.type else null
+    populateSchemaCoreMap(map, schema, typeFallback)
     map.putIfNotEmpty("oneOf", schemaCompositionToMaps(schema.oneOf, schema.oneOfSchemas, refBase))
     map.putIfNotEmpty("anyOf", schemaCompositionToMaps(schema.anyOf, schema.anyOfSchemas, refBase))
     map.putIfNotEmpty("allOf", schemaCompositionToMaps(schema.allOf, schema.allOfSchemas, refBase))
-    schema.not?.let { map["not"] = schemaPropertyToMap(it) }
-    schema.ifSchema?.let { map["if"] = schemaPropertyToMap(it) }
-    schema.thenSchema?.let { map["then"] = schemaPropertyToMap(it) }
-    schema.elseSchema?.let { map["else"] = schemaPropertyToMap(it) }
-    map.putIfNotNull("example", schema.example)
     schema.examplesList?.let { map["examples"] = it }
     if (schema.examplesList == null) {
       schema.examples?.let { map["examples"] = it.values.toList() }
@@ -686,77 +702,12 @@ class OpenApiWriter {
     schema.booleanSchema?.let {
       return it
     }
-
     val map = linkedMapOf<String, Any?>()
-    schema.ref?.let { map["\$ref"] = it }
-    schema.dynamicRef?.let { map["\$dynamicRef"] = it }
-    val typeValue = typeValue(schema.types, null)
-    typeValue?.let { map["type"] = it }
-
-    map.putIfNotNull("\$id", schema.schemaId)
-    map.putIfNotNull("\$schema", schema.schemaDialect)
-    map.putIfNotNull("\$anchor", schema.anchor)
-    map.putIfNotNull("\$dynamicAnchor", schema.dynamicAnchor)
-    map.putIfNotNull("format", schema.format)
-    map.putIfNotNull("contentMediaType", schema.contentMediaType)
-    map.putIfNotNull("contentEncoding", schema.contentEncoding)
-    map.putIfNotNull("minLength", schema.minLength)
-    map.putIfNotNull("maxLength", schema.maxLength)
-    map.putIfNotNull("pattern", schema.pattern)
-    map.putIfNotNull("minimum", schema.minimum)
-    map.putIfNotNull("maximum", schema.maximum)
-    map.putIfNotNull("multipleOf", schema.multipleOf)
-    map.putIfNotNull("exclusiveMinimum", schema.exclusiveMinimum)
-    map.putIfNotNull("exclusiveMaximum", schema.exclusiveMaximum)
-    map.putIfNotNull("minItems", schema.minItems)
-    map.putIfNotNull("maxItems", schema.maxItems)
-    map.putIfNotNull("uniqueItems", schema.uniqueItems)
-    map.putIfNotNull("minProperties", schema.minProperties)
-    map.putIfNotNull("maxProperties", schema.maxProperties)
-    map.putSchemaIfNotNull("items", schema.items)
-    map.putIfNotEmpty("prefixItems", schema.prefixItems.map { schemaPropertyToMap(it) })
-    map.putSchemaIfNotNull("contains", schema.contains)
-    map.putIfNotNull("minContains", schema.minContains)
-    map.putIfNotNull("maxContains", schema.maxContains)
-    if (schema.properties.isNotEmpty()) {
-      map["properties"] = schema.properties.mapValues { schemaPropertyToMap(it.value) }
-    }
-    map.putIfNotEmpty("required", schema.required)
-    map.putSchemaIfNotNull("additionalProperties", schema.additionalProperties)
-    map.putIfNotEmpty("\$defs", schema.defs.mapValues { schemaPropertyToMap(it.value) })
-    if (schema.patternProperties.isNotEmpty()) {
-      map["patternProperties"] =
-          schema.patternProperties.mapValues { schemaPropertyToMap(it.value) }
-    }
-    map.putSchemaIfNotNull("propertyNames", schema.propertyNames)
-    map.putIfNotEmpty("dependentRequired", schema.dependentRequired)
-    if (schema.dependentSchemas.isNotEmpty()) {
-      map["dependentSchemas"] = schema.dependentSchemas.mapValues { schemaPropertyToMap(it.value) }
-    }
-    map.putIfNotNull("description", schema.description)
-    map.putIfNotNull("title", schema.title)
-    map.putIfNotNull("default", schema.defaultValue)
-    map.putIfNotNull("const", schema.constValue)
-    map.putIfTrue("deprecated", schema.deprecated)
-    map.putIfTrue("readOnly", schema.readOnly)
-    map.putIfTrue("writeOnly", schema.writeOnly)
-    schema.externalDocs?.let { map["externalDocs"] = externalDocsToMap(it) }
-    schema.discriminator?.let { map["discriminator"] = discriminatorToMap(it) }
-    map.putIfNotNull("\$comment", schema.comment)
-    schema.enumValues?.let { map["enum"] = it }
+    populateSchemaCoreMap(map, schema, null)
     map.putIfNotEmpty("oneOf", schema.oneOf.map { schemaPropertyToMap(it) })
     map.putIfNotEmpty("anyOf", schema.anyOf.map { schemaPropertyToMap(it) })
     map.putIfNotEmpty("allOf", schema.allOf.map { schemaPropertyToMap(it) })
-    map.putSchemaIfNotNull("not", schema.not)
-    map.putSchemaIfNotNull("if", schema.ifSchema)
-    map.putSchemaIfNotNull("then", schema.thenSchema)
-    map.putSchemaIfNotNull("else", schema.elseSchema)
-    map.putIfNotNull("example", schema.example)
     schema.examples?.let { map["examples"] = it }
-    schema.xml?.let { map["xml"] = xmlToMap(it) }
-    map.putSchemaIfNotNull("unevaluatedProperties", schema.unevaluatedProperties)
-    map.putSchemaIfNotNull("unevaluatedItems", schema.unevaluatedItems)
-    map.putSchemaIfNotNull("contentSchema", schema.contentSchema)
     map.putCustomKeywords(schema.customKeywords)
     map.putExtensions(schema.extensions)
     return map
@@ -932,8 +883,7 @@ class OpenApiWriter {
   }
 
   private fun looksLikeRef(token: String): Boolean {
-    return listOf("#", "./").any { token.startsWith(it) } or
-        token.contains("/") or
+    return listOf("#", "./", "/").any { token.contains(it) } ||
         listOf(".json", ".yaml").any { token.endsWith(it) }
   }
 

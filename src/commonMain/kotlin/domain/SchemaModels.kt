@@ -200,26 +200,6 @@ sealed interface SchemaCore {
 val SchemaCore.parsedTypes: Set<SchemaType>
   get() = types.mapNotNull { SchemaType.fromWireName(it) }.toSet()
 
-/** Strongly-typed [OpenApiValue] view of [SchemaCore.defaultValue], or `null` if absent. */
-val SchemaCore.typedDefaultValue: OpenApiValue?
-  get() = defaultValue
-
-/** Strongly-typed [OpenApiValue] view of [SchemaCore.constValue], or `null` if absent. */
-val SchemaCore.typedConstValue: OpenApiValue?
-  get() = constValue
-
-/** Strongly-typed [OpenApiValue] view of [SchemaCore.example], or `null` if absent. */
-val SchemaCore.typedExample: OpenApiValue?
-  get() = example
-
-/** Strongly-typed [OpenApiValue] map view of [SchemaCore.customKeywords]. */
-val SchemaCore.typedCustomKeywords: Map<String, OpenApiValue>
-  get() = customKeywords
-
-/** Strongly-typed [OpenApiValue] map view of [SchemaCore.extensions]. */
-val SchemaCore.typedExtensions: Map<String, OpenApiValue>
-  get() = extensions
-
 /**
  * The Schema Object allows the definition of input and output data types. These types can be
  * objects, but also primitives and arrays. This object is a superset of the JSON Schema

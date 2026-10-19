@@ -124,11 +124,11 @@ class JsonValueAndErrorTest {
             dataValue = OpenApiObject(mapOf("id" to OpenApiInt(1L))),
             value = OpenApiString("sample"),
             extensions = mapOf("x-ex" to OpenApiBoolean(true)))
-    assertEquals(OpenApiObject(mapOf("id" to OpenApiInt(1L))), ex.typedDataValue)
-    assertEquals(OpenApiString("sample"), ex.typedValue)
-    assertEquals(mapOf("x-ex" to OpenApiBoolean(true)), ex.typedExtensions)
-    assertNull(ExampleObject().typedDataValue)
-    assertNull(ExampleObject().typedValue)
+    assertEquals(OpenApiObject(mapOf("id" to OpenApiInt(1L))), ex.dataValue)
+    assertEquals(OpenApiString("sample"), ex.value)
+    assertEquals(mapOf("x-ex" to OpenApiBoolean(true)), ex.extensions)
+    assertNull(ExampleObject().dataValue)
+    assertNull(ExampleObject().value)
 
     val linkExpr =
         Link(
@@ -136,8 +136,8 @@ class JsonValueAndErrorTest {
             parameters = mapOf("id" to OpenApiString("\$response.body#/id")),
             extensions = mapOf("x-l" to OpenApiInt(1L)))
     assertEquals(LinkRequestBody.Expression("\$request.body#/id"), linkExpr.typedRequestBody)
-    assertEquals(mapOf("id" to OpenApiString("\$response.body#/id")), linkExpr.typedParameters)
-    assertEquals(mapOf("x-l" to OpenApiInt(1L)), linkExpr.typedExtensions)
+    assertEquals(mapOf("id" to OpenApiString("\$response.body#/id")), linkExpr.parameters)
+    assertEquals(mapOf("x-l" to OpenApiInt(1L)), linkExpr.extensions)
 
     val linkEmbeddedExpr = Link(requestBody = OpenApiString("prefix{\$request.query.x}"))
     assertEquals(
@@ -173,17 +173,17 @@ class JsonValueAndErrorTest {
             extensions = mapOf("x-ext" to OpenApiString("v")),
             xml = Xml(nodeType = "attribute"))
     assertEquals(setOf(SchemaType.STRING, SchemaType.NULL), prop.parsedTypes)
-    assertEquals(OpenApiString("def"), prop.typedDefaultValue)
-    assertEquals(OpenApiString("c"), prop.typedConstValue)
-    assertEquals(OpenApiString("ex"), prop.typedExample)
-    assertEquals(mapOf("x-vocab" to OpenApiInt(1L)), prop.typedCustomKeywords)
-    assertEquals(mapOf("x-ext" to OpenApiString("v")), prop.typedExtensions)
+    assertEquals(OpenApiString("def"), prop.defaultValue)
+    assertEquals(OpenApiString("c"), prop.constValue)
+    assertEquals(OpenApiString("ex"), prop.example)
+    assertEquals(mapOf("x-vocab" to OpenApiInt(1L)), prop.customKeywords)
+    assertEquals(mapOf("x-ext" to OpenApiString("v")), prop.extensions)
     assertEquals(XmlNodeType.ATTRIBUTE, prop.xml?.parsedNodeType)
     assertNull(Xml(nodeType = "invalid").parsedNodeType)
     assertNull(Xml(nodeType = null).parsedNodeType)
-    assertNull(SchemaProperty().typedDefaultValue)
-    assertNull(SchemaProperty().typedConstValue)
-    assertNull(SchemaProperty().typedExample)
+    assertNull(SchemaProperty().defaultValue)
+    assertNull(SchemaProperty().constValue)
+    assertNull(SchemaProperty().example)
 
     val sec = SecurityScheme(type = "oauth2", `in` = "header")
     assertEquals(SecuritySchemeType.OAUTH2, sec.parsedType)
@@ -296,6 +296,13 @@ class JsonValueAndErrorTest {
     assertTrue(failedResult.isFailure)
     assertEquals(platErr, failedResult.cddErrorOrNull())
     assertNull(Result.success("ok").cddErrorOrNull())
+
+    assertEquals(Result.success(4), Result.success("abcd").mapResult { it.length })
+    assertTrue(failedResult.mapResult { it.length }.isFailure)
+    assertEquals(
+        Result.success("ABCD"),
+        Result.success("abcd").flatMapResult { Result.success(it.uppercase()) })
+    assertTrue(failedResult.flatMapResult { Result.success(it.uppercase()) }.isFailure)
 
     val genericThrowable = RuntimeException("boom")
     assertEquals(CddError.CliError("boom"), genericThrowable.toCddError())

@@ -103,7 +103,18 @@ class NetworkMergerTest {
                 path = "/a",
                 method = HttpMethod.GET,
                 operationId = "getA",
+                summary = "Code Summary A",
+                description = "Code Desc A",
+                externalDocs = domain.ExternalDocumentation(url = "https://code.example.com"),
+                extensions = mapOf("x-code" to domain.OpenApiString("1")),
                 responses = simpleResponse("String")),
+            EndpointDefinition(
+                path = "/b",
+                method = HttpMethod.GET,
+                operationId = "getB",
+                summary = "Old Summary B",
+                description = "Old Desc B",
+                externalDocs = domain.ExternalDocumentation(url = "https://old.example.com")),
             EndpointDefinition(
                 path = "/c",
                 method = HttpMethod.GET,
@@ -122,6 +133,10 @@ class NetworkMergerTest {
                 path = "/b",
                 method = HttpMethod.GET,
                 operationId = "getB",
+                summary = "Spec Summary B",
+                description = "Spec Desc B",
+                externalDocs = domain.ExternalDocumentation(url = "https://spec.example.com"),
+                extensions = mapOf("x-spec" to domain.OpenApiString("2")),
                 responses = simpleResponse("String")),
             EndpointDefinition(
                 path = "/d",
@@ -135,6 +150,14 @@ class NetworkMergerTest {
 
     val getA = result.find { it.operationId == "getA" }
     assertEquals("Int", getA?.responseType)
+    assertEquals("Code Summary A", getA?.summary)
+    assertEquals("Code Desc A", getA?.description)
+    assertEquals("https://code.example.com", getA?.externalDocs?.url)
+
+    val getB = result.find { it.operationId == "getB" }
+    assertEquals("Spec Summary B", getB?.summary)
+    assertEquals("Spec Desc B", getB?.description)
+    assertEquals("https://spec.example.com", getB?.externalDocs?.url)
 
     assertTrue(result.any { it.operationId == "getB" })
     assertTrue(result.any { it.operationId == "getD" })

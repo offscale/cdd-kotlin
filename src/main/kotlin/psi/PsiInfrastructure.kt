@@ -18,11 +18,9 @@ import org.jetbrains.kotlin.psi.KtPsiFactory
 @OptIn(org.jetbrains.kotlin.K1Deprecation::class)
 object PsiInfrastructure {
 
-  private var _disposable: Disposable? = null
-  private var _environment: KotlinCoreEnvironment? = null
+  private data class EnvHolder(val disposable: Disposable, val environment: KotlinCoreEnvironment)
 
-  // transform library tracking to manual tracking since Disposer.isDisposed is shaded out
-  private var _isDisposed: Boolean = true
+  private var holder: EnvHolder? = null
 
   /**
    * Retrieves or initializes the Project instance. Automatically re-initializes if the underlying
@@ -31,14 +29,12 @@ object PsiInfrastructure {
   val project: Project
     get() {
       synchronized(this) {
-        if (_isDisposed) {
-          initialize()
-        }
-        return _environment!!.project
+        val current = holder ?: initialize()
+        return current.environment.project
       }
     }
 
-  private fun initialize() {
+  private fun initialize(): EnvHolder {
     val disposable = Disposer.newDisposable("PsiInfrastructure")
     val configuration = CompilerConfiguration()
     configuration.put(CommonConfigurationKeys.MESSAGE_COLLECTOR_KEY, MessageCollector.NONE)
@@ -50,12 +46,16 @@ object PsiInfrastructure {
         KotlinCoreEnvironment.createForProduction(
             disposable, configuration, EnvironmentConfigFiles.JVM_CONFIG_FILES)
 
-    _disposable = disposable
-    _environment = env
-    _isDisposed = false
+    val created = EnvHolder(disposable, env)
+    holder = created
+    return created
   }
 
-  /** Creates a new instance of [KtPsiFactory]. */
+  /**
+   * Creates a new instance of [KtPsiFactory].
+   *
+   * @return A [KtPsiFactory] bound to [project].
+   */
   fun createPsiFactory(): KtPsiFactory {
     return KtPsiFactory(project)
   }
@@ -63,11 +63,10 @@ object PsiInfrastructure {
   /** Helper to manually dispose if needed. */
   fun dispose() {
     synchronized(this) {
-      if (!_isDisposed) {
-        Disposer.dispose(_disposable!!)
-        _disposable = null
-        _environment = null
-        _isDisposed = true
+      val current = holder
+      if (current != null) {
+        Disposer.dispose(current.disposable)
+        holder = null
       }
     }
   }

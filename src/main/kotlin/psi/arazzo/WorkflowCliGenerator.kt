@@ -9,6 +9,7 @@ import domain.ArazzoComponents
 import domain.ArazzoDefinition
 import domain.SchemaProperty
 import domain.Workflow
+import domain.mapResult
 import org.jetbrains.kotlin.psi.KtFile
 import psi.PsiInfrastructure
 import psi.arazzo.WorkflowSdkGenerator.quote
@@ -143,10 +144,10 @@ object WorkflowCliGenerator {
   fun generateWorkflowCliKtFileResult(
       packageName: String,
       definition: ArazzoDefinition
-  ): Result<KtFile> {
-    val src = generateWorkflowCliSourceResult(packageName, definition).getOrThrow()
-    return Result.success(PsiInfrastructure.createPsiFactory().createFile("WorkflowCli.kt", src))
-  }
+  ): Result<KtFile> =
+      generateWorkflowCliSourceResult(packageName, definition).mapResult { src ->
+        PsiInfrastructure.createPsiFactory().createFile("WorkflowCli.kt", src)
+      }
 
   private fun psi.KotlinSourceBuilder.emitCliWorkflowRunnerMethod(
       workflow: Workflow,

@@ -69,7 +69,7 @@ expect fun generateServerCode(
  * Performs bi-directional synchronization of code definitions in [inputDir] against [truth].
  *
  * @param inputDir The project directory to synchronize.
- * @param truth The source of truth (`class`, `sqlalchemy`, `function`, or `arazzo`).
+ * @param truth The source of truth (`class`, `dao`, `arazzo`, or `openapi`).
  * @return A [Result] indicating success or a [domain.CddError].
  */
 expect fun performSync(inputDir: String, truth: String): Result<Unit>

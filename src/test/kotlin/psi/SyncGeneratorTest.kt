@@ -62,9 +62,55 @@ class SyncGeneratorTest {
     val tempDir = Files.createTempDirectory("sync-other-truths").toFile()
     try {
       File(tempDir, "README.md").writeText("# ignore non-kt file")
+      File(tempDir, "Tables.kt")
+          .writeText(
+              """
+              package custom.pkg.dao
+              object AccountTable : Table("accounts") {
+                val idColumn = integer("id")
+                val totalColumn = long("total")
+                val scoreColumn = double("score")
+                val activeColumn = bool("active")
+                val nameColumn = varchar("name", 255)
+              }
+              """
+                  .trimIndent())
       assertTrue(SyncGenerator.synchronize(tempDir.absolutePath, "sqlalchemy").isSuccess)
-      assertTrue(SyncGenerator.synchronize(tempDir.absolutePath, "unknown_truth").isSuccess)
+      assertTrue(File(tempDir, "models/Account.kt").exists())
       assertTrue(File(tempDir, "openapi_sync.json").exists())
+
+      // Test openapi truth target (with existing openapi_sync.json and without)
+      assertTrue(SyncGenerator.synchronize(tempDir.absolutePath, "openapi").isSuccess)
+      File(tempDir, "openapi_sync.json").writeText("{bad json")
+      assertTrue(SyncGenerator.synchronize(tempDir.absolutePath, "openapi").isFailure)
+      File(tempDir, "openapi_sync.json").delete()
+      File(tempDir, "openapi.json").mkdirs()
+      assertTrue(SyncGenerator.synchronize(tempDir.absolutePath, "openapi").isSuccess)
+      File(tempDir, "openapi.json").deleteRecursively()
+
+      // Test failure when models/ is a regular file blocking writeModelSchemas
+      File(tempDir, "models").deleteRecursively()
+      File(tempDir, "models").writeText("blocked")
+      assertTrue(SyncGenerator.synchronize(tempDir.absolutePath, "dao").isFailure)
+      File(tempDir, "openapi_sync.json")
+          .writeText(
+              """{"openapi":"3.2.0","info":{"title":"T","version":"1"},"components":{"schemas":{"A":{"type":"object"}}}}""")
+      assertTrue(SyncGenerator.synchronize(tempDir.absolutePath, "openapi").isFailure)
+      File(tempDir, "openapi_sync.json")
+          .writeText("""{"openapi":"3.2.0","info":{"title":"T","version":"1"}}""")
+      File(tempDir, "models").delete()
+      assertTrue(SyncGenerator.synchronize(tempDir.absolutePath, "openapi").isSuccess)
+
+      // Test blank package fallback and unknown truth target failure
+      val blankPkgDir = Files.createTempDirectory("sync-blank-pkg").toFile()
+      try {
+        File(blankPkgDir, "OnlyDao.kt").writeText("package .models\ndata class Item(val id: Int)")
+        assertTrue(SyncGenerator.synchronize(blankPkgDir.absolutePath, "class").isSuccess)
+      } finally {
+        blankPkgDir.deleteRecursively()
+      }
+
+      assertTrue(SyncGenerator.synchronize(tempDir.absolutePath, "unknown_truth").isFailure)
     } finally {
       tempDir.deleteRecursively()
     }

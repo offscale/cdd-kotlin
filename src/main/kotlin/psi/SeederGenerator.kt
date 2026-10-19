@@ -70,7 +70,8 @@ class SeederGenerator {
               line("val entity = generate$name()")
               line("val created = daoConfig.${lowerName}Dao.create(entity)")
               if (schema.properties["id"] != null) {
-                line("if (created.id != null) pool${name}Ids.add(created.id!!)")
+                line("val createdId = created.id")
+                line("if (createdId != null) pool${name}Ids.add(createdId)")
               }
             }
           }

@@ -395,21 +395,21 @@ object EndpointMethodGenerator {
     return map
   }
 
-  private fun schemaPropertyToDocValue(schema: SchemaProperty): Any =
+  private fun schemaPropertyToDocValue(schema: SchemaProperty): OpenApiValue =
       psi.dto.SchemaDocTagWriter.schemaPropertyToDocValue(schema)
 
   /**
-   * Converts an [ExampleObject] into a JSON-serializable doc value.
+   * Converts an [ExampleObject] into a strongly-typed [OpenApiValue] doc value.
    *
    * @param example Example object.
-   * @return Serializable doc value.
+   * @return [OpenApiValue] doc representation.
    */
-  fun exampleObjectToDocValue(example: ExampleObject): Any {
+  fun exampleObjectToDocValue(example: ExampleObject): OpenApiValue {
     example.ref?.let {
       val refMap = linkedMapOf<String, Any?>("\$ref" to it)
       refMap.putIfNotNull("summary", example.summary)
       refMap.putIfNotNull("description", example.description)
-      return refMap
+      return OpenApiValues.fromAny(refMap)
     }
     val map = linkedMapOf<String, Any?>()
     map.putIfNotNull("summary", example.summary)
@@ -419,7 +419,7 @@ object EndpointMethodGenerator {
     map.putIfNotNull("externalValue", example.externalValue)
     map.putIfNotNull("value", example.value)
     map.putExtensions(example.extensions)
-    return map
+    return OpenApiValues.fromAny(map)
   }
 
   private fun referenceToDocValue(reference: ReferenceObject): Map<String, Any?> {

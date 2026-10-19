@@ -11,6 +11,7 @@ class DaoTestGenerator {
    *
    * @param packageName The package namespace for the DAOs.
    * @param schemas The list of schema definitions to generate tests for.
+   * @return Map of relative test file paths to generated Kotlin test source code.
    */
   fun generateDaoTests(packageName: String, schemas: List<SchemaDefinition>): Map<String, String> {
     val results = mutableMapOf<String, String>()
@@ -127,10 +128,11 @@ class DaoTestGenerator {
                       else -> "\"test\""
                     }
                   }
+              val safePropName = escapeKotlinKeyword(propName)
               if (propName == "id") {
-                "$propName = 0"
+                "$safePropName = 0"
               } else {
-                "$propName = $dummyVal"
+                "$safePropName = $dummyVal"
               }
             }
             .joinToString(", ")
@@ -154,7 +156,7 @@ class DaoTestGenerator {
       sb.append("        val created = dao.create(entity)\n")
       sb.append("        val fetched = dao.getById(created.id)\n")
       sb.append("        assertNotNull(fetched)\n")
-      sb.append("        assertEquals(created.id, fetched!!.id)\n")
+      sb.append("        assertEquals(created.id, fetched?.id)\n")
       sb.append("    }\n\n")
 
       sb.append("    @Test\n")

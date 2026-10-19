@@ -16,13 +16,11 @@ import domain.CriterionTypeOrExpression
 import domain.ExpressionTypeObject
 import domain.FailureActionObject
 import domain.OpenApiArray
-import domain.OpenApiBoolean
 import domain.OpenApiInt
 import domain.OpenApiNumber
 import domain.OpenApiObject
 import domain.OpenApiString
 import domain.OpenApiValue
-import domain.OpenApiValues
 import domain.OutputValue
 import domain.PayloadReplacementObject
 import domain.ReusableObject
@@ -36,7 +34,6 @@ import domain.Workflow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import openapi.OpenApiWriter
-import openapi.parseJsonElementResult
 import openapi.parser.YamlToJsonElementConverter
 
 /**
@@ -430,13 +427,8 @@ class ArazzoWriter {
     return OpenApiObject(map)
   }
 
-  private fun schemaPropertyToOpenApiValue(schema: SchemaProperty): OpenApiValue {
-    schema.booleanSchema?.let {
-      return OpenApiBoolean(it)
-    }
-    val jsonStr = openApiWriter.writeSchema(schema, OpenApiWriter.Format.JSON)
-    return OpenApiValues.fromJsonElement(parseJsonElementResult(jsonStr).getOrThrow())
-  }
+  private fun schemaPropertyToOpenApiValue(schema: SchemaProperty): OpenApiValue =
+      openApiWriter.schemaToOpenApiValue(schema)
 
   private fun resolveFormat(format: Format, fileName: String?): Format {
     if (format != Format.AUTO) return format

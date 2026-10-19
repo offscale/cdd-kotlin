@@ -18,6 +18,11 @@ fun processWasmArgs(args: Array<String>): String {
   return "cdd-kotlin WASM received: " + args.joinToString(", ")
 }
 
+private fun resolveWasmArgs(defaultCommand: String): Array<String> {
+  val argsStr = getEnvVar("CDD_ARGS") ?: defaultCommand
+  return argsStr.split(" ").filter { it.isNotEmpty() }.toTypedArray()
+}
+
 /**
  * Exported WASM function for `from_openapi`.
  *
@@ -26,9 +31,7 @@ fun processWasmArgs(args: Array<String>): String {
 @OptIn(kotlin.wasm.ExperimentalWasmInterop::class)
 @WasmExport
 fun from_openapi(): Int {
-  val argsStr = getEnvVar("CDD_ARGS") ?: "from_openapi to_sdk -o out"
-  val args = argsStr.split(" ").filter { it.isNotEmpty() }.toTypedArray()
-  return runCli(args)
+  return runCli(resolveWasmArgs("from_openapi to_sdk -o out"))
 }
 
 /**
@@ -39,7 +42,7 @@ fun from_openapi(): Int {
 @OptIn(kotlin.wasm.ExperimentalWasmInterop::class)
 @WasmExport
 fun to_openapi(): Int {
-  return runCli(arrayOf("to_openapi"))
+  return runCli(resolveWasmArgs("to_openapi"))
 }
 
 /**
@@ -50,9 +53,7 @@ fun to_openapi(): Int {
 @OptIn(kotlin.wasm.ExperimentalWasmInterop::class)
 @WasmExport
 fun from_arazzo(): Int {
-  val argsStr = getEnvVar("CDD_ARGS") ?: "from_arazzo to_sdk -o out"
-  val args = argsStr.split(" ").filter { it.isNotEmpty() }.toTypedArray()
-  return runCli(args)
+  return runCli(resolveWasmArgs("from_arazzo to_sdk -o out"))
 }
 
 /**
@@ -63,7 +64,7 @@ fun from_arazzo(): Int {
 @OptIn(kotlin.wasm.ExperimentalWasmInterop::class)
 @WasmExport
 fun to_arazzo(): Int {
-  return runCli(arrayOf("to_arazzo"))
+  return runCli(resolveWasmArgs("to_arazzo"))
 }
 
 /**
@@ -74,7 +75,7 @@ fun to_arazzo(): Int {
 @OptIn(kotlin.wasm.ExperimentalWasmInterop::class)
 @WasmExport
 fun to_docs_json(): Int {
-  return runCli(arrayOf("to_docs_json"))
+  return runCli(resolveWasmArgs("to_docs_json"))
 }
 
 /**
@@ -85,5 +86,5 @@ fun to_docs_json(): Int {
 @OptIn(kotlin.wasm.ExperimentalWasmInterop::class)
 @WasmExport
 fun to_sdk(): Int {
-  return runCli(arrayOf("to_sdk"))
+  return runCli(resolveWasmArgs("to_sdk"))
 }

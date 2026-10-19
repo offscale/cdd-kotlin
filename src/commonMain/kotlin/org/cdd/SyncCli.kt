@@ -15,7 +15,7 @@ object SyncCli {
    * @return Exit code (0 for success, 1 for error).
    */
   fun sync(args: Array<String>): Int {
-    var truth = ""
+    var truth = getEnvVar("CDD_TRUTH") ?: ""
     var inputDir = getEnvVar("CDD_INPUT_DIR") ?: "."
 
     var i = 1
@@ -30,7 +30,7 @@ object SyncCli {
     }
 
     if (truth.isEmpty()) {
-      println("Missing --truth <class|sqlalchemy|function>")
+      println("Missing --truth <class|dao|arazzo|openapi>")
       return 1
     }
 

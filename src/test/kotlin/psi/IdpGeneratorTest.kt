@@ -18,5 +18,11 @@ class IdpGeneratorTest {
     assertTrue(
         result.contains("fun validateToken(token: String, daoConfig: DaoConfiguration)"),
         "Missing token validator")
+
+    val withSchemas =
+        generator.generateIdpModule(
+            "com.example",
+            listOf(domain.SchemaDefinition("User"), domain.SchemaDefinition("Account")))
+    assertTrue(withSchemas.contains("val principalModelName: String = \"User\""))
   }
 }

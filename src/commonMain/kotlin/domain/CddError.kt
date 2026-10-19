@@ -264,3 +264,27 @@ fun Throwable.toCddError(): CddError =
  * @return The [CddError] describing the failure, or `null` on success.
  */
 fun <T> Result<T>.cddErrorOrNull(): CddError? = exceptionOrNull()?.toCddError()
+
+/**
+ * Transforms the success value of this [Result] using [transform], or propagates the failure
+ * [Result] unchanged.
+ *
+ * @param T The input success value type.
+ * @param R The output success value type.
+ * @param transform Function mapping a successful [T] into a [Result] of [R].
+ * @return The transformed [Result] on success, or the original failure [Result].
+ */
+fun <T, R> Result<T>.flatMapResult(transform: (T) -> Result<R>): Result<R> =
+    fold(onSuccess = transform, onFailure = { Result.failure(it) })
+
+/**
+ * Transforms the success value of this [Result] using [transform], or propagates the failure
+ * [Result] unchanged.
+ *
+ * @param T The input success value type.
+ * @param R The output success value type.
+ * @param transform Function mapping a successful [T] into [R].
+ * @return A [Result] wrapping the transformed [R] on success, or the original failure [Result].
+ */
+fun <T, R> Result<T>.mapResult(transform: (T) -> R): Result<R> =
+    fold(onSuccess = { Result.success(transform(it)) }, onFailure = { Result.failure(it) })

@@ -310,7 +310,10 @@ object OpenApiPathFlattener {
     if (opParams.isEmpty()) return pathParams
 
     val merged = LinkedHashMap<String, EndpointParameter>()
-    /** @param param Parameter to build a lookup key for. */
+    /**
+     * @param param Parameter to build a lookup key for.
+     * @return Unique parameter key combining location and name.
+     */
     fun key(param: EndpointParameter): String = "${param.location}:${param.name}"
 
     pathParams.forEach { merged[key(it)] = it }

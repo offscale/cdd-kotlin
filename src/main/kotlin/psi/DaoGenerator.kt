@@ -144,8 +144,7 @@ class DaoGenerator {
           }
       val dbType = if (isNullable && propName != "id") "$dbTypeBase.nullable()" else dbTypeBase
       if (propName == "id") {
-        val ktTypeWithNullId = TypeMappers.mapType(schema.properties["id"]!!)
-        val isAutoInc = ktTypeWithNullId == "Int" || ktTypeWithNullId == "Long"
+        val isAutoInc = ktTypeWithNull == "Int" || ktTypeWithNull == "Long"
         if (isAutoInc) {
           sb.append("    val idColumn = $dbType.autoIncrement()\n")
         } else {
@@ -273,14 +272,16 @@ class DaoGenerator {
   private fun generateDaoFactory(modelSchemas: List<SchemaDefinition>): String {
     val sb = StringBuilder()
     sb.append("/**\n")
-    sb.append(" * Configuration object containing DAOs.\n")
+    sb.append(" * Configuration object containing strongly-typed DAOs.\n")
+    sb.append(" *\n")
+    sb.append(" * @property useConcrete Whether concrete database-backed DAOs are enabled.\n")
     sb.append(" */\n")
-    sb.append("class DaoConfiguration(private val daos: Map<String, Any>) {\n")
+    sb.append("class DaoConfiguration(val useConcrete: Boolean) {\n")
     for (schema in modelSchemas) {
       val name = capitalizeName(schema.safeName)
       val lowerName = decapitalizeName(name)
       sb.append(
-          "    val ${lowerName}Dao: ${name}Dao get() = daos[\"${lowerName}Dao\"] as ${name}Dao\n")
+          "    val ${lowerName}Dao: ${name}Dao get() = if (useConcrete) Concrete${name}Dao() else Stub${name}Dao()\n")
     }
     sb.append("}\n\n")
 
@@ -292,34 +293,10 @@ class DaoGenerator {
     sb.append("     * Instantiates the correct DAOs based on configuration.\n")
     sb.append(
         "     * @param useConcrete If true, initializes concrete DAOs (and requires DB setup). Otherwise, initializes Stub DAOs.\n")
+    sb.append("     * @return The configured [DaoConfiguration].\n")
     sb.append("     */\n")
-    sb.append("    fun create(useConcrete: Boolean): DaoConfiguration {\n")
-    sb.append("        val map = mutableMapOf<String, Any>()\n")
-    val chunkedDaos = modelSchemas.chunked(100)
-    chunkedDaos.forEachIndexed { index, _ ->
-      sb.append("        populateBatch$index(map, useConcrete)\n")
-    }
-    sb.append("        return DaoConfiguration(map)\n")
-    sb.append("    }\n\n")
-
-    chunkedDaos.forEachIndexed { index, batch ->
-      sb.append(
-          "    private fun populateBatch$index(map: MutableMap<String, Any>, useConcrete: Boolean) {\n")
-      sb.append("        if (useConcrete) {\n")
-      for (schema in batch) {
-        val name = capitalizeName(schema.safeName)
-        val lowerName = decapitalizeName(name)
-        sb.append("            map[\"${lowerName}Dao\"] = Concrete${name}Dao()\n")
-      }
-      sb.append("        } else {\n")
-      for (schema in batch) {
-        val name = capitalizeName(schema.safeName)
-        val lowerName = decapitalizeName(name)
-        sb.append("            map[\"${lowerName}Dao\"] = Stub${name}Dao()\n")
-      }
-      sb.append("        }\n")
-      sb.append("    }\n\n")
-    }
+    sb.append(
+        "    fun create(useConcrete: Boolean): DaoConfiguration = DaoConfiguration(useConcrete)\n")
     sb.append("}\n")
     return sb.toString()
   }

@@ -8,6 +8,8 @@ package psi.arazzo
 import domain.ArazzoDefinition
 import domain.FailureActionType
 import domain.ReusableOr
+import domain.flatMapResult
+import domain.mapResult
 import psi.arazzo.WorkflowSdkGenerator.quote
 import psi.buildKotlinFile
 import psi.escapeKotlinKeyword
@@ -29,19 +31,23 @@ object WorkflowServerGenerator {
   fun generateWorkflowServerSourcesResult(
       packageName: String,
       definition: ArazzoDefinition
-  ): Result<Map<String, String>> {
-    val files = LinkedHashMap<String, String>()
-    val sdkFiles =
-        WorkflowSdkGenerator.generateWorkflowSdkSourcesResult(packageName, definition).getOrThrow()
-    files.putAll(sdkFiles)
-    files["WorkflowRoutes.kt"] =
-        generateWorkflowRoutesSourceResult(packageName, definition).getOrThrow()
-    files["StatefulWorkflowMockServer.kt"] =
-        generateStatefulMockServerSourceResult(packageName, definition).getOrThrow()
-    files["WorkflowE2ETest.kt"] =
-        generateWorkflowE2ETestSourceResult(packageName, definition).getOrThrow()
-    return Result.success(files)
-  }
+  ): Result<Map<String, String>> =
+      WorkflowSdkGenerator.generateWorkflowSdkSourcesResult(packageName, definition)
+          .flatMapResult { sdkFiles ->
+            generateWorkflowRoutesSourceResult(packageName, definition).flatMapResult { routes ->
+              generateStatefulMockServerSourceResult(packageName, definition).flatMapResult { mock
+                ->
+                generateWorkflowE2ETestSourceResult(packageName, definition).mapResult { e2e ->
+                  val files = LinkedHashMap<String, String>()
+                  files.putAll(sdkFiles)
+                  files["WorkflowRoutes.kt"] = routes
+                  files["StatefulWorkflowMockServer.kt"] = mock
+                  files["WorkflowE2ETest.kt"] = e2e
+                  files
+                }
+              }
+            }
+          }
 
   /**
    * Generates `WorkflowRoutes.kt` containing server-side workflow execution endpoints.

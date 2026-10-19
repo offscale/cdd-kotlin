@@ -84,17 +84,23 @@ class DtoGeneratorTest {
             customKeywords = mapOf("x-key" to OpenApiString("val")),
             extensions = mapOf("x-ext" to OpenApiString("val")))
 
-    val result = psi.dto.SchemaDocTagWriter.schemaPropertyToDocValue(schema) as Map<*, *>
+    val result =
+        (psi.dto.SchemaDocTagWriter.schemaPropertyToDocValue(schema) as domain.OpenApiObject)
+            .properties
     org.junit.jupiter.api.Assertions.assertTrue(result.isNotEmpty())
 
     // Also test booleanSchema
     val boolSchema = domain.SchemaProperty(booleanSchema = true)
-    val result2 = psi.dto.SchemaDocTagWriter.schemaPropertyToDocValue(boolSchema) as Boolean
+    val result2 =
+        (psi.dto.SchemaDocTagWriter.schemaPropertyToDocValue(boolSchema) as domain.OpenApiBoolean)
+            .value
     org.junit.jupiter.api.Assertions.assertTrue(result2)
 
     // Also test dynamicRef
     val dynRefSchema = domain.SchemaProperty(dynamicRef = "#/defs/a")
-    val result3 = psi.dto.SchemaDocTagWriter.schemaPropertyToDocValue(dynRefSchema) as Map<*, *>
+    val result3 =
+        (psi.dto.SchemaDocTagWriter.schemaPropertyToDocValue(dynRefSchema) as domain.OpenApiObject)
+            .properties
     org.junit.jupiter.api.Assertions.assertTrue(result3.isNotEmpty())
 
     // Test empty/minimal SchemaProperty and multi-type SchemaProperty in schemaPropertyToDocValue
@@ -108,13 +114,18 @@ class DtoGeneratorTest {
                     propertyName = "kind", mapping = mapOf("a" to "A"), defaultMapping = "A"),
             xml = domain.Xml(),
             customKeywords = mapOf("type" to OpenApiString("ignored")))
-    val emptyResult = psi.dto.SchemaDocTagWriter.schemaPropertyToDocValue(emptySchema) as Map<*, *>
+    val emptyResult =
+        (psi.dto.SchemaDocTagWriter.schemaPropertyToDocValue(emptySchema) as domain.OpenApiObject)
+            .properties
     org.junit.jupiter.api.Assertions.assertFalse(emptyResult.containsKey("xml"))
-    org.junit.jupiter.api.Assertions.assertEquals(listOf("null", "string"), emptyResult["type"])
+    org.junit.jupiter.api.Assertions.assertEquals(
+        domain.OpenApiArray(listOf(OpenApiString("null"), OpenApiString("string"))),
+        emptyResult["type"])
 
     val noTypeSchema = domain.SchemaProperty(types = emptySet())
     val noTypeResult =
-        psi.dto.SchemaDocTagWriter.schemaPropertyToDocValue(noTypeSchema) as Map<*, *>
+        (psi.dto.SchemaDocTagWriter.schemaPropertyToDocValue(noTypeSchema) as domain.OpenApiObject)
+            .properties
     org.junit.jupiter.api.Assertions.assertFalse(noTypeResult.containsKey("type"))
 
     // Test buildClassKDoc and buildPropertyKDoc branches (if/then/else, XML fields, blank strings,
@@ -686,6 +697,8 @@ class DtoGeneratorTest {
         filterModelSchemas(
             listOf(
                 SchemaDefinition("Obj", type = "object"),
+                SchemaDefinition("BoolObj", type = "object", booleanSchema = true),
+                SchemaDefinition("RefObj", type = "object", ref = "#/components/schemas/Obj"),
                 SchemaDefinition(
                     "EnumObj", type = "object", enumValues = listOf(OpenApiString("a"))),
                 SchemaDefinition("AnyOfObj", type = "object", anyOf = listOf("A")),
@@ -698,9 +711,16 @@ class DtoGeneratorTest {
                     "OneOfSchObj",
                     type = "object",
                     oneOfSchemas = listOf(SchemaProperty("string"))),
-                SchemaDefinition("ExternalAccount", type = "object"),
-                SchemaDefinition("PaymentSource", type = "object")))
-    org.junit.jupiter.api.Assertions.assertEquals(1, filtered.size)
+                SchemaDefinition(
+                    "MapAliasObj",
+                    type = "object",
+                    additionalProperties = SchemaProperty("string")),
+                SchemaDefinition(
+                    "ObjWithPropsAndAdditional",
+                    type = "object",
+                    properties = mapOf("id" to SchemaProperty("string")),
+                    additionalProperties = SchemaProperty("string"))))
+    org.junit.jupiter.api.Assertions.assertEquals(2, filtered.size)
 
     // Test double dispose on PsiInfrastructure
     PsiInfrastructure.dispose()

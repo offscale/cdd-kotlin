@@ -233,6 +233,15 @@ tasks.register("checkDocCoverage") {
                 }
               }
             }
+            val afterParen = sig.substringAfterLast(")", "").trim()
+            if (afterParen.startsWith(":") &&
+                !Regex("""^:\s*Unit\b""").containsMatchIn(afterParen)) {
+              if (!kdocBlock.contains("@return")) {
+                missing.add("${file.path}:${index + 1}: missing @return on ${trimmed}")
+              } else {
+                coveredCount++
+              }
+            }
           }
         }
       }

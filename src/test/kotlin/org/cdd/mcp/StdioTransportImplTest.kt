@@ -2,6 +2,7 @@
 package org.cdd.mcp
 
 import kotlinx.serialization.json.Json
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -30,52 +31,33 @@ class StdioTransportImplTest {
   @Test
   fun testStartReading() {
     val transport = StdioTransportImpl()
-    var received = false
-    var errored = false
+    val receivedMessages = mutableListOf<kotlinx.serialization.json.JsonElement>()
+    val errors = mutableListOf<Exception>()
     var closed = false
 
-    transport.onReceive { received = true }
-    transport.onError { errored = true }
+    transport.onReceive { receivedMessages.add(it) }
+    transport.onError { errors.add(it) }
     transport.onClose { closed = true }
 
-    // On JVM readlnOrNull caches System.in so we can't easily mock it this way.
-    // However we can test error and close branch via simulateReceive.
+    val lines = ArrayDeque(listOf("", """{"jsonrpc":"2.0","method":"ping"}""", "{bad json", null))
+    transport.startReading { lines.removeFirst() }
 
-    // Test that a bad message in send throws
-    // We can't really make println throw on JVM easily because PrintStream swallows IOExceptions.
-
-    // So let's just do reflection or direct method calls if we really need coverage,
-    // or simulate an exception another way.
-    transport.simulateReceive(Json.parseToJsonElement("""{"test": true}"""))
-    assertTrue(received)
+    assertEquals(1, receivedMessages.size)
+    assertEquals(1, errors.size)
+    assertTrue(closed)
   }
 
   @Test
   fun testSendError() {
     val transport = StdioTransportImpl()
-    var errored = false
-    transport.onError { errored = true }
+    val errors = mutableListOf<Exception>()
+    var closed = false
+    transport.onError { errors.add(it) }
+    transport.onClose { closed = true }
 
-    // Instead let's just trigger startReading error branch using an InputStream that throws on read
-    val originalIn = System.`in`
-    try {
-      System.setIn(
-          object : java.io.InputStream() {
-            override fun read(): Int {
-              throw java.io.IOException("Test Exception")
-            }
-          })
-      // Note: On some Kotlin JVM versions readlnOrNull caches the stream, but sometimes it doesn't.
-      // If it throws, we catch it.
-      transport.startReading()
-    } catch (e: Exception) {
-      // Ignored
-    } finally {
-      System.setIn(originalIn)
-    }
-    // If it didn't error (because of caching), we just simulate it to pass coverage
-    if (!errored) {
-      // simulate error to ensure coverage passes if stream wasn't read
-    }
+    transport.startReadingResult { kotlin.Result.failure(AssertionError("fatal read error")) }
+    assertEquals(1, errors.size)
+    assertEquals("fatal read error", errors.first().message)
+    assertTrue(closed)
   }
 }

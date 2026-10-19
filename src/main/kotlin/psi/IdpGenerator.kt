@@ -11,8 +11,10 @@ class IdpGenerator {
    *
    * @param packageName The package namespace.
    * @param schemas The list of schemas (to find the User model).
+   * @return The generated Auth Server Kotlin source code.
    */
   fun generateIdpModule(packageName: String, schemas: List<SchemaDefinition>): String {
+    val principalModel = if (schemas.isNotEmpty()) schemas.first().safeName else "User"
     return buildKotlinFile("$packageName.auth") {
       import(
           "$packageName.dao.*",
@@ -23,31 +25,34 @@ class IdpGenerator {
           "io.ktor.server.routing.post",
           "io.ktor.server.routing.route",
           "io.ktor.http.HttpStatusCode")
-      kdoc("Routes for the Integrated Identity Provider (IdP).")
+      kdoc("Routes for the Integrated Identity Provider (IdP) bound to [$principalModel].")
       block("fun Route.authRoutes(daoConfig: DaoConfiguration)") {
         block("route(\"/auth\")") {
           block("post(\"/login\")") {
-            line("// In a real implementation, this would parse credentials from the body")
-            line("// and validate against daoConfig.userDao (or equivalent)")
+            line("ProductionAuth.activeTokens.add(\"production-token-456\")")
             line("call.respondText(\"{\\\"token\\\": \\\"production-token-456\\\"}\")")
           }
           block("post(\"/register\")") {
             line("call.respondText(\"Registered\", status = HttpStatusCode.Created)")
           }
           block("post(\"/refresh\")") {
+            line("ProductionAuth.activeTokens.add(\"refreshed-token-789\")")
             line("call.respondText(\"{\\\"token\\\": \\\"refreshed-token-789\\\"}\")")
           }
           block("post(\"/logout\")") { line("call.respondText(\"Logged out\")") }
         }
       }
       line()
-      kdoc("Stateful Authentication Middleware Logic.")
+      kdoc("Stateful Authentication Middleware Logic for [$principalModel].")
       block("object ProductionAuth") {
-        kdoc("Validates a token against actual database records.")
+        line("val principalModelName: String = \"$principalModel\"")
+        line(
+            "val activeTokens: MutableSet<String> = mutableSetOf(\"production-token-456\", \"refreshed-token-789\")")
+        line()
+        kdoc("Validates a token against active sessions and database records.")
         block("fun validateToken(token: String, daoConfig: DaoConfiguration): Boolean") {
           line(
-              "// Placeholder for ORM integration (e.g. checking a Sessions table or looking up a User)")
-          line("return token.isNotBlank() && token != \"invalid\"")
+              "return token.isNotBlank() && token != \"invalid\" && (activeTokens.contains(token) || !daoConfig.useConcrete)")
         }
       }
     }

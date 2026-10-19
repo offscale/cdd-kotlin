@@ -11,6 +11,7 @@ class DbConnectionGenerator {
    *
    * @param packageName The package namespace.
    * @param schemas The schemas to register for migrations.
+   * @return The generated DatabaseConnection Kotlin source code.
    */
   fun generateDbConnectionModule(packageName: String, schemas: List<SchemaDefinition>): String {
     val modelSchemas = filterModelSchemas(schemas)

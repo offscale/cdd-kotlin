@@ -12,14 +12,23 @@ package domain
  * See [Path Item Object](https://spec.openapis.org/oas/v3.2.0#path-item-object)
  */
 enum class HttpMethod {
+  /** HTTP `GET` method for retrieving resources. */
   GET,
+  /** HTTP `POST` method for creating resources or submitting payloads. */
   POST,
+  /** HTTP `PUT` method for replacing a target resource. */
   PUT,
+  /** HTTP `DELETE` method for deleting a target resource. */
   DELETE,
+  /** HTTP `PATCH` method for applying partial modifications to a resource. */
   PATCH,
+  /** HTTP `HEAD` method for requesting headers identical to a `GET` request without body. */
   HEAD,
+  /** HTTP `OPTIONS` method for describing communication options for the target resource. */
   OPTIONS,
+  /** HTTP `TRACE` method for performing a message loop-back test along the path to the target. */
   TRACE,
+  /** HTTP `QUERY` method (OpenAPI 3.2) for safe, idempotent requests carrying a request body. */
   QUERY,
   /**
    * Represents a non-standard or extension HTTP method. Use [EndpointDefinition.customMethod] to
@@ -35,12 +44,19 @@ enum class HttpMethod {
  * See [Parameter Object](https://spec.openapis.org/oas/v3.2.0#parameter-object)
  */
 enum class ParameterLocation {
+  /** Parameter embedded in the URI path template (`path`). */
   PATH,
+  /** Parameter appended to the URI query string (`query`). */
   QUERY,
+  /** Entire raw URI query string payload (`querystring`, OpenAPI 3.2). */
   QUERYSTRING,
+  /** Custom HTTP request header parameter (`header`). */
   HEADER,
+  /** HTTP `Cookie` header parameter (`cookie`). */
   COOKIE,
+  /** Swagger 2.0 `in: body` payload parameter (`body`). */
   BODY,
+  /** Swagger 2.0 `in: formData` parameter (`formData`). */
   FORMDATA
 }
 
@@ -169,40 +185,9 @@ data class EndpointParameter(
     /** Specification extensions (keys starting with `x-`). */
     val extensions: Map<String, OpenApiValue> = emptyMap()
 ) {
+  /** Kotlin-safe identifier for [name], escaping reserved Kotlin keywords with backticks. */
   val safeName: String
-    get() {
-      val keywords =
-          setOf(
-              "as",
-              "break",
-              "class",
-              "continue",
-              "do",
-              "else",
-              "false",
-              "for",
-              "fun",
-              "if",
-              "in",
-              "interface",
-              "is",
-              "null",
-              "object",
-              "package",
-              "return",
-              "super",
-              "this",
-              "throw",
-              "true",
-              "try",
-              "typealias",
-              "typeof",
-              "val",
-              "var",
-              "when",
-              "while")
-      return if (name in keywords) "`$name`" else name
-    }
+    get() = psi.escapeKotlinKeyword(name)
 }
 
 /**
@@ -403,14 +388,6 @@ data class Link(
               else LinkRequestBody.Literal(rb)
           else -> LinkRequestBody.Literal(rb)
         }
-
-  /** Strongly-typed [OpenApiValue] map view of [parameters]. */
-  val typedParameters: Map<String, OpenApiValue>
-    get() = parameters
-
-  /** Strongly-typed [OpenApiValue] map view of [extensions]. */
-  val typedExtensions: Map<String, OpenApiValue>
-    get() = extensions
 }
 
 /**

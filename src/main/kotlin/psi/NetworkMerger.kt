@@ -35,11 +35,14 @@ class NetworkMerger {
 
       if (codeEndpoint != null) {
         // UPDATE:
-        // We have an existing implementation.
-        // In a strict CDD flow, the Spec dictates the contract.
-        // If we tracked manual implementation bodies, we would merge them here.
-        // For now, we take the Spec definition to ensure the Interface is current.
-        merged.add(specEndpoint)
+        // The Spec dictates the contract (path, method, parameters, requestBody, responses),
+        // while preserving code-level documentation or extensions not overridden by the Spec.
+        merged.add(
+            specEndpoint.copy(
+                summary = specEndpoint.summary ?: codeEndpoint.summary,
+                description = specEndpoint.description ?: codeEndpoint.description,
+                externalDocs = specEndpoint.externalDocs ?: codeEndpoint.externalDocs,
+                extensions = codeEndpoint.extensions + specEndpoint.extensions))
       } else {
         // ADD:
         // New endpoint defined in Spec, implies generating new code.

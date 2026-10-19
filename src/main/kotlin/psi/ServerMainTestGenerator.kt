@@ -11,6 +11,7 @@ class ServerMainTestGenerator {
    *
    * @param packageName The package namespace.
    * @param schemas The schemas.
+   * @return Map of relative test file paths to generated Kotlin test source code.
    */
   fun generateServerMainTests(
       packageName: String,

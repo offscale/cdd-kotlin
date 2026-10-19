@@ -172,7 +172,7 @@ class OpenApiParser {
   private fun resolveFormat(source: String, hint: Format): Format {
     if (hint != Format.AUTO) return hint
     val trimmed = source.trimStart()
-    return if (trimmed.startsWith("{") or trimmed.startsWith("[")) {
+    return if (trimmed.firstOrNull() in setOf('{', '[')) {
       Format.JSON
     } else {
       Format.YAML
@@ -198,7 +198,7 @@ class OpenApiParser {
     if (root.has("arazzo")) {
       return arazzo.ArazzoParser().parseJsonObjectResult(root).map { OpenApiDocument.Arazzo(it) }
     }
-    val isOpenApi = root.has("openapi") or root.has("swagger")
+    val isOpenApi = listOf("openapi", "swagger").any { root.has(it) }
     return if (isOpenApi) {
       Result.success(OpenApiDocument.OpenApi(parseOpenApi(root, baseUri)))
     } else {

@@ -8,6 +8,7 @@ package psi.arazzo
 import arazzo.ArazzoWriter
 import domain.ArazzoDefinition
 import domain.CddError
+import domain.flatMapResult
 import domain.toFailure
 import java.io.File
 import writeToFile
@@ -30,10 +31,9 @@ object ArazzoApiGenerator {
         parseArazzoFromPathResult(inputPath).getOrElse {
           return Result.failure(it)
         }
-    val writer = ArazzoWriter()
-    val serialized =
-        writer.writeResult(definition, ArazzoWriter.Format.AUTO, outputFile).getOrThrow()
-    return writeToFile(outputFile, serialized)
+    return ArazzoWriter()
+        .writeResult(definition, ArazzoWriter.Format.AUTO, outputFile)
+        .flatMapResult { serialized -> writeToFile(outputFile, serialized) }
   }
 
   /**
