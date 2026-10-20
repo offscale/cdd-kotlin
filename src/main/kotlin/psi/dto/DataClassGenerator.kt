@@ -7,6 +7,7 @@ import domain.SchemaDefinition
 import domain.SchemaProperty
 import psi.ReferenceResolver
 import psi.TypeMappers
+import psi.buildKotlinFile
 import psi.escapeKotlinKeyword
 
 /**
@@ -14,6 +15,8 @@ import psi.escapeKotlinKeyword
  * array) from OpenAPI [SchemaDefinition]s.
  */
 object DataClassGenerator {
+  private val NL = 10.toChar()
+
   /**
    * Generates a Kotlin `typealias` source file for a primitive or array [SchemaDefinition].
    *
@@ -37,15 +40,11 @@ object DataClassGenerator {
     val isNullable = prop.types.contains("null")
     val kotlinType = if (isNullable) "$baseType?" else baseType
 
-    return """
-            package $packageName
-
-            ${imports.sorted().joinToString("\n") { "import $it" }}
-
-            $kdoc$deprecatedAnnotation
-            typealias ${definition.safeName} = $kotlinType
-        """
-        .trimIndent()
+    return buildKotlinFile(packageName) {
+      imports.sorted().forEach { import(it) }
+      raw("$kdoc$deprecatedAnnotation")
+      line("typealias ${definition.safeName} = $kotlinType")
+    }
   }
 
   /**
@@ -65,13 +64,10 @@ object DataClassGenerator {
     val deprecatedAnnotation = SchemaDocTagWriter.buildDeprecatedAnnotation(definition.deprecated)
     val kotlinType = if (value) "Any" else "Nothing"
 
-    return """
-            package $packageName
-
-            $kdoc$deprecatedAnnotation
-            typealias ${definition.safeName} = $kotlinType
-        """
-        .trimIndent()
+    return buildKotlinFile(packageName) {
+      raw("$kdoc$deprecatedAnnotation")
+      line("typealias ${definition.safeName} = $kotlinType")
+    }
   }
 
   /**
@@ -87,13 +83,10 @@ object DataClassGenerator {
     val deprecatedAnnotation = SchemaDocTagWriter.buildDeprecatedAnnotation(definition.deprecated)
     val target = ReferenceResolver.resolveRefToType(ref)
 
-    return """
-            package $packageName
-
-            $kdoc$deprecatedAnnotation
-            typealias ${definition.safeName} = $target
-        """
-        .trimIndent()
+    return buildKotlinFile(packageName) {
+      raw("$kdoc$deprecatedAnnotation")
+      line("typealias ${definition.safeName} = $target")
+    }
   }
 
   /**
@@ -119,15 +112,11 @@ object DataClassGenerator {
         TypeMappers.mapType(
             definition.additionalProperties!!, dynamicContext.scope::resolveDynamicRef)
 
-    return """
-            package $packageName
-
-            ${imports.sorted().joinToString("\n") { "import $it" }}
-
-            $kdoc$deprecatedAnnotation
-            typealias ${definition.safeName} = Map<String, $valueType>
-        """
-        .trimIndent()
+    return buildKotlinFile(packageName) {
+      imports.sorted().forEach { import(it) }
+      raw("$kdoc$deprecatedAnnotation")
+      line("typealias ${definition.safeName} = Map<String, $valueType>")
+    }
   }
 
   /**
@@ -168,11 +157,11 @@ object DataClassGenerator {
               val desc = SchemaDocTagWriter.buildPropertyKDoc(prop)
               val deprecatedPropAnnotation =
                   SchemaDocTagWriter.buildDeprecatedAnnotation(prop.deprecated, indent = "    ")
-              val serialName = "    @SerialName(\"$name\")"
-              val contextual = if (kotlinType.startsWith("Any")) "    @Contextual\n" else ""
-              "$desc$deprecatedPropAnnotation$serialName\n$contextual    val ${escapeKotlinKeyword(name)}: $kotlinType$defaultVal"
+              val serialName = """    @SerialName("$name")"""
+              val contextual = if (kotlinType.startsWith("Any")) "    @Contextual$NL" else ""
+              "$desc$deprecatedPropAnnotation$serialName$NL$contextual    val ${escapeKotlinKeyword(name)}: $kotlinType$defaultVal"
             }
-            .joinToString(",\n\n")
+            .joinToString(",$NL$NL")
 
     val kdoc = SchemaDocTagWriter.buildClassKDoc(definition)
     val deprecatedAnnotation = SchemaDocTagWriter.buildDeprecatedAnnotation(definition.deprecated)
@@ -180,17 +169,13 @@ object DataClassGenerator {
     val isDataClass = propertyLines.isNotBlank()
     val classKeyword = if (isDataClass) "data class" else "class"
     val classBody =
-        if (isDataClass) "( \n            $propertyLines\n            )$inheritanceClause"
-        else "$inheritanceClause"
-    return """ 
-            package $packageName
-            
-            ${imports.sorted().joinToString("\n") { "import $it" }} 
-            
-            $kdoc$deprecatedAnnotation@Serializable
-            $classKeyword ${escapeKotlinKeyword(definition.safeName)}$classBody
-        """
-        .trimIndent()
+        if (isDataClass) "( $NL$propertyLines$NL)$inheritanceClause" else inheritanceClause
+    return buildKotlinFile(packageName) {
+      imports.sorted().forEach { import(it) }
+      raw("$kdoc$deprecatedAnnotation")
+      line("@Serializable")
+      line("$classKeyword ${escapeKotlinKeyword(definition.safeName)}$classBody")
+    }
   }
 
   /**
@@ -210,9 +195,6 @@ object DataClassGenerator {
   ): String {
     val baseType = TypeMappers.mapType(prop, dynamicScope::resolveDynamicRef)
 
-    // Nullability Logic:
-    // 1. If "null" is in types -> Nullable (OAS 3.2)
-    // 2. If not required -> Nullable (Swagger 2.0 / OAS 3.0 default)
     val isExplicitlyNullable = prop.types.contains("null")
     val isRequired = requiredList.contains(name)
 

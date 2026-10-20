@@ -91,11 +91,22 @@ actual fun generateSdkCode(
 
   val filesToWrite = mutableListOf<Pair<String, String>>()
   val dtoGen = psi.DtoGenerator()
+  val uiGen = psi.UiGenerator()
+  val pkgPath = packageName.replace(".", "/")
   for ((name, schema) in schemaMap) {
     val file = dtoGen.generateDto("$packageName.models", schema)
     filesToWrite.add(
-        "$outputDir/composeApp/src/commonMain/kotlin/${packageName.replace(".", "/")}/models/$name.kt" to
-            file.text)
+        "$outputDir/composeApp/src/commonMain/kotlin/$pkgPath/models/$name.kt" to file.text)
+    if (schema.properties.isNotEmpty()) {
+      val formFile = uiGen.generateForm("$packageName.ui", schema.copy(name = name))
+      val gridFile = uiGen.generateGrid("$packageName.ui", schema.copy(name = name))
+      filesToWrite.add(
+          "$outputDir/composeApp/src/commonMain/kotlin/$pkgPath/ui/${schema.copy(name = name).safeName}Form.kt" to
+              formFile.text)
+      filesToWrite.add(
+          "$outputDir/composeApp/src/commonMain/kotlin/$pkgPath/ui/${schema.copy(name = name).safeName}Grid.kt" to
+              gridFile.text)
+    }
   }
 
   val endpoints = domain.OpenApiPathFlattener.flattenPaths(definition.paths, definition.components)
@@ -152,6 +163,8 @@ actual fun generateServerCode(
   }
 
   val schemas = schemaMap.map { (key, value) -> value.copy(name = key) }
+  val endpoints = domain.OpenApiPathFlattener.flattenPaths(definition.paths, definition.components)
+  val securitySchemes = if (components != null) components.securitySchemes else emptyMap()
 
   val daoGen = psi.DaoGenerator()
   for ((path, content) in daoGen.generateDaos(packageName, schemas)) {
@@ -169,19 +182,20 @@ actual fun generateServerCode(
           seederGen.generateSeederModule(packageName, schemas))
 
   val mainGen = psi.ServerMainGenerator()
-  for ((path, content) in mainGen.generateServerMain(packageName, schemas)) {
+  for ((path, content) in
+      mainGen.generateServerMain(packageName, schemas, endpoints, securitySchemes)) {
     filesToWrite.add("$outputDir/server/src/main/kotlin/$pkgPath/$path" to content)
   }
 
   val idpGen = psi.IdpGenerator()
   filesToWrite.add(
       "$outputDir/server/src/main/kotlin/$pkgPath/auth/Idp.kt" to
-          idpGen.generateIdpModule(packageName, schemas))
+          idpGen.generateIdpModule(packageName, schemas, securitySchemes))
 
   val webhookGen = psi.WebhookGenerator()
   filesToWrite.add(
       "$outputDir/server/src/main/kotlin/$pkgPath/webhooks/Webhooks.kt" to
-          webhookGen.generateWebhookModule(packageName, schemas))
+          webhookGen.generateWebhookModule(packageName, schemas, definition.webhooks))
 
   if (withTests) {
     val daoTestGen = psi.DaoTestGenerator()
@@ -200,7 +214,7 @@ actual fun generateServerCode(
             seederTestGen.generateSeederTestModule(packageName, schemas))
 
     val mainTestGen = psi.ServerMainTestGenerator()
-    for ((path, content) in mainTestGen.generateServerMainTests(packageName, schemas)) {
+    for ((path, content) in mainTestGen.generateServerMainTests(packageName, schemas, endpoints)) {
       filesToWrite.add("$outputDir/server/src/test/kotlin/$pkgPath/$path" to content)
     }
   }

@@ -298,5 +298,13 @@ class ArazzoModelsTest {
     assertEquals(1, def.workflows.size)
     assertEquals(comps, def.components)
     assertEquals(ext, def.extensions)
+
+    val writer = arazzo.ArazzoWriter()
+    val json = writer.writeJson(def)
+    val reparsed = arazzo.ArazzoParser().parseStringResult(json).getOrThrow()
+    assertEquals(def, reparsed)
+    val yaml = writer.writeYaml(def)
+    val reparsedYaml = arazzo.ArazzoParser().parseStringResult(yaml).getOrThrow()
+    assertEquals(def, reparsedYaml)
   }
 }

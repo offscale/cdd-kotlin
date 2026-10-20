@@ -10,6 +10,12 @@ import domain.OpenApiDefinition
 /** Generates functional MCP client/server bridge source files for an OpenAPI specification. */
 object McpClientGenerator {
 
+  private data class AdaptedMcpTool(
+      val name: String,
+      val description: String,
+      val requiredParams: List<String>
+  )
+
   /**
    * Generates all MCP integration files mapped to the given [definition]'s paths and operations.
    *
@@ -20,7 +26,9 @@ object McpClientGenerator {
   fun generateMcpFiles(packageName: String, definition: OpenApiDefinition?): Map<String, String> {
     val paths = if (definition != null) definition.paths else emptyMap()
     val serverTitle = if (definition != null) definition.info.title else "GeneratedMcpServer"
-    val toolNames =
+    val schemas =
+        if (definition?.components != null) definition.components.schemas.keys else emptySet()
+    val tools =
         paths.flatMap { (path, item) ->
           listOf(
                   "get" to item.get,
@@ -30,14 +38,31 @@ object McpClientGenerator {
                   "patch" to item.patch)
               .mapNotNull { (method, op) ->
                 op?.let {
-                  it.operationId.takeIf { id -> id.isNotBlank() }
-                      ?: "${method}_${path.trim('/').replace('/', '_').replace("{", "").replace("}", "")}"
+                  val name =
+                      it.operationId.takeIf { id -> id.isNotBlank() }
+                          ?: "${method}_${path.trim('/').replace('/', '_').replace("{", "").replace("}", "")}"
+                  val desc = it.summary ?: it.description ?: "${method.uppercase()} $path"
+                  val reqParams = it.parameters.filter { p -> p.isRequired }.map { p -> p.name }
+                  AdaptedMcpTool(name, desc, reqParams)
                 }
               }
         }
 
     val quote = '"'
-    val toolListLiteral = toolNames.joinToString(", ") { "$quote$it$quote" }
+    val toolListLiteral = tools.joinToString(", ") { "$quote${it.name}$quote" }
+    val toolDescriptionsLiteral =
+        tools.joinToString(", ") {
+          "$quote${it.name}$quote to $quote${it.description.replace(quote, '\'')}$quote"
+        }
+    val toolRequiredParamsLiteral =
+        tools.joinToString(", ") { tool ->
+          val reqList = tool.requiredParams.joinToString(", ") { "$quote$it$quote" }
+          "$quote${tool.name}$quote to listOf($reqList)"
+        }
+    val resourceListLiteral =
+        (listOf("openapi://spec/info", "openapi://spec/schemas") +
+                schemas.map { "openapi://spec/schemas/$it" })
+            .joinToString(", ") { "$quote$it$quote" }
 
     return mapOf(
         "McpServer.kt" to
@@ -46,11 +71,19 @@ object McpClientGenerator {
             package $packageName.mcp
 
             /**
-             * Embedded MCP Server exposing OpenAPI operations as MCP tools.
+             * Embedded MCP Server exposing OpenAPI operations as MCP tools and schemas as resources.
              *
              * @property serverName Name of the MCP server instance.
+             * @property toolAdapter Adapter providing OpenAPI operation tool definitions.
+             * @property resourceAdapter Adapter providing OpenAPI schema resources.
+             * @property router Execution router dispatching tool calls.
              */
-            class McpServer(val serverName: String = "$serverTitle") {
+            class McpServer(
+                val serverName: String = "$serverTitle",
+                val toolAdapter: McpToolAdapter = McpToolAdapter(),
+                val resourceAdapter: McpResourceAdapter = McpResourceAdapter(),
+                val router: McpExecutionRouter = McpExecutionRouter(toolAdapter)
+            ) {
               /** Indicates whether the server is currently running. */
               var isRunning: Boolean = false
                 private set
@@ -64,6 +97,30 @@ object McpClientGenerator {
               fun stop() {
                 isRunning = false
               }
+
+              /**
+               * Lists all registered tool names.
+               *
+               * @return List of tool names.
+               */
+              fun listTools(): List<String> = toolAdapter.adapt()
+
+              /**
+               * Lists all registered resource URIs.
+               *
+               * @return List of resource URIs.
+               */
+              fun listResources(): List<String> = resourceAdapter.adapt()
+
+              /**
+               * Calls a tool by [name] with optional [arguments].
+               *
+               * @param name Tool identifier.
+               * @param arguments Map of argument names to string values.
+               * @return True if the tool call succeeded.
+               */
+              fun callTool(name: String, arguments: Map<String, String> = emptyMap()): Boolean =
+                  isRunning && router.routeWithArguments(name, arguments)
             }
             """
                 .trimIndent(),
@@ -121,15 +178,35 @@ object McpClientGenerator {
             package $packageName.mcp
 
             /**
-             * Adapts OpenAPI operations into callable MCP tool descriptors.
+             * Adapts OpenAPI operations into callable MCP tool descriptors and input schemas.
              */
             class McpToolAdapter {
+              private val descriptions: Map<String, String> = mapOf($toolDescriptionsLiteral)
+              private val requiredParams: Map<String, List<String>> = mapOf($toolRequiredParamsLiteral)
+
               /**
                * Returns the list of adapted OpenAPI operation tool names.
                *
                * @return List of MCP tool identifiers.
                */
               fun adapt(): List<String> = listOf($toolListLiteral)
+
+              /**
+               * Returns the description for [toolName], or null if unknown.
+               *
+               * @param toolName Tool identifier.
+               * @return Description string or null.
+               */
+              fun describe(toolName: String): String? = descriptions[toolName]
+
+              /**
+               * Returns the required parameter names for [toolName].
+               *
+               * @param toolName Tool identifier.
+               * @return List of required parameter names.
+               */
+              fun requiredArguments(toolName: String): List<String> =
+                  requiredParams[toolName] ?: emptyList()
             }
             """
                 .trimIndent(),
@@ -147,7 +224,16 @@ object McpClientGenerator {
                *
                * @return List of MCP resource URI strings.
                */
-              fun adapt(): List<String> = listOf("openapi://spec/info", "openapi://spec/schemas")
+              fun adapt(): List<String> = listOf($resourceListLiteral)
+
+              /**
+               * Reads the textual content of a resource [uri].
+               *
+               * @param uri Target resource URI.
+               * @return Resource payload string or null if not found.
+               */
+              fun read(uri: String): String? =
+                  if (adapt().contains(uri)) "$serverTitle: " + uri else null
             }
             """
                 .trimIndent(),
@@ -168,6 +254,21 @@ object McpClientGenerator {
                */
               fun route(toolName: String = ""): Boolean =
                   toolName.isEmpty() || adapter.adapt().contains(toolName)
+
+              /**
+               * Routes a tool invocation by [toolName] and validates required [arguments].
+               *
+               * @param toolName Name of the tool to invoke.
+               * @param arguments Map of provided argument values.
+               * @return True if the tool is registered and all required arguments are present.
+               */
+              fun routeWithArguments(
+                  toolName: String,
+                  arguments: Map<String, String> = emptyMap()
+              ): Boolean {
+                if (!adapter.adapt().contains(toolName)) return false
+                return adapter.requiredArguments(toolName).all { arguments.containsKey(it) }
+              }
             }
             """
                 .trimIndent(),

@@ -1871,9 +1871,14 @@ class OpenApiParserTest {
     assertTrue(richDef.components?.callbacks?.get("RefCb") is domain.Callback.Inline)
 
     // 4. Direct calls to decomposed sub-parsers with default parameters and edge cases
-    val emptyInfoDef = parser.parseString("""{"openapi":"3.2.0","info":{}}""")
-    assertEquals("Unknown", emptyInfoDef.info.title)
-    assertEquals("0.0.0", emptyInfoDef.info.version)
+    val emptyInfoDef = parser.parseString("""{"openapi":"3.2.0","info":{"license":{}}}""")
+    assertEquals("", emptyInfoDef.info.title)
+    assertEquals("", emptyInfoDef.info.version)
+    assertEquals("", emptyInfoDef.info.license?.name)
+    val emptyInfoIssues = OpenApiValidator().validate(emptyInfoDef)
+    assertTrue(emptyInfoIssues.any { it.path == "$.info.title" })
+    assertTrue(emptyInfoIssues.any { it.path == "$.info.version" })
+    assertTrue(emptyInfoIssues.any { it.path == "$.info.license.name" })
     val swagWithArrays =
         parser.parseString(
             """{"swagger":"2.0","info":{"title":"T","version":"1"},"schemes":["https",{}],"consumes":["application/json"],"produces":["application/json"]}""")

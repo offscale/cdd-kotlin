@@ -104,11 +104,6 @@ object ParameterAndHeaderValidator : OpenApiValidationRule {
               severity = OpenApiIssueSeverity.ERROR,
               path = path,
               message = "allowEmptyValue is only valid for query parameters.")
-      issues +=
-          OpenApiIssue(
-              severity = OpenApiIssueSeverity.WARNING,
-              path = path,
-              message = "allowEmptyValue is only valid for query parameters.")
     }
     if (param.location == ParameterLocation.HEADER &&
         setOf("accept", "content-type", "authorization").contains(param.name.lowercase())) {
@@ -117,13 +112,7 @@ object ParameterAndHeaderValidator : OpenApiValidationRule {
               severity = OpenApiIssueSeverity.WARNING,
               path = path,
               message =
-                  "Header parameters named Accept, Content-Type, or Authorization are ignored by the spec.")
-      issues +=
-          OpenApiIssue(
-              severity = OpenApiIssueSeverity.WARNING,
-              path = path,
-              message =
-                  "Header parameter '${param.name.lowercase()}' is ignored by the specification.")
+                  "Header parameters named Accept, Content-Type, or Authorization (${param.name.lowercase()}) are ignored by the specification.")
     }
     if (param.schema == null && param.content.isEmpty()) {
       issues +=
@@ -145,11 +134,6 @@ object ParameterAndHeaderValidator : OpenApiValidationRule {
               severity = OpenApiIssueSeverity.ERROR,
               path = "$path.content",
               message = "Parameter content must contain exactly one media type.")
-      issues +=
-          OpenApiIssue(
-              severity = OpenApiIssueSeverity.ERROR,
-              path = path,
-              message = "Parameter content must contain exactly one media type.")
     }
     val hasSerializationFlags =
         listOfNotNull(param.style, param.explode, param.allowReserved).isNotEmpty()
@@ -161,7 +145,7 @@ object ParameterAndHeaderValidator : OpenApiValidationRule {
               path = path,
               message = "Parameters using content must not define style/explode/allowReserved.")
     }
-    if ((param.example != null) and param.examples.isNotEmpty()) {
+    if (param.example != null && param.examples.isNotEmpty()) {
       issues +=
           OpenApiIssue(
               severity = OpenApiIssueSeverity.ERROR,
@@ -206,7 +190,7 @@ object ParameterAndHeaderValidator : OpenApiValidationRule {
               message = "pipeDelimited style does not support explode=true.")
     }
     if (param.style == ParameterStyle.DEEP_OBJECT) {
-      if (schemaTypes.isNotEmpty() and !schemaTypes.contains("object")) {
+      if (schemaTypes.isNotEmpty() && !schemaTypes.contains("object")) {
         issues +=
             OpenApiIssue(
                 severity = OpenApiIssueSeverity.ERROR,
@@ -293,11 +277,6 @@ object ParameterAndHeaderValidator : OpenApiValidationRule {
               severity = OpenApiIssueSeverity.ERROR,
               path = "$path.content",
               message = "Header content must contain exactly one media type.")
-      issues +=
-          OpenApiIssue(
-              severity = OpenApiIssueSeverity.ERROR,
-              path = path,
-              message = "Header content must contain exactly one media type.")
     }
     val hasNonSimpleStyle = header.style in (ParameterStyle.entries - ParameterStyle.SIMPLE)
     if (header.content.isNotEmpty()) {
@@ -316,7 +295,7 @@ object ParameterAndHeaderValidator : OpenApiValidationRule {
                 message = "Header explode must not be set when content is used.")
       }
     }
-    if ((header.example != null) and header.examples.isNotEmpty()) {
+    if (header.example != null && header.examples.isNotEmpty()) {
       issues +=
           OpenApiIssue(
               severity = OpenApiIssueSeverity.ERROR,

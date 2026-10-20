@@ -326,7 +326,16 @@ data class EndpointResponse(
 
     /** Specification extensions (keys starting with `x-`). */
     val extensions: Map<String, OpenApiValue> = emptyMap()
-)
+) {
+  /**
+   * Resolves the primary [SchemaProperty] for this response from `schema` or the first defined
+   * media type in `content`.
+   *
+   * @return The primary [SchemaProperty] or `null`.
+   */
+  fun resolvePrimarySchema(): SchemaProperty? =
+      schema ?: content["application/json"]?.schema ?: content.values.firstOrNull()?.schema
+}
 
 /**
  * The Link Object represents a possible design-time link for a response. The presence of a link
@@ -379,15 +388,7 @@ data class Link(
 ) {
   /** Strongly-typed [LinkRequestBody] view of [requestBody], or `null` if absent. */
   val typedRequestBody: LinkRequestBody?
-    get() =
-        when (val rb = requestBody) {
-          null -> null
-          is OpenApiString ->
-              if (rb.value.startsWith("$") || rb.value.contains("{$"))
-                  LinkRequestBody.Expression(rb.value)
-              else LinkRequestBody.Literal(rb)
-          else -> LinkRequestBody.Literal(rb)
-        }
+    get() = requestBody?.let { LinkRequestBody.fromOpenApiValue(it) }
 }
 
 /**

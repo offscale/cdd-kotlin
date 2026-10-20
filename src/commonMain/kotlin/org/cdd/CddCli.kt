@@ -29,47 +29,20 @@ object CddCli {
    * @return Exit code (0 for success, 1 for error).
    */
   fun generateFromOpenApi(args: Array<String>, target: String = "to_sdk"): Int {
-    var outputDir = getEnvVar("CDD_OUTPUT") ?: "out"
-    var inputFile = getEnvVar("CDD_INPUT") ?: ""
-    var inputDir = getEnvVar("CDD_INPUT_DIR") ?: ""
-    var noGithubActions =
-        getEnvVar("CDD_NO_GITHUB_ACTIONS") == "true" || getEnvVar("CDD_NO_GITHUB_ACTIONS") == "1"
-    var noInstallablePackage =
-        getEnvVar("CDD_NO_INSTALLABLE_PACKAGE") == "true" ||
-            getEnvVar("CDD_NO_INSTALLABLE_PACKAGE") == "1"
-    var tests = getEnvVar("CDD_TESTS") == "true" || getEnvVar("CDD_TESTS") == "1"
-    var i = 1
-    while (i < args.size) {
-      val arg = args[i]
-      if (arg == "-o" || arg == "--output") {
-        if (i + 1 < args.size) outputDir = args[++i]
-      } else if (arg == "-i" || arg == "--input") {
-        if (i + 1 < args.size) inputFile = args[++i]
-      } else if (arg == "--input-dir") {
-        if (i + 1 < args.size) inputDir = args[++i]
-      } else if (arg == "--no-github-actions") {
-        noGithubActions = true
-      } else if (arg == "--no-installable-package") {
-        noInstallablePackage = true
-      } else if (arg == "--tests") {
-        tests = true
-      }
-      i++
-    }
-
-    if (inputFile.isEmpty() && inputDir.isEmpty()) {
+    val flags = CliArgumentParser.parse(args, defaultOutput = "out")
+    if (flags.input.isEmpty() && flags.inputDir.isEmpty()) {
       println("Missing -i <spec.json> or --input-dir <specs_dir>")
       return 1
     }
 
     val config =
         Config(
-            inputPath = inputFile,
-            outputDir = outputDir,
-            noGithubActions = noGithubActions,
-            noInstallablePackage = noInstallablePackage,
-            tests = tests,
-            inputDir = inputDir)
+            inputPath = flags.input,
+            outputDir = flags.output,
+            noGithubActions = flags.noGithubActions,
+            noInstallablePackage = flags.noInstallablePackage,
+            tests = flags.tests,
+            inputDir = flags.inputDir)
     val generationResult =
         if (target == "to_server") {
           CddGenerator.generateServer(config)
@@ -92,41 +65,18 @@ object CddCli {
    * @return Exit code (0 for success, 1 for error).
    */
   fun generateFromArazzo(args: Array<String>, target: String = "to_sdk"): Int {
-    var outputDir = getEnvVar("CDD_OUTPUT") ?: "out"
-    var inputFile = getEnvVar("CDD_INPUT") ?: ""
-    var noGithubActions =
-        getEnvVar("CDD_NO_GITHUB_ACTIONS") == "true" || getEnvVar("CDD_NO_GITHUB_ACTIONS") == "1"
-    var noInstallablePackage =
-        getEnvVar("CDD_NO_INSTALLABLE_PACKAGE") == "true" ||
-            getEnvVar("CDD_NO_INSTALLABLE_PACKAGE") == "1"
-    var tests = getEnvVar("CDD_TESTS") == "true" || getEnvVar("CDD_TESTS") == "1"
-    var i = 1
-    while (i < args.size) {
-      val arg = args[i]
-      if (arg == "-o" || arg == "--output") {
-        if (i + 1 < args.size) outputDir = args[++i]
-      } else if (arg == "-i" || arg == "--input") {
-        if (i + 1 < args.size) inputFile = args[++i]
-      } else if (arg == "--no-github-actions") {
-        noGithubActions = true
-      } else if (arg == "--no-installable-package") {
-        noInstallablePackage = true
-      } else if (arg == "--tests") {
-        tests = true
-      }
-      i++
-    }
-    if (inputFile.isEmpty()) {
+    val flags = CliArgumentParser.parse(args, defaultOutput = "out")
+    if (flags.input.isEmpty()) {
       println("Missing -i <arazzo.json|yaml>")
       return 1
     }
     val config =
         Config(
-            inputPath = inputFile,
-            outputDir = outputDir,
-            noGithubActions = noGithubActions,
-            noInstallablePackage = noInstallablePackage,
-            tests = tests)
+            inputPath = flags.input,
+            outputDir = flags.output,
+            noGithubActions = flags.noGithubActions,
+            noInstallablePackage = flags.noInstallablePackage,
+            tests = flags.tests)
     val generationResult =
         if (target == "to_server") {
           CddGenerator.generateArazzoServer(config)
@@ -148,23 +98,12 @@ object CddCli {
    * @return Exit code (0 for success, 1 for error).
    */
   fun generateToArazzo(args: Array<String>): Int {
-    var outputFile = getEnvVar("CDD_OUTPUT") ?: "arazzo.json"
-    var inputPath = getEnvVar("CDD_INPUT") ?: ""
-    var i = 1
-    while (i < args.size) {
-      val arg = args[i]
-      if (arg == "-o" || arg == "--output") {
-        if (i + 1 < args.size) outputFile = args[++i]
-      } else if (arg == "-i" || arg == "--input") {
-        if (i + 1 < args.size) inputPath = args[++i]
-      }
-      i++
-    }
-    if (inputPath.isEmpty()) {
+    val flags = CliArgumentParser.parse(args, defaultOutput = "arazzo.json")
+    if (flags.input.isEmpty()) {
       println("Missing -i <src>")
       return 1
     }
-    return generateToArazzo(inputPath, outputFile)
+    return generateToArazzo(flags.input, flags.output)
         .fold(
             onSuccess = { 0 },
             onFailure = { e ->
@@ -180,25 +119,13 @@ object CddCli {
    * @return Exit code (0 for success, 1 for error).
    */
   fun generateToOpenApi(args: Array<String>): Int {
-    var outputDir = getEnvVar("CDD_OUTPUT") ?: "out.json"
-    var inputFile = getEnvVar("CDD_INPUT") ?: ""
-    var i = 1
-    while (i < args.size) {
-      val arg = args[i]
-      if (arg == "-o" || arg == "--output") {
-        if (i + 1 < args.size) outputDir = args[++i]
-      } else if (arg == "-i" || arg == "--input") {
-        if (i + 1 < args.size) inputFile = args[++i]
-      }
-      i++
-    }
-
-    if (inputFile.isEmpty()) {
+    val flags = CliArgumentParser.parse(args, defaultOutput = "out.json")
+    if (flags.input.isEmpty()) {
       println("Missing -i <src>")
       return 1
     }
 
-    return generateToOpenApi(inputFile, outputDir)
+    return generateToOpenApi(flags.input, flags.output)
         .fold(
             onSuccess = { 0 },
             onFailure = { e ->
@@ -214,23 +141,11 @@ object CddCli {
    * @return Exit code (0 for success, 1 for error).
    */
   fun generateDocsJson(args: Array<String>): Int {
-    var inputFile = getEnvVar("CDD_INPUT") ?: getEnvVar("INPUT") ?: ""
-    var outputFile = getEnvVar("CDD_OUTPUT") ?: ""
-    var noImports = getEnvVar("CDD_NO_IMPORTS") == "true" || getEnvVar("CDD_NO_IMPORTS") == "1"
-    var noWrapping = getEnvVar("CDD_NO_WRAPPING") == "true" || getEnvVar("CDD_NO_WRAPPING") == "1"
-
-    var i = 1
-    while (i < args.size) {
-      when (args[i]) {
-        "-i",
-        "--input" -> if (i + 1 < args.size) inputFile = args[++i]
-        "-o",
-        "--output" -> if (i + 1 < args.size) outputFile = args[++i]
-        "--no-imports" -> noImports = true
-        "--no-wrapping" -> noWrapping = true
-      }
-      i++
-    }
+    val flags = CliArgumentParser.parse(args, defaultOutput = "")
+    val inputFile = flags.input.ifEmpty { getEnvVar("INPUT") ?: "" }
+    val outputFile = flags.output
+    val noImports = flags.noImports
+    val noWrapping = flags.noWrapping
 
     if (inputFile.isEmpty()) {
       println("Missing -i <spec.json>")
@@ -325,19 +240,12 @@ object CddCli {
    * @return Exit code (0 for success, 1 for error).
    */
   fun generateDemo(args: Array<String>): Int {
-    val pwd = getEnvVar("PWD")
-    var outputDir =
+    val cwd = getEnvVar("user.dir")
+    val defaultOutput =
         getEnvVar("CDD_OUTPUT")
-            ?: if (pwd != null && pwd.isNotEmpty()) "$pwd/generated-project"
+            ?: if (cwd != null && cwd.isNotEmpty()) "$cwd/generated-project"
             else "generated-project"
-    var i = 1
-    while (i < args.size) {
-      val arg = args[i]
-      if (arg in setOf("-o", "--output") && i + 1 < args.size) {
-        outputDir = args[++i]
-      }
-      i++
-    }
+    val outputDir = CliArgumentParser.parse(args, defaultOutput = defaultOutput).output
     return scaffold
         .ScaffoldGenerator()
         .generate(outputDir, "demo", "org.example")
@@ -463,6 +371,32 @@ object CddCli {
       }
     }
 
+    peer.onRequest("tools/list") { _ ->
+      buildJsonObject {
+        put(
+            "tools",
+            buildJsonArray {
+              listOf("cdd_generate", "cdd_inspect_schema", "cdd_sync_schema").forEach { name ->
+                add(buildJsonObject { put("name", JsonPrimitive(name)) })
+              }
+            })
+      }
+    }
+
+    peer.onRequest("resources/list") { _ ->
+      buildJsonObject {
+        put(
+            "resources",
+            buildJsonArray {
+              add(
+                  buildJsonObject {
+                    put("uri", JsonPrimitive("openapi://spec/schemas"))
+                    put("name", JsonPrimitive("OpenAPI Schemas"))
+                  })
+            })
+      }
+    }
+
     return peer
   }
 
@@ -474,7 +408,7 @@ object CddCli {
    */
   fun serveJsonRpc(args: Array<String>): Int {
     val transport = org.cdd.mcp.StdioTransportImpl()
-    org.cdd.mcp.McpPeer(transport)
+    createConfiguredMcpPeer(transport)
     transport.startReading()
     return 0
   }

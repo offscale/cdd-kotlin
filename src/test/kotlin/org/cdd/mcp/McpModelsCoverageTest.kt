@@ -1009,12 +1009,38 @@ class McpModelsCoverageTest {
     assertEquals(2, serverRequests.size)
     assertEquals(3, clientResults.size)
     assertEquals(2, serverResults.size)
-    assertNotNull(ClientNotification.serializer())
-    assertNotNull(ServerNotification.serializer())
-    assertNotNull(ClientRequest.serializer())
-    assertNotNull(ServerRequest.serializer())
-    assertNotNull(ClientResult.serializer())
-    assertNotNull(ServerResult.serializer())
+
+    for (cn in clientNotifications) {
+      val wire = jsonCodec.encodeToString(ClientNotification.serializer(), cn)
+      assertEquals(cn, jsonCodec.decodeFromString(ClientNotification.serializer(), wire))
+    }
+    for (sn in serverNotifications) {
+      val wire = jsonCodec.encodeToString(ServerNotification.serializer(), sn)
+      assertEquals(sn, jsonCodec.decodeFromString(ServerNotification.serializer(), wire))
+    }
+    for (cr in clientRequests) {
+      val wire = jsonCodec.encodeToString(ClientRequest.serializer(), cr)
+      assertEquals(cr, jsonCodec.decodeFromString(ClientRequest.serializer(), wire))
+    }
+    for (sr in serverRequests) {
+      val wire = jsonCodec.encodeToString(ServerRequest.serializer(), sr)
+      assertEquals(sr, jsonCodec.decodeFromString(ServerRequest.serializer(), wire))
+    }
+    for (cres in clientResults) {
+      val wire = jsonCodec.encodeToString(ClientResult.serializer(), cres)
+      assertEquals(cres, jsonCodec.decodeFromString(ClientResult.serializer(), wire))
+    }
+    for (sres in serverResults) {
+      val wire = jsonCodec.encodeToString(ServerResult.serializer(), sres)
+      assertEquals(sres, jsonCodec.decodeFromString(ServerResult.serializer(), wire))
+    }
+
+    val rawRpcReqJson =
+        """{"jsonrpc":"2.0","id":"req-42","method":"tools/call","params":{"name":"getPet","arguments":{"id":1}}}"""
+    val decodedRpcReq = jsonCodec.decodeFromString(JSONRPCRequest.serializer(), rawRpcReqJson)
+    assertEquals("2.0", decodedRpcReq.jsonrpc)
+    assertEquals("req-42", decodedRpcReq.id)
+    assertEquals("tools/call", decodedRpcReq.method)
     assertNotNull(JSONRPCMessage.serializer())
   }
 }

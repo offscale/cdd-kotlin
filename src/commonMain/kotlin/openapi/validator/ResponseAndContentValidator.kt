@@ -199,14 +199,14 @@ object ResponseAndContentValidator : OpenApiValidationRule {
       }
       return
     }
-    if ((media.example != null) and media.examples.isNotEmpty()) {
+    if (media.example != null && media.examples.isNotEmpty()) {
       issues +=
           OpenApiIssue(
               severity = OpenApiIssueSeverity.ERROR,
               path = path,
               message = "Media type must not define both example and examples.")
     }
-    val hasPositionalEncoding = media.prefixEncoding.isNotEmpty() or (media.itemEncoding != null)
+    val hasPositionalEncoding = media.prefixEncoding.isNotEmpty() || media.itemEncoding != null
     if (media.encoding.isNotEmpty() && hasPositionalEncoding) {
       issues +=
           OpenApiIssue(
@@ -257,8 +257,8 @@ object ResponseAndContentValidator : OpenApiValidationRule {
     val baseType = mediaTypeKey.substringBefore(";").trim().lowercase()
     val isMultipart = baseType.startsWith("multipart/")
     val isFormUrlEncoded = baseType == "application/x-www-form-urlencoded"
-    val hasPositional = media.prefixEncoding.isNotEmpty() or (media.itemEncoding != null)
-    val hasEncoding = media.encoding.isNotEmpty() or hasPositional
+    val hasPositional = media.prefixEncoding.isNotEmpty() || media.itemEncoding != null
+    val hasEncoding = media.encoding.isNotEmpty() || hasPositional
     if (hasEncoding && !(isMultipart || isFormUrlEncoded)) {
       issues +=
           OpenApiIssue(
@@ -292,7 +292,7 @@ object ResponseAndContentValidator : OpenApiValidationRule {
                       message = "Encoding entries are ignored when no schema is defined.")
               return
             }
-    if ((schema.ref != null) or (schema.booleanSchema != null)) return
+    if (schema.ref != null || schema.booleanSchema != null) return
     val properties = schema.properties
     if (properties.isEmpty()) {
       issues +=
@@ -319,18 +319,18 @@ object ResponseAndContentValidator : OpenApiValidationRule {
     val exactSequential =
         setOf(
             "text/event-stream", "application/jsonl", "application/x-ndjson", "application/ndjson")
-    return baseType.startsWith("multipart/") or
-        baseType.endsWith("json-seq") or
-        (baseType in exactSequential)
+    return baseType.startsWith("multipart/") ||
+        baseType.endsWith("json-seq") ||
+        baseType in exactSequential
   }
 
   private fun hasArraySchemaOrItemSchema(media: MediaTypeObject): Boolean {
     val schema = media.schema
     val hasArrayItems =
-        listOfNotNull(media.itemSchema, schema?.items).isNotEmpty() or
+        listOfNotNull(media.itemSchema, schema?.items).isNotEmpty() ||
             schema?.prefixItems.orEmpty().isNotEmpty()
     val isArrayType = "array" in schema?.types.orEmpty()
-    return hasArrayItems or isArrayType
+    return hasArrayItems || isArrayType
   }
 
   /**
@@ -345,7 +345,7 @@ object ResponseAndContentValidator : OpenApiValidationRule {
       path: String,
       issues: MutableList<OpenApiIssue>
   ) {
-    val hasPositional = encoding.prefixEncoding.isNotEmpty() or (encoding.itemEncoding != null)
+    val hasPositional = encoding.prefixEncoding.isNotEmpty() || encoding.itemEncoding != null
     if (encoding.encoding.isNotEmpty() && hasPositional) {
       issues +=
           OpenApiIssue(
@@ -407,8 +407,8 @@ object ResponseAndContentValidator : OpenApiValidationRule {
           it, "examples", components, path, issues, currentSelfBase)
     }
 
-    val hasAnyPayload = hasValue or hasDataValue or hasSerialized or hasExternal
-    if ((example.ref != null) and hasAnyPayload) {
+    val hasAnyPayload = hasValue || hasDataValue || hasSerialized || hasExternal
+    if (example.ref != null && hasAnyPayload) {
       issues +=
           OpenApiIssue(
               severity = OpenApiIssueSeverity.ERROR,
@@ -423,21 +423,21 @@ object ResponseAndContentValidator : OpenApiValidationRule {
               path = path,
               message = "Example with \$ref must not define extensions (they are ignored).")
     }
-    if (hasDataValue and hasValue) {
+    if (hasDataValue && hasValue) {
       issues +=
           OpenApiIssue(
               severity = OpenApiIssueSeverity.ERROR,
               path = path,
               message = "Example must not define both dataValue and value.")
     }
-    if (hasSerialized and (hasValue or hasExternal)) {
+    if (hasSerialized && (hasValue || hasExternal)) {
       issues +=
           OpenApiIssue(
               severity = OpenApiIssueSeverity.ERROR,
               path = path,
               message = "Example must not define serializedValue with value or externalValue.")
     }
-    if (hasExternal and hasValue) {
+    if (hasExternal && hasValue) {
       issues +=
           OpenApiIssue(
               severity = OpenApiIssueSeverity.ERROR,

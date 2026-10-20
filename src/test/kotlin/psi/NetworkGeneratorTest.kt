@@ -3185,11 +3185,26 @@ class NetworkGeneratorTest {
                             statusCode = "200",
                             headers =
                                 mapOf(
+                                    "X-NullExplode" to
+                                        Header(type = "String", style = null, explode = null),
                                     "X-Custom" to
-                                        Header(type = "String", style = null, explode = true)),
+                                        Header(
+                                            type = "String",
+                                            style = null,
+                                            explode = true,
+                                            example =
+                                                ExampleObject(value = OpenApiString("hdr-val")),
+                                            examples =
+                                                mapOf(
+                                                    "ex1" to
+                                                        ExampleObject(
+                                                            value = OpenApiString("hdr-ex1"))))),
                             content =
                                 mapOf(
-                                    "application/json" to MediaTypeObject(),
+                                    "application/json" to
+                                        MediaTypeObject(
+                                            example =
+                                                ExampleObject(value = OpenApiString("mt-ex"))),
                                     "application/problem+json" to MediaTypeObject(),
                                     "text/plain" to MediaTypeObject(),
                                     "application/soap+xml" to MediaTypeObject(),

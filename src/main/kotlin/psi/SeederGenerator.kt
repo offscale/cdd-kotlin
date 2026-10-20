@@ -43,12 +43,12 @@ class SeederGenerator {
         }
         line()
         for (schema in modelSchemas) {
-          raw(generateFactory(schema))
+          appendFactory(schema)
         }
         kdoc("Seeds the database by creating batches of synthetic entities in topological order.")
         line(
-            "private fun generatekotlinx_serialization_json_JsonElement(): kotlinx.serialization.json.JsonElement = kotlinx.serialization.json.JsonObject(mapOf(\"uuid\" to kotlinx.serialization.json.JsonPrimitive(java.util.UUID.randomUUID().toString())))")
-        line("private fun generateMap(): Map<String, Any> = mapOf(\"key\" to \"value\")")
+            """private fun generatekotlinx_serialization_json_JsonElement(): kotlinx.serialization.json.JsonElement = kotlinx.serialization.json.JsonObject(mapOf("uuid" to kotlinx.serialization.json.JsonPrimitive(java.util.UUID.randomUUID().toString())))""")
+        line("""private fun generateMap(): Map<String, Any> = mapOf("key" to "value")""")
         block("fun seedDatabase() = runBlocking") {
           chunked.forEachIndexed { index, _ -> line("seedBatch$index()") }
         }
@@ -81,58 +81,56 @@ class SeederGenerator {
     }
   }
 
-  private fun generateFactory(schema: SchemaDefinition): String {
-    val sb = StringBuilder()
+  private fun KotlinSourceBuilder.appendFactory(schema: SchemaDefinition) {
     val name = capitalizeName(schema.safeName)
-    sb.append("    /**\n")
-    sb.append("     * Generates a synthetic [$name] using Faker.\n")
-    sb.append("     */\n")
-    sb.append("    private fun generate$name(): $name {\n")
+    val q = '"'
+    val d = '$'
+    val nl = '\n'
+    kdoc("Generates a synthetic [$name] using Faker.")
+    block("private fun generate$name(): $name") {
+      val constructorArgs =
+          schema.properties.entries
+              .map { (propName, prop) ->
+                val ktTypeWithNull = TypeMappers.mapType(prop)
+                val isNullable = !schema.required.contains(propName) || ktTypeWithNull.endsWith("?")
+                val type = ktTypeWithNull.removeSuffix("?")
 
-    val constructorArgs =
-        schema.properties.entries
-            .map { (propName, prop) ->
-              val ktTypeWithNull = TypeMappers.mapType(prop)
-              val isNullable = !schema.required.contains(propName) || ktTypeWithNull.endsWith("?")
-              val type = ktTypeWithNull.removeSuffix("?")
-
-              val valGen =
-                  when (type) {
-                    "Int" -> "faker.random.nextInt(1, 1000)"
-                    "Long" -> "faker.random.nextLong(1000L)"
-                    "Double" -> "faker.random.nextDouble()"
-                    "Boolean" -> "faker.random.nextBoolean()"
-                    "String" ->
-                        when {
-                          propName.contains("email", ignoreCase = true) -> "faker.internet.email()"
-                          propName.contains("name", ignoreCase = true) -> "faker.name.name()"
-                          propName.contains("phone", ignoreCase = true) ->
-                              "faker.phoneNumber.phoneNumber()"
-                          else -> "faker.lorem.words()"
-                        }
-                    else ->
-                        if (isNullable) "null"
-                        else if (type.startsWith("List")) "emptyList()"
-                        else if (type.contains("Map<")) "emptyMap()"
-                        else "generate${type.replace(".", "_")}()"
-                  }
-              if (propName == "id" && (type == "String" || type == "Int" || type == "Long")) {
-                if (type == "Long") "${escapeKotlinKeyword(propName)} = 0L"
-                else if (type == "Int") "${escapeKotlinKeyword(propName)} = 0"
-                else "${escapeKotlinKeyword(propName)} = \"id_\${java.util.UUID.randomUUID()}\""
-              } else if (propName.endsWith("Id") && (type == "Int" || type == "Long")) {
-                val parentName = capitalizeName(propName.removeSuffix("Id"))
-                // Use a random from the pool if it exists, else 1
-                val defaultVal = if (type == "Long") "1L" else "1"
-                "${escapeKotlinKeyword(propName)} = if (pool${parentName}Ids.isNotEmpty()) pool${parentName}Ids.random() else $defaultVal"
-              } else {
-                "${escapeKotlinKeyword(propName)} = $valGen"
+                val valGen =
+                    when (type) {
+                      "Int" -> "faker.random.nextInt(1, 1000)"
+                      "Long" -> "faker.random.nextLong(1000L)"
+                      "Double" -> "faker.random.nextDouble()"
+                      "Boolean" -> "faker.random.nextBoolean()"
+                      "String" ->
+                          when {
+                            propName.contains("email", ignoreCase = true) ->
+                                "faker.internet.email()"
+                            propName.contains("name", ignoreCase = true) -> "faker.name.name()"
+                            propName.contains("phone", ignoreCase = true) ->
+                                "faker.phoneNumber.phoneNumber()"
+                            else -> "faker.lorem.words()"
+                          }
+                      else ->
+                          if (isNullable) "null"
+                          else if (type.startsWith("List")) "emptyList()"
+                          else if (type.contains("Map<")) "emptyMap()"
+                          else "generate${type.replace(".", "_")}()"
+                    }
+                if (propName == "id" && (type == "String" || type == "Int" || type == "Long")) {
+                  if (type == "Long") "${escapeKotlinKeyword(propName)} = 0L"
+                  else if (type == "Int") "${escapeKotlinKeyword(propName)} = 0"
+                  else "${escapeKotlinKeyword(propName)} = ${q}id_$d{java.util.UUID.randomUUID()}$q"
+                } else if (propName.endsWith("Id") && (type == "Int" || type == "Long")) {
+                  val parentName = capitalizeName(propName.removeSuffix("Id"))
+                  val defaultVal = if (type == "Long") "1L" else "1"
+                  "${escapeKotlinKeyword(propName)} = if (pool${parentName}Ids.isNotEmpty()) pool${parentName}Ids.random() else $defaultVal"
+                } else {
+                  "${escapeKotlinKeyword(propName)} = $valGen"
+                }
               }
-            }
-            .joinToString(",\n            ")
-
-    sb.append("        return $name(\n            $constructorArgs\n        )\n")
-    sb.append("    }\n\n")
-    return sb.toString()
+              .joinToString(",$nl            ")
+      line("return $name($nl            $constructorArgs$nl        )")
+    }
+    line()
   }
 }

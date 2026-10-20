@@ -203,7 +203,7 @@ object SecurityValidator : OpenApiValidationRule {
       validateOptionalFlowUrl(flow.refreshUrl, "$path.clientCredentials.refreshUrl", issues)
     }
     flows.authorizationCode?.let { flow ->
-      if (isMissingFlowUrl(flow.authorizationUrl) or isMissingFlowUrl(flow.tokenUrl)) {
+      if (isMissingFlowUrl(flow.authorizationUrl) || isMissingFlowUrl(flow.tokenUrl)) {
         issues +=
             OpenApiIssue(
                 severity = OpenApiIssueSeverity.ERROR,
@@ -216,7 +216,7 @@ object SecurityValidator : OpenApiValidationRule {
       validateOptionalFlowUrl(flow.refreshUrl, "$path.authorizationCode.refreshUrl", issues)
     }
     flows.deviceAuthorization?.let { flow ->
-      if (isMissingFlowUrl(flow.deviceAuthorizationUrl) or isMissingFlowUrl(flow.tokenUrl)) {
+      if (isMissingFlowUrl(flow.deviceAuthorizationUrl) || isMissingFlowUrl(flow.tokenUrl)) {
         issues +=
             OpenApiIssue(
                 severity = OpenApiIssueSeverity.ERROR,

@@ -4,6 +4,7 @@ package psi.dto
 import domain.DynamicAnchorContext
 import domain.OpenApiString
 import domain.SchemaDefinition
+import psi.buildKotlinFile
 import psi.capitalizeName
 import psi.escapeKotlinKeyword
 
@@ -12,6 +13,8 @@ import psi.escapeKotlinKeyword
  * [SchemaDefinition]s.
  */
 object EnumAndSealedGenerator {
+  private val NL = 10.toChar()
+
   /**
    * Generates a Kotlin `sealed interface` source file for a polymorphic (`oneOf`/`anyOf`)
    * [SchemaDefinition].
@@ -36,13 +39,6 @@ object EnumAndSealedGenerator {
     val kdoc = SchemaDocTagWriter.buildClassKDoc(definition)
     val deprecatedAnnotation = SchemaDocTagWriter.buildDeprecatedAnnotation(definition.deprecated)
 
-    val discriminatorAnnotation =
-        if (definition.discriminator != null) {
-          "@OptIn(ExperimentalSerializationApi::class)\n@JsonClassDiscriminator(\"${definition.discriminator.propertyName}\")"
-        } else {
-          ""
-        }
-
     val propertyLines =
         definition.properties
             .map { (name, prop) ->
@@ -54,20 +50,22 @@ object EnumAndSealedGenerator {
                   SchemaDocTagWriter.buildDeprecatedAnnotation(prop.deprecated, indent = "    ")
               "$desc$deprecatedPropAnnotation    val ${escapeKotlinKeyword(name)}: $kotlinType"
             }
-            .joinToString("\n\n")
+            .joinToString("$NL$NL")
 
-    return """ 
-            package $packageName
-
-            ${imports.sorted().joinToString("\n") { "import $it" }} 
-
-            $kdoc$deprecatedAnnotation@Serializable
-            $discriminatorAnnotation
-            sealed interface ${definition.safeName} { 
-            $propertyLines
-            } 
-        """
-        .trimIndent()
+    return buildKotlinFile(packageName) {
+      imports.sorted().forEach { import(it) }
+      raw("$kdoc$deprecatedAnnotation")
+      line("@Serializable")
+      if (definition.discriminator != null) {
+        line("@OptIn(ExperimentalSerializationApi::class)")
+        line("""@JsonClassDiscriminator("${definition.discriminator.propertyName}")""")
+      }
+      line("sealed interface ${definition.safeName} {")
+      if (propertyLines.isNotEmpty()) {
+        raw("$propertyLines$NL")
+      }
+      line("}")
+    }
   }
 
   /**
@@ -85,23 +83,20 @@ object EnumAndSealedGenerator {
 
     val values = definition.enumValues!!.map { (it as OpenApiString).value }
     val entries =
-        values.joinToString(",\n\n") { value ->
+        values.joinToString(",$NL$NL") { value ->
           val validName = sanitizeEnumName(value)
-          val annotation = "    @SerialName(\"$value\")"
-          "$annotation\n    $validName"
+          val annotation = """    @SerialName("$value")"""
+          "$annotation$NL    $validName"
         }
 
-    return """ 
-            package $packageName
-
-            ${imports.sorted().joinToString("\n") { "import $it" }} 
-
-            $kdoc$deprecatedAnnotation@Serializable
-            enum class ${definition.safeName} { 
-            $entries
-            } 
-        """
-        .trimIndent()
+    return buildKotlinFile(packageName) {
+      imports.sorted().forEach { import(it) }
+      raw("$kdoc$deprecatedAnnotation")
+      line("@Serializable")
+      line("enum class ${definition.safeName} {")
+      raw("$entries$NL")
+      line("}")
+    }
   }
 
   /**

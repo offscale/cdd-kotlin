@@ -7,50 +7,50 @@ package org.cdd.mcp
 import kotlinx.serialization.Required
 import kotlinx.serialization.Serializable
 
-/** Represents the Annotated MCP model. */
+/** Base MCP object carrying optional user/client annotations. */
 @Serializable
 data class Annotated(
-    /** The annotations property. */
+    /** Optional key-value annotations attached to the resource or content block. */
     @Required val annotations: Map<String, String>? = null,
 )
 
-/** Represents the BlobResourceContents MCP model. */
+/** Binary resource contents encoded as a base64 string. */
 @Serializable
 data class BlobResourceContents(
-    /** The blob property. */
+    /** Base64-encoded binary data of the resource. */
     val blob: String,
-    /** The mimeType property. */
+    /** Optional MIME type of the binary resource. */
     val mimeType: String? = null,
-    /** The uri property. */
+    /** Canonical URI identifying the resource. */
     val uri: String,
 )
 
-/** Represents the CallToolRequest MCP model. */
+/** Client-to-server request to invoke a named MCP tool. */
 @Serializable
 data class CallToolRequest(
-    /** The method property. */
+    /** JSON-RPC method name (`"tools/call"`). */
     val method: String = "tools/call",
-    /** The params property. */
+    /** Tool invocation parameters including tool name and arguments. */
     val params: CallToolRequestParams,
 ) : ClientRequest
 
-/** Represents the CallToolRequestParams MCP model. */
+/** Parameters for a [CallToolRequest]. */
 @Serializable
 data class CallToolRequestParams(
-    /** The arguments property. */
+    /** Optional map of named JSON arguments passed to the tool. */
     val arguments: Map<String, kotlinx.serialization.json.JsonElement>? = null,
-    /** The name property. */
+    /** Unique name of the tool to invoke. */
     val name: String,
 )
 
-/** Represents the CallToolResult MCP model. */
+/** Server-to-client result returned from a `tools/call` invocation. */
 @Serializable
 data class CallToolResult(
-    /** The _meta property. */
+    /** Optional protocol metadata map. */
     val _meta: Map<String, kotlinx.serialization.json.JsonElement>? = null,
-    /** The content property. */
+    /** List of content blocks (`TextContent`, `ImageContent`, `EmbeddedResource`) produced. */
     val content: List<kotlinx.serialization.json.JsonElement>,
-    /** The isError property. */
+    /** Whether the tool execution resulted in an application-level error. */
     val isError: Boolean? = null,
 ) : ServerResult
 

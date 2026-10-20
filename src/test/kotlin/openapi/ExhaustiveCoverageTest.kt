@@ -4,6 +4,8 @@ package openapi
 import java.io.File
 import org.cdd.CddCli
 import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
@@ -184,20 +186,44 @@ class ExhaustiveCoverageTest {
     val parser = OpenApiParser()
     val doc = parser.parseString(json, OpenApiParser.Format.JSON)
     val validator = OpenApiValidator()
-    validator.validate(doc)
+    val docIssues = validator.validate(doc)
+    assertTrue(docIssues.any { it.path == "$.info.license" })
 
     val swDoc = parser.parseString(swaggerJson, OpenApiParser.Format.JSON)
-    validator.validate(swDoc)
+    val swIssues = validator.validate(swDoc)
+    assertTrue(swIssues.none { it.severity == OpenApiIssueSeverity.ERROR })
+    assertTrue(swDoc.components?.schemas.orEmpty().containsKey("Model"))
+    assertTrue(swDoc.components?.responses.orEmpty().containsKey("SomeResponse"))
+    assertTrue(swDoc.components?.parameters.orEmpty().containsKey("SomeParam"))
+    assertTrue(swDoc.components?.securitySchemes.orEmpty().containsKey("api_key"))
 
     val writer = OpenApiWriter()
-    writer.writeDocumentToFile(
-        openapi.OpenApiDocument.OpenApi(doc), File(outDir, "openapi-out.json"))
-    writer.writeDocumentToFile(
-        openapi.OpenApiDocument.OpenApi(doc), File(outDir, "openapi-out.yaml"))
+    val outJsonFile = File(outDir, "openapi-out.json")
+    val outYamlFile = File(outDir, "openapi-out.yaml")
+    assertTrue(
+        writer.writeDocumentToFile(openapi.OpenApiDocument.OpenApi(doc), outJsonFile).isSuccess)
+    assertTrue(
+        writer.writeDocumentToFile(openapi.OpenApiDocument.OpenApi(doc), outYamlFile).isSuccess)
+
+    val reparsedJson = parser.parseString(outJsonFile.readText(), OpenApiParser.Format.JSON)
+    val reparsedYaml = parser.parseString(outYamlFile.readText(), OpenApiParser.Format.YAML)
+    assertEquals(doc.info, reparsedJson.info)
+    assertEquals(doc.info, reparsedYaml.info)
+    assertEquals(doc.servers, reparsedJson.servers)
+    assertEquals(doc.paths.keys, reparsedYaml.paths.keys)
+    assertEquals(doc.components?.schemas?.keys, reparsedYaml.components?.schemas?.keys)
 
     val exitCode =
         CddCli.generateFromOpenApi(
             arrayOf("generate", "-i", inFile.absolutePath, "-o", outDir.absolutePath))
     assertTrue(exitCode == 0, "CLI generation failed")
+
+    val apiClientFile = outDir.walkTopDown().firstOrNull { it.isFile && it.name == "ApiClient.kt" }
+    assertNotNull(apiClientFile)
+    val parsedApi = psi.NetworkParser().parseWithMetadata(apiClientFile!!.readText())
+    assertTrue(parsedApi.endpoints.any { it.operationId == "doSomething" })
+    val doSomethingEp = parsedApi.endpoints.first { it.operationId == "doSomething" }
+    assertEquals(7, doSomethingEp.parameters.size)
+    assertTrue(doSomethingEp.callbacks.containsKey("myEvent"))
   }
 }

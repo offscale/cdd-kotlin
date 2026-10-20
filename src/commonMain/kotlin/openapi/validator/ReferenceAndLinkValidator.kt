@@ -4,6 +4,7 @@
  */
 package openapi.validator
 
+import arazzo.RuntimeExpressionEngine
 import domain.Callback
 import domain.Components
 import domain.Link
@@ -90,7 +91,7 @@ object ReferenceAndLinkValidator : OpenApiValidationRule {
       selfBase: String?,
       issues: MutableList<OpenApiIssue>
   ) {
-    if ((link.ref != null) or (link.reference != null)) return
+    if (link.ref != null || link.reference != null) return
     val operationId = link.operationId
     if (!operationId.isNullOrBlank() && !operationIds.contains(operationId)) {
       issues +=
@@ -141,7 +142,7 @@ object ReferenceAndLinkValidator : OpenApiValidationRule {
       validateComponentReference(refTarget, "links", components, path, issues, currentSelfBase)
       val hasOverrides =
           listOfNotNull(link.operationId, link.operationRef, link.requestBody, link.server)
-              .isNotEmpty() or link.parameters.isNotEmpty()
+              .isNotEmpty() || link.parameters.isNotEmpty()
       if (hasOverrides) {
         issues +=
             OpenApiIssue(
@@ -264,54 +265,9 @@ object ReferenceAndLinkValidator : OpenApiValidationRule {
     }
   }
 
-  private fun isValidRuntimeExpression(value: String): Boolean {
-    return when (value) {
-      "\$url",
-      "\$method",
-      "\$statusCode" -> true
-      else ->
-          when {
-            value.startsWith("\$request.") -> isValidRuntimeSource(value.removePrefix("\$request."))
-            value.startsWith("\$response.") ->
-                isValidRuntimeSource(value.removePrefix("\$response."))
-            else -> false
-          }
-    }
-  }
-
-  private fun isValidRuntimeSource(source: String): Boolean {
-    return when {
-      source.startsWith("header.") ->
-          ValidationCommon.isValidHeaderToken(source.removePrefix("header."))
-      source.startsWith("query.") -> isValidParamName(source.removePrefix("query."))
-      source.startsWith("path.") -> isValidParamName(source.removePrefix("path."))
-      source == "body" -> true
-      source.startsWith("body#") -> isValidJsonPointer(source.removePrefix("body#"))
-      else -> false
-    }
-  }
-
-  private fun isValidParamName(name: String): Boolean {
-    return name.isNotEmpty()
-  }
-
-  private fun isValidJsonPointer(pointer: String): Boolean {
-    if (!pointer.startsWith("/")) return pointer.isEmpty()
-    val segments = pointer.substring(1).split("/")
-    segments.forEach { segment ->
-      var i = 0
-      while (i < segment.length) {
-        if (segment[i] == '~') {
-          val next = segment.getOrNull(i + 1)
-          if (next != '0' && next != '1') return false
-          i += 2
-        } else {
-          i += 1
-        }
-      }
-    }
-    return true
-  }
+  private fun isValidRuntimeExpression(value: String): Boolean =
+      RuntimeExpressionEngine.isValidOpenApiRuntimeExpression(
+          value, ValidationCommon::isValidHeaderToken)
 
   /**
    * Validates that a component `$ref` resolves to a defined key in [components].
@@ -418,7 +374,7 @@ object ReferenceAndLinkValidator : OpenApiValidationRule {
   private fun extractComponentKey(ref: String, component: String): String? {
     val marker = "#/components/$component/"
     val raw = ref.substringAfter(marker, "")
-    if (raw.isBlank() or raw.contains("/")) return null
+    if (raw.isBlank() || raw.contains("/")) return null
     return decodeJsonPointerToken(raw)
   }
 
@@ -460,7 +416,7 @@ object ReferenceAndLinkValidator : OpenApiValidationRule {
     if (hashIndex < 0) return null
     val base = operationRef.substring(0, hashIndex).trimEnd('#')
     val normalizedSelf = selfBase.orEmpty().trimEnd('#')
-    if (normalizedSelf.isBlank() or (base != normalizedSelf)) return null
+    if (normalizedSelf.isBlank() || base != normalizedSelf) return null
     return normalizeOperationRef(operationRef.substring(hashIndex))
   }
 

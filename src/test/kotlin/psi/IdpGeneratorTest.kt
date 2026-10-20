@@ -22,7 +22,27 @@ class IdpGeneratorTest {
     val withSchemas =
         generator.generateIdpModule(
             "com.example",
-            listOf(domain.SchemaDefinition("User"), domain.SchemaDefinition("Account")))
+            listOf(domain.SchemaDefinition("User"), domain.SchemaDefinition("Account")),
+            mapOf(
+                "oauth" to
+                    domain.SecurityScheme(
+                        type = "oauth2",
+                        scopes = mapOf("legacy:scope" to "legacy"),
+                        flows =
+                            domain.OAuthFlows(
+                                implicit =
+                                    domain.OAuthFlow(
+                                        authorizationUrl = "https://auth.example.com",
+                                        scopes = mapOf("read:users" to "read")),
+                                password =
+                                    domain.OAuthFlow(
+                                        tokenUrl = "https://auth.example.com/token",
+                                        scopes = mapOf("write:users" to "write")))),
+                "basic" to domain.SecurityScheme(type = "http", scheme = "basic")))
     assertTrue(withSchemas.contains("val principalModelName: String = \"User\""))
+    assertTrue(withSchemas.contains("ConcurrentHashMap.newKeySet"))
+    assertTrue(withSchemas.contains("read:users"))
+    assertTrue(withSchemas.contains("write:users"))
+    assertTrue(withSchemas.contains("legacy:scope"))
   }
 }

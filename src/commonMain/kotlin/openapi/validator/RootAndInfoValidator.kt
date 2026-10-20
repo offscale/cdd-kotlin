@@ -100,6 +100,13 @@ object RootAndInfoValidator : OpenApiValidationRule {
   }
 
   private fun validateLicense(license: License, path: String, issues: MutableList<OpenApiIssue>) {
+    if (license.name.isBlank()) {
+      issues +=
+          OpenApiIssue(
+              severity = OpenApiIssueSeverity.ERROR,
+              path = "$path.name",
+              message = "License name must not be blank.")
+    }
     if (listOfNotNull(license.identifier, license.url).size == 2) {
       issues +=
           OpenApiIssue(
@@ -193,7 +200,10 @@ object RootAndInfoValidator : OpenApiValidationRule {
               path = "$.tags",
               message = "Tag name '$name' must be unique (found ${tags.size}).")
     }
-    val tagsByName = definition.tags.associateBy { it.name }
+    val tagsByName =
+        definition.tags
+            .groupBy { it.name }
+            .mapValues { (_, list) -> list.firstOrNull { it.parent != null } ?: list.first() }
     definition.tags.forEach { tag ->
       tag.externalDocs?.let {
         ValidationCommon.validateExternalDocs(it, "$.tags.${tag.name}.externalDocs", issues)

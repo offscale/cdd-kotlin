@@ -261,8 +261,8 @@ class OpenApiParser {
   private fun parseInfo(node: JsonNode?): Info? {
     val obj = node.asObject() ?: return null
     return Info(
-        title = obj.text("title") ?: "Unknown",
-        version = obj.text("version") ?: "0.0.0",
+        title = obj.text("title") ?: "",
+        version = obj.text("version") ?: "",
         summary = obj.text("summary"),
         description = obj.text("description"),
         termsOfService = obj.text("termsOfService"),
@@ -283,7 +283,7 @@ class OpenApiParser {
   private fun parseLicense(node: JsonNode?): License? {
     val obj = node.asObject() ?: return null
     return License(
-        name = obj.text("name") ?: "Unknown",
+        name = obj.text("name") ?: "",
         identifier = obj.text("identifier"),
         url = obj.text("url"),
         extensions = SchemaNodeParser.parseExtensions(obj))

@@ -20,7 +20,7 @@ class DaoTestGenerator {
     results["dao/DaoFactoryTest.kt"] =
         buildKotlinFile("$packageName.dao") {
           import("$packageName.models.*", "kotlin.test.*", "kotlin.test.Test")
-          raw(generateFactoryTest(modelSchemas))
+          appendFactoryTest(modelSchemas)
         }
 
     for (schema in modelSchemas) {
@@ -36,147 +36,147 @@ class DaoTestGenerator {
                 "kotlin.test.BeforeTest",
                 "kotlin.test.Test",
                 "kotlinx.coroutines.runBlocking")
-            raw(generateConcreteDaoTest(schema))
+            appendConcreteDaoTest(schema)
           }
     }
 
     return results
   }
 
-  private fun generateFactoryTest(schemas: List<SchemaDefinition>): String {
-    val sb = StringBuilder()
-    sb.append("/**\n")
-    sb.append(" * Tests for [DaoFactory].\n")
-    sb.append(" */\n")
-    sb.append("class DaoFactoryTest {\n")
-    sb.append("    @Test\n")
-    sb.append("    fun `create with true returns concrete DAOs`() {\n")
-    sb.append("        val config = DaoFactory.create(useConcrete = true)\n")
-    for (schema in schemas) {
-      val name = capitalizeName(schema.safeName)
-      val lowerName = decapitalizeName(name)
-      sb.append("        assertTrue(config.${lowerName}Dao is Concrete${name}Dao)\n")
+  private fun KotlinSourceBuilder.appendFactoryTest(schemas: List<SchemaDefinition>) {
+    kdoc("Tests for [DaoFactory].")
+    block("class DaoFactoryTest") {
+      line("@Test")
+      block("fun `create with true returns concrete DAOs`()") {
+        line("val config = DaoFactory.create(useConcrete = true)")
+        for (schema in schemas) {
+          val name = capitalizeName(schema.safeName)
+          val lowerName = decapitalizeName(name)
+          line("assertTrue(config.${lowerName}Dao is Concrete${name}Dao)")
+        }
+      }
+      line()
+      line("@Test")
+      block("fun `create with false returns stub DAOs`()") {
+        line("val config = DaoFactory.create(useConcrete = false)")
+        for (schema in schemas) {
+          val name = capitalizeName(schema.safeName)
+          val lowerName = decapitalizeName(name)
+          line("assertTrue(config.${lowerName}Dao is Stub${name}Dao)")
+        }
+      }
     }
-    sb.append("    }\n\n")
-
-    sb.append("    @Test\n")
-    sb.append("    fun `create with false returns stub DAOs`() {\n")
-    sb.append("        val config = DaoFactory.create(useConcrete = false)\n")
-    for (schema in schemas) {
-      val name = capitalizeName(schema.safeName)
-      val lowerName = decapitalizeName(name)
-      sb.append("        assertTrue(config.${lowerName}Dao is Stub${name}Dao)\n")
-    }
-    sb.append("    }\n")
-    sb.append("}\n\n")
-    return sb.toString()
+    line()
   }
 
-  private fun generateConcreteDaoTest(schema: SchemaDefinition): String {
-    val sb = StringBuilder()
+  private fun KotlinSourceBuilder.appendConcreteDaoTest(schema: SchemaDefinition) {
     val name = capitalizeName(schema.safeName)
     val tableName = "${name}Table"
 
-    sb.append("/**\n")
-    sb.append(" * Tests for [Concrete${name}Dao] using an ephemeral SQLite database.\n")
-    sb.append(" */\n")
-    sb.append("class Concrete${name}DaoTest {\n")
-    sb.append("    private lateinit var dao: Concrete${name}Dao\n\n")
+    kdoc("Tests for [Concrete${name}Dao] using an ephemeral SQLite database.")
+    block("class Concrete${name}DaoTest") {
+      line("private lateinit var dao: Concrete${name}Dao")
+      line()
+      line("@BeforeTest")
+      block("fun setup()") {
+        val d = '$'
+        line(
+            """val dbFile = java.io.File.createTempFile("${name.lowercase()}_dao_", ".db").apply { deleteOnExit() }""")
+        line(
+            """Database.connect("jdbc:sqlite:$d{dbFile.absolutePath}", driver = "org.sqlite.JDBC")""")
+        block("transaction") { line("SchemaUtils.create($tableName)") }
+        line("dao = Concrete${name}Dao()")
+      }
+      line()
+      line("@Test")
+      block("fun `getAll returns empty list initially`() = runBlocking") {
+        line("val items = dao.getAll()")
+        line("assertTrue(items.isEmpty())")
+      }
+      line()
 
-    sb.append("    @BeforeTest\n")
-    sb.append("    fun setup() {\n")
-    sb.append(
-        "        val dbFile = java.io.File.createTempFile(\"${name.lowercase()}_dao_\", \".db\").apply { deleteOnExit() }\n")
-    sb.append(
-        "        Database.connect(\"jdbc:sqlite:\${dbFile.absolutePath}\", driver = \"org.sqlite.JDBC\")\n")
-    sb.append("        transaction {\n")
-    sb.append("            SchemaUtils.create($tableName)\n")
-    sb.append("        }\n")
-    sb.append("        dao = Concrete${name}Dao()\n")
-    sb.append("    }\n\n")
+      val constructorArgs =
+          schema.properties.entries
+              .map { (propName, prop) ->
+                val typeWithNull = TypeMappers.mapType(prop)
+                val isNullable = !schema.required.contains(propName) || typeWithNull.endsWith("?")
+                val type = typeWithNull.removeSuffix("?")
+                val isComplex =
+                    type != "Int" &&
+                        type != "Long" &&
+                        type != "Double" &&
+                        type != "Boolean" &&
+                        type != "String"
 
-    sb.append("    @Test\n")
-    sb.append("    fun `getAll returns empty list initially`() = runBlocking {\n")
-    sb.append("        val items = dao.getAll()\n")
-    sb.append("        assertTrue(items.isEmpty())\n")
-    sb.append("    }\n\n")
-
-    sb.append("    @Test\n")
-    sb.append("    fun `create inserts record and getAll retrieves it`() = runBlocking {\n")
-
-    val constructorArgs =
-        schema.properties.entries
-            .map { (propName, prop) ->
-              val typeWithNull = TypeMappers.mapType(prop)
-              val isNullable = !schema.required.contains(propName) || typeWithNull.endsWith("?")
-              val type = typeWithNull.removeSuffix("?")
-              val isComplex =
-                  type != "Int" &&
-                      type != "Long" &&
-                      type != "Double" &&
-                      type != "Boolean" &&
-                      type != "String"
-
-              val dummyVal =
-                  if (isComplex) {
-                    if (isNullable) "null"
-                    else if (type.startsWith("List")) "emptyList()" else "$type()"
-                  } else {
-                    when (type) {
-                      "Int" -> "1"
-                      "Long" -> "1L"
-                      "Double" -> "1.0"
-                      "Boolean" -> "true"
-                      else -> "\"test\""
+                val dummyVal =
+                    if (isComplex) {
+                      if (isNullable) "null"
+                      else if (type.startsWith("List")) "emptyList()" else "$type()"
+                    } else {
+                      when (type) {
+                        "Int" -> "1"
+                        "Long" -> "1L"
+                        "Double" -> "1.0"
+                        "Boolean" -> "true"
+                        else -> """"test""""
+                      }
                     }
-                  }
-              val safePropName = escapeKotlinKeyword(propName)
-              if (propName == "id") {
-                val idZero = if (type == "Long") "0L" else if (type == "Int") "0" else dummyVal
-                "$safePropName = $idZero"
-              } else {
-                "$safePropName = $dummyVal"
+                val safePropName = escapeKotlinKeyword(propName)
+                if (propName == "id") {
+                  val idZero = if (type == "Long") "0L" else if (type == "Int") "0" else dummyVal
+                  "$safePropName = $idZero"
+                } else {
+                  "$safePropName = $dummyVal"
+                }
               }
-            }
-            .joinToString(", ")
+              .joinToString(", ")
 
-    sb.append("        val entity = $name($constructorArgs)\n")
-    sb.append("        val created = dao.create(entity)\n")
-    val idProp = schema.properties["id"]
-    if (idProp != null) {
-      val idType = TypeMappers.mapType(idProp)
-      val idZero = if (idType == "Long") "0L" else "0"
-      val idIsNullable = !schema.required.contains("id")
-      val createdIdExpr = if (idIsNullable) "created.id!!" else "created.id"
-      sb.append("        assertNotEquals($idZero, created.id)\n")
-      sb.append("        val items = dao.getAll()\n")
-      sb.append("        assertEquals(1, items.size)\n")
-      sb.append("    }\n\n")
+      val idProp = schema.properties["id"]
+      if (idProp != null) {
+        val idType = TypeMappers.mapType(idProp)
+        val idZero = if (idType == "Long") "0L" else "0"
+        val idIsNullable = !schema.required.contains("id")
+        val createdIdExpr = if (idIsNullable) "created.id!!" else "created.id"
 
-      sb.append("    @Test\n")
-      sb.append("    fun `getById retrieves correct record`() = runBlocking {\n")
-      sb.append("        val entity = $name($constructorArgs)\n")
-      sb.append("        val created = dao.create(entity)\n")
-      sb.append("        val fetched = dao.getById($createdIdExpr)\n")
-      sb.append("        assertNotNull(fetched)\n")
-      sb.append("        assertEquals(created.id, fetched?.id)\n")
-      sb.append("    }\n\n")
+        line("@Test")
+        block("fun `create inserts record and getAll retrieves it`() = runBlocking") {
+          line("val entity = $name($constructorArgs)")
+          line("val created = dao.create(entity)")
+          line("assertNotEquals($idZero, created.id)")
+          line("val items = dao.getAll()")
+          line("assertEquals(1, items.size)")
+        }
+        line()
 
-      sb.append("    @Test\n")
-      sb.append("    fun `delete removes record`() = runBlocking {\n")
-      sb.append("        val entity = $name($constructorArgs)\n")
-      sb.append("        val created = dao.create(entity)\n")
-      sb.append("        val deleted = dao.delete($createdIdExpr)\n")
-      sb.append("        assertTrue(deleted)\n")
-      sb.append("        val fetched = dao.getById($createdIdExpr)\n")
-      sb.append("        assertNull(fetched)\n")
-      sb.append("    }\n")
-    } else {
-      sb.append("        val items = dao.getAll()\n")
-      sb.append("        assertEquals(1, items.size)\n")
-      sb.append("    }\n")
+        line("@Test")
+        block("fun `getById retrieves correct record`() = runBlocking") {
+          line("val entity = $name($constructorArgs)")
+          line("val created = dao.create(entity)")
+          line("val fetched = dao.getById($createdIdExpr)")
+          line("assertNotNull(fetched)")
+          line("assertEquals(created.id, fetched?.id)")
+        }
+        line()
+
+        line("@Test")
+        block("fun `delete removes record`() = runBlocking") {
+          line("val entity = $name($constructorArgs)")
+          line("val created = dao.create(entity)")
+          line("val deleted = dao.delete($createdIdExpr)")
+          line("assertTrue(deleted)")
+          line("val fetched = dao.getById($createdIdExpr)")
+          line("assertNull(fetched)")
+        }
+      } else {
+        line("@Test")
+        block("fun `create inserts record and getAll retrieves it`() = runBlocking") {
+          line("val entity = $name($constructorArgs)")
+          line("val created = dao.create(entity)")
+          line("val items = dao.getAll()")
+          line("assertEquals(1, items.size)")
+        }
+      }
     }
-    sb.append("}\n\n")
-    return sb.toString()
+    line()
   }
 }

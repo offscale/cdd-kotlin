@@ -139,7 +139,7 @@ object ComponentsMetadataCodec {
     val json = openApiWriter.writeJson(tempDefinition)
     val node = Json.parseToJsonElement(json)
     val schemasNode = node.get("components")!!.get("schemas")!!
-    return OpenApiValues.encodeAnyToString(schemasNode)
+    return OpenApiValues.encodeJsonElementToString(schemasNode)
   }
 
   /**
@@ -157,7 +157,7 @@ object ComponentsMetadataCodec {
     val json = openApiWriter.writeJson(tempDefinition)
     val node = Json.parseToJsonElement(json)
     val paramsNode = node.get("components")!!.get("parameters")!!
-    return OpenApiValues.encodeAnyToString(paramsNode)
+    return OpenApiValues.encodeJsonElementToString(paramsNode)
   }
 
   /**
@@ -175,7 +175,7 @@ object ComponentsMetadataCodec {
     val json = openApiWriter.writeJson(tempDefinition)
     val node = Json.parseToJsonElement(json)
     val responsesNode = node.get("components")!!.get("responses")!!
-    return OpenApiValues.encodeAnyToString(responsesNode)
+    return OpenApiValues.encodeJsonElementToString(responsesNode)
   }
 
   /**
@@ -193,7 +193,7 @@ object ComponentsMetadataCodec {
     val json = openApiWriter.writeJson(tempDefinition)
     val node = Json.parseToJsonElement(json)
     val bodiesNode = node.get("components")!!.get("requestBodies")!!
-    return OpenApiValues.encodeAnyToString(bodiesNode)
+    return OpenApiValues.encodeJsonElementToString(bodiesNode)
   }
 
   /**
@@ -211,7 +211,7 @@ object ComponentsMetadataCodec {
     val json = openApiWriter.writeJson(tempDefinition)
     val node = Json.parseToJsonElement(json)
     val headersNode = node.get("components")!!.get("headers")!!
-    return OpenApiValues.encodeAnyToString(headersNode)
+    return OpenApiValues.encodeJsonElementToString(headersNode)
   }
 
   /**
@@ -229,7 +229,7 @@ object ComponentsMetadataCodec {
     val json = openApiWriter.writeJson(tempDefinition)
     val node = Json.parseToJsonElement(json)
     val pathItemsNode = node.get("components")!!.get("pathItems")!!
-    return OpenApiValues.encodeAnyToString(pathItemsNode)
+    return OpenApiValues.encodeJsonElementToString(pathItemsNode)
   }
 
   /**
@@ -247,7 +247,7 @@ object ComponentsMetadataCodec {
     val json = openApiWriter.writeJson(tempDefinition)
     val node = Json.parseToJsonElement(json)
     val mediaTypesNode = node.get("components")!!.get("mediaTypes")!!
-    return OpenApiValues.encodeAnyToString(mediaTypesNode)
+    return OpenApiValues.encodeJsonElementToString(mediaTypesNode)
   }
 
   /**
@@ -263,7 +263,7 @@ object ComponentsMetadataCodec {
     val json = openApiWriter.writeJson(tempDefinition)
     val node = Json.parseToJsonElement(json)
     val pathsNode = node.get("paths")!!
-    return OpenApiValues.encodeAnyToString(pathsNode)
+    return OpenApiValues.encodeJsonElementToString(pathsNode)
   }
 
   /**
@@ -279,7 +279,7 @@ object ComponentsMetadataCodec {
     val json = openApiWriter.writeJson(tempDefinition)
     val node = Json.parseToJsonElement(json)
     val webhooksNode = node.get("webhooks")!!
-    return OpenApiValues.encodeAnyToString(webhooksNode)
+    return OpenApiValues.encodeJsonElementToString(webhooksNode)
   }
 
   /**

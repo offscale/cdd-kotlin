@@ -70,6 +70,66 @@ enum class XmlNodeType(val wireName: String) {
 }
 
 /**
+ * Strongly-typed mode for boolean JSON Schema literals (`true` vs `false`).
+ *
+ * @property value The underlying boolean value (`true` accepts any instance, `false` rejects all).
+ */
+enum class BooleanSchemaMode(val value: Boolean) {
+  /** Schema `true` (accepts any instance). */
+  TRUE(true),
+  /** Schema `false` (rejects all instances). */
+  FALSE(false);
+
+  /** Companion factory methods for [BooleanSchemaMode]. */
+  companion object {
+    /**
+     * Converts a nullable boolean schema flag into a [BooleanSchemaMode].
+     *
+     * @param flag The boolean schema flag.
+     * @return Matching [BooleanSchemaMode] or `null`.
+     */
+    fun fromBoolean(flag: Boolean?): BooleanSchemaMode? =
+        when (flag) {
+          true -> TRUE
+          false -> FALSE
+          null -> null
+        }
+  }
+}
+
+/**
+ * Strongly-typed representation of JSON Schema `contentEncoding` values (RFC 2045 / RFC 4648).
+ *
+ * @property wireName The lowercase wire encoding name.
+ */
+enum class ContentEncoding(val wireName: String) {
+  /** Base64 encoding (RFC 4648 Section 4). */
+  BASE64("base64"),
+  /** URL-safe Base64 encoding (RFC 4648 Section 5). */
+  BASE64URL("base64url"),
+  /** Quoted-Printable encoding (RFC 2045 Section 6.7). */
+  QUOTED_PRINTABLE("quoted-printable"),
+  /** Unencoded binary data (`binary`). */
+  BINARY("binary"),
+  /** 7-bit ASCII data (`7bit`). */
+  SEVEN_BIT("7bit"),
+  /** 8-bit octets (`8bit`). */
+  EIGHT_BIT("8bit");
+
+  /** Companion factory methods for [ContentEncoding]. */
+  companion object {
+    /**
+     * Resolves a [ContentEncoding] from its wire name, or `null` if unrecognized.
+     *
+     * @param value The raw `contentEncoding` string.
+     * @return Matching [ContentEncoding] or `null`.
+     */
+    fun fromWireName(value: String): ContentEncoding? =
+        entries.firstOrNull { it.wireName.equals(value, ignoreCase = true) }
+  }
+}
+
+/**
  * Shared contract for JSON Schema Draft 2020-12 and OpenAPI 3.2 Schema Objects, unifying
  * root/component schemas ([SchemaDefinition]) and nested property/subschemas ([SchemaProperty]).
  */
@@ -575,6 +635,28 @@ data class SchemaDefinition(
   val primaryType: String
     get() = effectiveTypes.firstOrNull { it != "null" } ?: effectiveTypes.first()
 }
+
+/**
+ * Returns the strongly-typed [BooleanSchemaMode] of this [SchemaCore], or `null` if not a boolean
+ * schema.
+ */
+val SchemaCore.booleanSchemaMode: BooleanSchemaMode?
+  get() = BooleanSchemaMode.fromBoolean(booleanSchema)
+
+/** Returns the set of resolved [SchemaType] enums declared on this [SchemaCore]. */
+val SchemaCore.schemaTypes: Set<SchemaType>
+  get() = types.mapNotNull { SchemaType.fromWireName(it) }.toSet()
+
+/** Returns the primary non-null [SchemaType] of this [SchemaCore], or `null` if unspecified. */
+val SchemaCore.primarySchemaType: SchemaType?
+  get() = schemaTypes.firstOrNull { it != SchemaType.NULL } ?: schemaTypes.firstOrNull()
+
+/**
+ * Returns the strongly-typed [ContentEncoding] parsed from [SchemaCore.contentEncoding], or `null`
+ * if absent or custom.
+ */
+val SchemaCore.parsedContentEncoding: ContentEncoding?
+  get() = contentEncoding?.let { ContentEncoding.fromWireName(it) }
 
 /**
  * When request bodies or response payloads may be one of a number of different schemas, these

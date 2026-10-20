@@ -7,7 +7,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -24,46 +23,46 @@ class JsonValueAndErrorTest {
   }
 
   @Test
-  fun `OpenApiValue conversions between JsonElement and untyped`() {
+  fun `OpenApiValue conversions between JsonElement and display strings`() {
     assertEquals(JsonNull, OpenApiNull.toJsonElement())
-    assertNull(OpenApiNull.toUntyped())
+    assertEquals("null", OpenApiNull.toDisplayString())
 
     val boolVal = OpenApiBoolean(true)
     assertEquals(JsonPrimitive(true), boolVal.toJsonElement())
-    assertEquals(true, boolVal.toUntyped())
+    assertEquals("true", boolVal.toDisplayString())
 
     val intVal = OpenApiInt(42L)
     assertEquals(JsonPrimitive(42L), intVal.toJsonElement())
-    assertEquals(42, intVal.toUntyped())
+    assertEquals("42", intVal.toDisplayString())
 
     val bigIntVal = OpenApiInt(Long.MAX_VALUE)
-    assertEquals(Long.MAX_VALUE, bigIntVal.toUntyped())
+    assertEquals(Long.MAX_VALUE.toString(), bigIntVal.toDisplayString())
 
     val smallIntVal = OpenApiInt(Long.MIN_VALUE)
-    assertEquals(Long.MIN_VALUE, smallIntVal.toUntyped())
+    assertEquals(Long.MIN_VALUE.toString(), smallIntVal.toDisplayString())
 
     val numVal = OpenApiNumber(3.14)
-    assertEquals(JsonPrimitive(3.14), numVal.toJsonElement())
-    assertEquals(3.14, numVal.toUntyped())
+    assertEquals(JsonPrimitive(3.14).content, numVal.toJsonElement().toString())
+    assertEquals("3.14", numVal.toDisplayString())
     assertEquals("3.14", numVal.raw)
 
     val strVal = OpenApiString("hello")
     assertEquals(JsonPrimitive("hello"), strVal.toJsonElement())
-    assertEquals("hello", strVal.toUntyped())
+    assertEquals("hello", strVal.toDisplayString())
 
     val arrVal = OpenApiArray(listOf(strVal, intVal))
     assertEquals(
         JsonArray(listOf(JsonPrimitive("hello"), JsonPrimitive(42L))), arrVal.toJsonElement())
-    assertEquals(listOf("hello", 42), arrVal.toUntyped())
+    assertEquals("[\"hello\",42]", arrVal.toDisplayString())
 
     val objVal = OpenApiObject(mapOf("k" to boolVal))
     assertEquals(JsonObject(mapOf("k" to JsonPrimitive(true))), objVal.toJsonElement())
-    assertEquals(mapOf("k" to true), objVal.toUntyped())
+    assertEquals("{\"k\":true}", objVal.toDisplayString())
   }
 
   @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
   @Test
-  fun `OpenApiValues fromJsonElement handles all JsonElement variants`() {
+  fun `OpenApiValues fromJsonElement and string codecs handle all JsonElement variants`() {
     assertEquals(OpenApiNull, OpenApiValues.fromJsonElement(JsonNull))
     assertEquals(OpenApiString("true"), OpenApiValues.fromJsonElement(JsonPrimitive("true")))
     assertEquals(OpenApiBoolean(false), OpenApiValues.fromJsonElement(JsonPrimitive(false)))
@@ -82,39 +81,19 @@ class JsonValueAndErrorTest {
     assertEquals(
         OpenApiObject(mapOf("a" to OpenApiString("b"))),
         OpenApiValues.fromJsonElement(JsonObject(mapOf("a" to JsonPrimitive("b")))))
-  }
 
-  @Test
-  fun `OpenApiValues fromAny handles all Kotlin types`() {
-    assertEquals(OpenApiNull, OpenApiValues.fromAny(null))
-    val existing = OpenApiString("existing")
-    assertSame(existing, OpenApiValues.fromAny(existing))
-    assertEquals(OpenApiBoolean(true), OpenApiValues.fromAny(JsonPrimitive(true)))
-    assertEquals(OpenApiBoolean(false), OpenApiValues.fromAny(false))
-    assertEquals(OpenApiInt(7L), OpenApiValues.fromAny(7))
-    assertEquals(OpenApiInt(8L), OpenApiValues.fromAny(8L))
-    assertEquals(OpenApiInt(9L), OpenApiValues.fromAny(9.toShort()))
-    assertEquals(OpenApiInt(10L), OpenApiValues.fromAny(10.toByte()))
-    assertEquals(OpenApiNumber(2.5, "2.5"), OpenApiValues.fromAny(2.5f))
-    assertEquals(OpenApiNumber(3.5, "3.5"), OpenApiValues.fromAny(3.5))
-    assertEquals(OpenApiNumber(42.0, "42"), OpenApiValues.fromAny(java.math.BigDecimal("42")))
-    assertEquals(OpenApiString("str"), OpenApiValues.fromAny("str"))
-    assertEquals(OpenApiArray(listOf(OpenApiInt(1L))), OpenApiValues.fromAny(listOf(1)))
-    assertEquals(OpenApiArray(listOf(OpenApiString("x"))), OpenApiValues.fromAny(arrayOf("x")))
+    val typedObj =
+        OpenApiObject(mapOf("x-flag" to OpenApiBoolean(true), "x-count" to OpenApiInt(5L)))
+    assertEquals("{\"x-flag\":true,\"x-count\":5}", OpenApiValues.encodeToString(typedObj))
     assertEquals(
-        OpenApiObject(mapOf("key" to OpenApiInt(2L))), OpenApiValues.fromAny(mapOf("key" to 2)))
-    val customObj =
-        object {
-          override fun toString(): String = "custom"
-        }
-    assertEquals(OpenApiString("custom"), OpenApiValues.fromAny(customObj))
-
-    val rawMap = mapOf("x-flag" to true, "x-count" to 5)
-    val typedMap = OpenApiValues.fromMap(rawMap)
-    assertEquals(mapOf("x-flag" to OpenApiBoolean(true), "x-count" to OpenApiInt(5L)), typedMap)
-    assertEquals(rawMap, OpenApiValues.toUntypedMap(typedMap))
-    assertEquals("{\"x-flag\":true,\"x-count\":5}", OpenApiValues.encodeAnyToString(rawMap))
-    assertEquals(rawMap, OpenApiValues.decodeStringToAny("{\"x-flag\":true,\"x-count\":5}"))
+        "{\"x-flag\":true,\"x-count\":5}",
+        OpenApiValues.encodeJsonElementToString(typedObj.toJsonElement()))
+    assertEquals(
+        typedObj,
+        OpenApiValues.decodeFromStringResult("{\"x-flag\":true,\"x-count\":5}").getOrThrow())
+    assertEquals(typedObj, OpenApiValues.decodeFromStringOrNull("{\"x-flag\":true,\"x-count\":5}"))
+    assertTrue(OpenApiValues.decodeFromStringResult("{bad").isFailure)
+    assertNull(OpenApiValues.decodeFromStringOrNull("{bad"))
   }
 
   @Test
@@ -149,10 +128,10 @@ class JsonValueAndErrorTest {
 
     val linkObjLiteral = Link(requestBody = OpenApiInt(99L))
     assertEquals(LinkRequestBody.Literal(OpenApiInt(99L)), linkObjLiteral.typedRequestBody)
+    assertEquals(OpenApiString("\$request.body#/id"), linkExpr.typedRequestBody?.toOpenApiValue())
+    assertEquals(OpenApiInt(99L), linkObjLiteral.typedRequestBody?.toOpenApiValue())
     assertNull(Link().typedRequestBody)
 
-    assertEquals("hello", OpenApiString("hello").unwrapOrNull())
-    assertNull((null as OpenApiValue?).unwrapOrNull())
     assertEquals("hello", OpenApiString("hello").stringOrNull())
     assertNull(OpenApiInt(1L).stringOrNull())
     assertEquals(true, OpenApiBoolean(true).booleanOrNull())
@@ -308,9 +287,5 @@ class JsonValueAndErrorTest {
     assertEquals(CddError.CliError("boom"), genericThrowable.toCddError())
     val nullMsgThrowable = RuntimeException()
     assertEquals(CddError.CliError("Unknown error"), nullMsgThrowable.toCddError())
-
-    assertEquals(mapOf("a" to 1), OpenApiValues.decodeStringToAnyResult("""{"a":1}""").getOrThrow())
-    assertTrue(OpenApiValues.decodeStringToAnyResult("{bad").isFailure)
-    assertNull(OpenApiValues.decodeStringToAny("{bad"))
   }
 }

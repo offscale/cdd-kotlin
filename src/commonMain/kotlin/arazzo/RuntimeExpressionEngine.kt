@@ -73,6 +73,20 @@ sealed interface RuntimeExpressionAst {
   data class ResponseHeader(val name: String) : RuntimeExpressionAst
 
   /**
+   * Represents `$response.query.<name>` (OpenAPI 3.2 runtime expression).
+   *
+   * @property name HTTP query parameter name.
+   */
+  data class ResponseQuery(val name: String) : RuntimeExpressionAst
+
+  /**
+   * Represents `$response.path.<name>` (OpenAPI 3.2 runtime expression).
+   *
+   * @property name URL path parameter name.
+   */
+  data class ResponsePath(val name: String) : RuntimeExpressionAst
+
+  /**
    * Represents `$response.body` or `$response.body#<json-pointer>`.
    *
    * @property pointer Optional RFC 6901 JSON Pointer.
@@ -278,6 +292,61 @@ object RuntimeExpressionEngine {
   }
 
   /**
+   * Validates whether [pointer] conforms to RFC 6901 JSON Pointer syntax (`""` or `"/..."` with
+   * valid `~0` and `~1` escape sequences).
+   *
+   * @param pointer Candidate JSON Pointer string (without leading `#`).
+   * @return `true` if [pointer] is syntactically valid per RFC 6901.
+   */
+  fun isValidJsonPointerSyntax(pointer: String): Boolean {
+    if (pointer.isEmpty()) return true
+    if (!pointer.startsWith("/")) return false
+    var i = 1
+    while (i < pointer.length) {
+      if (pointer[i] == '~') {
+        val next = pointer.getOrNull(i + 1)
+        if (next != '0' && next != '1') return false
+        i += 2
+      } else {
+        i += 1
+      }
+    }
+    return true
+  }
+
+  /**
+   * Validates whether [expression] is a valid OpenAPI 3.2 runtime expression (`$url`, `$method`,
+   * `$statusCode`, `$request.header.<token>`, `$request.query.<name>`, `$request.path.<name>`,
+   * `$request.body[#<pointer>]`, `$response.header.<token>`, `$response.query.<name>`,
+   * `$response.path.<name>`, or `$response.body[#<pointer>]`) using the unified
+   * [RuntimeExpressionAst] parser.
+   *
+   * @param expression Raw runtime expression string.
+   * @param headerTokenValidator Predicate validating HTTP header token characters.
+   * @return `true` if [expression] is a valid OpenAPI 3.2 runtime expression.
+   */
+  fun isValidOpenApiRuntimeExpression(
+      expression: String,
+      headerTokenValidator: (String) -> Boolean
+  ): Boolean {
+    val ast = parseSingleDollarExpression(expression).getOrNull() ?: return false
+    return when (ast) {
+      RuntimeExpressionAst.Url,
+      RuntimeExpressionAst.Method,
+      RuntimeExpressionAst.StatusCode,
+      is RuntimeExpressionAst.RequestQuery,
+      is RuntimeExpressionAst.RequestPath,
+      is RuntimeExpressionAst.ResponseQuery,
+      is RuntimeExpressionAst.ResponsePath,
+      is RuntimeExpressionAst.RequestBody,
+      is RuntimeExpressionAst.ResponseBody -> true
+      is RuntimeExpressionAst.RequestHeader -> headerTokenValidator(ast.name)
+      is RuntimeExpressionAst.ResponseHeader -> headerTokenValidator(ast.name)
+      else -> false
+    }
+  }
+
+  /**
    * Parses a raw Arazzo runtime expression or embedded `{...}` string template into a
    * [RuntimeExpressionAst] wrapped in a [Result].
    *
@@ -394,12 +463,11 @@ object RuntimeExpressionEngine {
           Result.success(RuntimeExpressionAst.RequestPath(name))
         }
       }
-      rest == "body" -> Result.success(RuntimeExpressionAst.RequestBody(null))
+      rest == "body" || rest == "body#" -> Result.success(RuntimeExpressionAst.RequestBody(null))
       rest.startsWith("body#") -> {
         val pointer = rest.removePrefix("body#")
-        if (!pointer.startsWith("/")) {
-          CddError.RuntimeExpressionError(expr, "JSON Pointer after # must start with '/'")
-              .toFailure()
+        if (!isValidJsonPointerSyntax(pointer)) {
+          CddError.RuntimeExpressionError(expr, "Invalid RFC 6901 JSON Pointer after #").toFailure()
         } else {
           Result.success(RuntimeExpressionAst.RequestBody(pointer))
         }
@@ -423,19 +491,36 @@ object RuntimeExpressionEngine {
           Result.success(RuntimeExpressionAst.ResponseHeader(name))
         }
       }
-      rest == "body" -> Result.success(RuntimeExpressionAst.ResponseBody(null))
+      rest.startsWith("query.") -> {
+        val name = rest.removePrefix("query.")
+        if (name.isBlank()) {
+          CddError.RuntimeExpressionError(expr, "Missing query parameter name in \$response.query")
+              .toFailure()
+        } else {
+          Result.success(RuntimeExpressionAst.ResponseQuery(name))
+        }
+      }
+      rest.startsWith("path.") -> {
+        val name = rest.removePrefix("path.")
+        if (name.isBlank()) {
+          CddError.RuntimeExpressionError(expr, "Missing path parameter name in \$response.path")
+              .toFailure()
+        } else {
+          Result.success(RuntimeExpressionAst.ResponsePath(name))
+        }
+      }
+      rest == "body" || rest == "body#" -> Result.success(RuntimeExpressionAst.ResponseBody(null))
       rest.startsWith("body#") -> {
         val pointer = rest.removePrefix("body#")
-        if (!pointer.startsWith("/")) {
-          CddError.RuntimeExpressionError(expr, "JSON Pointer after # must start with '/'")
-              .toFailure()
+        if (!isValidJsonPointerSyntax(pointer)) {
+          CddError.RuntimeExpressionError(expr, "Invalid RFC 6901 JSON Pointer after #").toFailure()
         } else {
           Result.success(RuntimeExpressionAst.ResponseBody(pointer))
         }
       }
       else ->
           CddError.RuntimeExpressionError(
-                  expr, "Invalid \$response source (expected header or body)")
+                  expr, "Invalid \$response source (expected header, query, path, or body)")
               .toFailure()
     }
   }
@@ -762,6 +847,32 @@ object RuntimeExpressionEngine {
             findHeaderIgnoreCase(resp.headers, ast.name)
                 ?: return CddError.RuntimeExpressionError(
                         rawExpr, "Response header '${ast.name}' not found")
+                    .toFailure()
+        Result.success(OpenApiString(match))
+      }
+      is RuntimeExpressionAst.ResponseQuery -> {
+        val req =
+            context.currentRequest
+                ?: return CddError.RuntimeExpressionError(
+                        rawExpr, "No active request for \$response.query.${ast.name}")
+                    .toFailure()
+        val match =
+            req.query[ast.name]
+                ?: return CddError.RuntimeExpressionError(
+                        rawExpr, "Response query parameter '${ast.name}' not found")
+                    .toFailure()
+        Result.success(OpenApiString(match))
+      }
+      is RuntimeExpressionAst.ResponsePath -> {
+        val req =
+            context.currentRequest
+                ?: return CddError.RuntimeExpressionError(
+                        rawExpr, "No active request for \$response.path.${ast.name}")
+                    .toFailure()
+        val match =
+            req.path[ast.name]
+                ?: return CddError.RuntimeExpressionError(
+                        rawExpr, "Response path parameter '${ast.name}' not found")
                     .toFailure()
         Result.success(OpenApiString(match))
       }

@@ -66,17 +66,30 @@ class SyncGeneratorTest {
           .writeText(
               """
               package custom.pkg.dao
+              val anon = object : Runnable { override fun run() {} }
+              object Table : Table("empty_name")
+              object NoBodyTable : Table("no_body")
               object AccountTable : Table("accounts") {
-                val idColumn = integer("id")
+                val ignoredProp = 1
+                val noInitColumn: Int
+                val unknownCallColumn = customCol("u")
+                val idColumn = integer("id").autoIncrement()
                 val totalColumn = long("total")
-                val scoreColumn = double("score")
+                val scoreColumn = double("score").nullable()
                 val activeColumn = bool("active")
                 val nameColumn = varchar("name", 255)
+                val bioColumn = text("bio").nullable()
               }
               """
                   .trimIndent())
       assertTrue(SyncGenerator.synchronize(tempDir.absolutePath, "sqlalchemy").isSuccess)
       assertTrue(File(tempDir, "models/Account.kt").exists())
+      // Second run merges into existing Account.kt via DtoMerger
+      assertTrue(SyncGenerator.synchronize(tempDir.absolutePath, "dao").isSuccess)
+      // Corrupt Account.kt so DtoMerger falls back to DtoGenerator
+      File(tempDir, "models/Account.kt").writeText("package custom.pkg.models\n// no class")
+      assertTrue(SyncGenerator.synchronize(tempDir.absolutePath, "model").isSuccess)
+      assertTrue(SyncGenerator.synchronize(tempDir.absolutePath, "dao").isSuccess)
       assertTrue(File(tempDir, "openapi_sync.json").exists())
 
       // Test openapi truth target (with existing openapi_sync.json and without)

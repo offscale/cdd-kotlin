@@ -48,6 +48,16 @@ class RoundTripTest {
     val extractedSchemas = dtoParser.parse(sourceCode)
     val extractedSchema = extractedSchemas.first()
     assertEquals(originalSchema.name, extractedSchema.name)
+    assertEquals(originalSchema.description, extractedSchema.description)
+    assertEquals(originalSchema.externalDocs, extractedSchema.externalDocs)
+    assertEquals(originalSchema.required, extractedSchema.required)
+    assertEquals(originalSchema.properties.keys, extractedSchema.properties.keys)
+    assertEquals("integer", extractedSchema.properties["id"]?.type)
+    assertEquals("int64", extractedSchema.properties["id"]?.format)
+    assertEquals("Unique ID", extractedSchema.properties["id"]?.description)
+    assertEquals("string", extractedSchema.properties["email"]?.type)
+    assertEquals("boolean", extractedSchema.properties["isActive"]?.type)
+    assertEquals("Status flag", extractedSchema.properties["isActive"]?.description)
   }
 
   @Test
@@ -95,6 +105,7 @@ class RoundTripTest {
     val extractedSchemas = dtoParser.parse(sourceCode)
     val extractedEnum = extractedSchemas.first()
     assertEquals(originalEnum.name, extractedEnum.name)
+    assertEquals(originalEnum.enumValues, extractedEnum.enumValues)
   }
 
   @Test
@@ -108,13 +119,23 @@ class RoundTripTest {
                 mapOf(
                     "valid" to OpenApiObject(mapOf("id" to OpenApiInt(1L))),
                     "invalid" to OpenApiObject(emptyMap())),
-            properties = mapOf("id" to SchemaProperty("integer", example = OpenApiInt(1L))))
+            properties =
+                mapOf(
+                    "id" to
+                        SchemaProperty(
+                            "integer",
+                            example = OpenApiInt(1L),
+                            examples = listOf(OpenApiInt(1L), OpenApiInt(2L)))))
     val kotlinFile = dtoGenerator.generateDto("com.test", originalSchema)
     val sourceCode = kotlinFile.text
     val extractedSchemas = dtoParser.parse(sourceCode)
     val extractedSchema = extractedSchemas.first()
-    // assert values match roughly
     assertEquals(originalSchema.example, extractedSchema.example)
+    assertEquals(originalSchema.examples, extractedSchema.examples)
+    assertEquals(
+        originalSchema.properties["id"]?.example, extractedSchema.properties["id"]?.example)
+    assertEquals(
+        originalSchema.properties["id"]?.examples, extractedSchema.properties["id"]?.examples)
   }
 
   @Test

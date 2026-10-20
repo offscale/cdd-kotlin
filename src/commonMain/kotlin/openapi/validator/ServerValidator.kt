@@ -43,7 +43,7 @@ object ServerValidator : OpenApiValidationRule {
                   "Server name '$name' must be unique within the server list (found ${values.size}).")
     }
     servers.forEachIndexed { index, server ->
-      if (server.url.contains("?") or server.url.contains("#")) {
+      if (server.url.contains("?") || server.url.contains("#")) {
         issues +=
             OpenApiIssue(
                 severity = OpenApiIssueSeverity.ERROR,
@@ -98,7 +98,7 @@ object ServerValidator : OpenApiValidationRule {
         }
       }
       server.variables?.forEach { (name, variable) ->
-        if (name.contains("{") or name.contains("}")) {
+        if (name.contains("{") || name.contains("}")) {
           issues +=
               OpenApiIssue(
                   severity = OpenApiIssueSeverity.ERROR,

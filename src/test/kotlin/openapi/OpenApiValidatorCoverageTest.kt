@@ -488,5 +488,259 @@ class OpenApiValidatorCoverageTest {
                 remainingBranchDef.copy(self = "https://other.com/spec.json"),
                 baseUri = "https://other.com/spec.json")
             .isNotEmpty())
+
+    val shortCircuitBranchDef =
+        OpenApiDefinition(
+            info = Info(title = "SC", version = "1.0"),
+            servers =
+                listOf(
+                    Server(url = "https://example.com/api?query=1"),
+                    Server(
+                        url = "https://example.com/{v1}",
+                        variables =
+                            mapOf(
+                                "bad{name" to ServerVariable(default = "a"),
+                                "bad}name" to ServerVariable(default = "b")))),
+            components =
+                Components(
+                    securitySchemes =
+                        mapOf(
+                            "OAuthMissingToken" to
+                                SecurityScheme(
+                                    type = "oauth2",
+                                    flows =
+                                        OAuthFlows(
+                                            authorizationCode =
+                                                OAuthFlow(
+                                                    authorizationUrl = "https://example.com/auth",
+                                                    tokenUrl = null),
+                                            deviceAuthorization =
+                                                OAuthFlow(
+                                                    deviceAuthorizationUrl = null,
+                                                    tokenUrl = "https://example.com/tok")))),
+                    headers =
+                        mapOf(
+                            "NoExampleHeader" to
+                                Header(
+                                    type = "string",
+                                    schema = SchemaProperty("string"),
+                                    example = null,
+                                    examples =
+                                        mapOf("e" to ExampleObject(value = OpenApiString("v")))),
+                            "BothExampleHeader" to
+                                Header(
+                                    type = "string",
+                                    schema = SchemaProperty("string"),
+                                    example = ExampleObject(value = OpenApiString("v")),
+                                    examples =
+                                        mapOf("e" to ExampleObject(value = OpenApiString("v"))))),
+                    parameters =
+                        mapOf(
+                            "NoExampleParam" to
+                                EndpointParameter(
+                                    name = "p1",
+                                    type = "string",
+                                    location = ParameterLocation.QUERY,
+                                    schema = SchemaProperty("string"),
+                                    example = null,
+                                    examples =
+                                        mapOf("e" to ExampleObject(value = OpenApiString("v"))))),
+                    examples =
+                        mapOf(
+                            "RefWithData" to
+                                ExampleObject(
+                                    ref = "#/components/examples/Other",
+                                    dataValue = OpenApiString("d")),
+                            "RefWithSerialized" to
+                                ExampleObject(
+                                    ref = "#/components/examples/Other", serializedValue = "s"),
+                            "RefWithExternal" to
+                                ExampleObject(
+                                    ref = "#/components/examples/Other",
+                                    externalValue = "https://example.com/ex"),
+                            "DataOnly" to ExampleObject(dataValue = OpenApiString("d")),
+                            "SerializedWithVal" to
+                                ExampleObject(serializedValue = "s", value = OpenApiString("v")),
+                            "SerializedWithExt" to
+                                ExampleObject(
+                                    serializedValue = "s",
+                                    externalValue = "https://example.com/ex"),
+                            "ExternalOnly" to
+                                ExampleObject(externalValue = "https://example.com/ex")),
+                    mediaTypes =
+                        mapOf(
+                            "NoExMedia" to
+                                MediaTypeObject(
+                                    schema = SchemaProperty("string"),
+                                    example = null,
+                                    examples =
+                                        mapOf("e" to ExampleObject(value = OpenApiString("v")))),
+                            "PrefixArrMedia" to
+                                MediaTypeObject(
+                                    schema =
+                                        SchemaProperty(
+                                            prefixItems = listOf(SchemaProperty("string"))),
+                                    itemEncoding = EncodingObject(contentType = "text/plain")),
+                            "NoItemsArrMedia" to
+                                MediaTypeObject(
+                                    schema = SchemaProperty(types = emptySet()),
+                                    itemEncoding = EncodingObject(contentType = "text/plain")),
+                            "MultipartSeqMedia" to
+                                MediaTypeObject(itemSchema = SchemaProperty("string")),
+                            "JsonSeqMedia" to
+                                MediaTypeObject(itemSchema = SchemaProperty("string"))),
+                    schemas =
+                        mapOf(
+                            "EmptyTypesContentEnc" to
+                                SchemaDefinition(
+                                    name = "EmptyTypesContentEnc",
+                                    types = emptySet(),
+                                    contentEncoding = "base64"),
+                            "EmptyTypesWrappedXml" to
+                                SchemaDefinition(
+                                    name = "EmptyTypesWrappedXml",
+                                    types = emptySet(),
+                                    xml = Xml(wrapped = true)),
+                            "EmptyTypesAttrXml" to
+                                SchemaDefinition(
+                                    name = "EmptyTypesAttrXml",
+                                    types = emptySet(),
+                                    xml = Xml(nodeType = "attribute")),
+                            "DefsScopeSchema" to
+                                SchemaDefinition(
+                                    name = "DefsScopeSchema",
+                                    defs = mapOf("KnownDef" to SchemaProperty("string")),
+                                    properties =
+                                        mapOf(
+                                            "validDefRef" to
+                                                SchemaProperty(ref = "#/\$defs/KnownDef"),
+                                            "unknownDefRef" to
+                                                SchemaProperty(ref = "#/\$defs/UnknownDef"),
+                                            "nonDefRef" to
+                                                SchemaProperty(
+                                                    ref =
+                                                        "#/components/schemas/EmptyTypesContentEnc"),
+                                            "validSubDialect" to
+                                                SchemaProperty(
+                                                    schemaDialect =
+                                                        "https://json-schema.org/draft/2020-12/schema"))))),
+            paths =
+                mapOf(
+                    "/sc" to
+                        PathItem(
+                            get =
+                                EndpointDefinition(
+                                    path = "/sc",
+                                    method = HttpMethod.GET,
+                                    operationId = "getSc",
+                                    responses =
+                                        mapOf(
+                                            "200" to
+                                                EndpointResponse(
+                                                    statusCode = "200",
+                                                    description = "ok",
+                                                    content =
+                                                        mapOf(
+                                                            "multipart/mixed" to
+                                                                MediaTypeObject(
+                                                                    itemSchema =
+                                                                        SchemaProperty("string")),
+                                                            "application/geo+json-seq" to
+                                                                MediaTypeObject(
+                                                                    itemSchema =
+                                                                        SchemaProperty("string")),
+                                                            "text/event-stream" to
+                                                                MediaTypeObject(
+                                                                    itemSchema =
+                                                                        SchemaProperty("string")),
+                                                            "*/*" to
+                                                                MediaTypeObject(
+                                                                    schema =
+                                                                        SchemaProperty("string"),
+                                                                    example =
+                                                                        ExampleObject(
+                                                                            value =
+                                                                                OpenApiString("v")),
+                                                                    examples = emptyMap()),
+                                                            "application/json" to
+                                                                MediaTypeObject(
+                                                                    schema = null,
+                                                                    itemEncoding =
+                                                                        EncodingObject(
+                                                                            contentType =
+                                                                                "text/plain")))))))))
+    assertTrue(validator.validate(shortCircuitBranchDef).isNotEmpty())
+
+    val extraShortCircuitDef =
+        OpenApiDefinition(
+            info = Info(title = "ESC", version = "1.0"),
+            servers = listOf(Server(url = "https://example.com/api#frag")),
+            security =
+                listOf(
+                    mapOf("https://auth.example.com/scheme" to emptyList()),
+                    mapOf("#/components/securitySchemes/Local" to emptyList())),
+            components =
+                Components(
+                    mediaTypes =
+                        mapOf(
+                            "ItemSchemaWithPositional" to
+                                MediaTypeObject(
+                                    itemSchema = SchemaProperty("string"),
+                                    itemEncoding = EncodingObject(contentType = "text/plain"))),
+                    securitySchemes =
+                        mapOf(
+                            "OAuthCompleteDevice" to
+                                SecurityScheme(
+                                    type = "oauth2",
+                                    flows =
+                                        OAuthFlows(
+                                            deviceAuthorization =
+                                                OAuthFlow(
+                                                    deviceAuthorizationUrl =
+                                                        "https://example.com/dev",
+                                                    tokenUrl = null)))),
+                    headers =
+                        mapOf(
+                            "SingleExampleHeader" to
+                                Header(
+                                    type = "string",
+                                    schema = SchemaProperty("string"),
+                                    example = ExampleObject(value = OpenApiString("v")),
+                                    examples = emptyMap())),
+                    parameters =
+                        mapOf(
+                            "SingleExampleParam" to
+                                EndpointParameter(
+                                    name = "p1",
+                                    type = "string",
+                                    location = ParameterLocation.QUERY,
+                                    schema = SchemaProperty("string"),
+                                    example = ExampleObject(value = OpenApiString("v")),
+                                    examples = emptyMap())),
+                    schemas =
+                        mapOf(
+                            "StringContentEnc" to
+                                SchemaDefinition(
+                                    name = "StringContentEnc",
+                                    types = setOf("string"),
+                                    contentEncoding = "base64"),
+                            "ArrayWrappedXml" to
+                                SchemaDefinition(
+                                    name = "ArrayWrappedXml",
+                                    types = setOf("array"),
+                                    items = SchemaProperty("string"),
+                                    xml = Xml(wrapped = true)),
+                            "StringAttrXml" to
+                                SchemaDefinition(
+                                    name = "StringAttrXml",
+                                    types = setOf("string"),
+                                    xml = Xml(nodeType = "attribute")),
+                            "NoDefsScopeRef" to
+                                SchemaDefinition(
+                                    name = "NoDefsScopeRef",
+                                    defs = emptyMap(),
+                                    properties =
+                                        mapOf("d" to SchemaProperty(ref = "#/\$defs/Missing"))))))
+    assertTrue(validator.validate(extraShortCircuitDef).isNotEmpty())
   }
 }

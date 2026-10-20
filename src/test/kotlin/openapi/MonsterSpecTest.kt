@@ -13,11 +13,28 @@ class MonsterSpecTest {
     val parser = OpenApiParser()
     val doc = parser.parseDocumentString(content)
     assertTrue(doc is OpenApiDocument.OpenApi)
+    val definition = (doc as OpenApiDocument.OpenApi).definition
     val validator = OpenApiValidator()
-    validator.validate((doc as OpenApiDocument.OpenApi).definition)
+    val issues = validator.validate(definition)
+    assertTrue(issues.isNotEmpty())
+    assertTrue(issues.any { it.path == "$.openapi" && it.severity == OpenApiIssueSeverity.WARNING })
+    assertTrue(
+        issues.any {
+          it.path == "$.components.schemas.Monster.discriminator" &&
+              it.severity == OpenApiIssueSeverity.ERROR
+        })
 
     val writer = OpenApiWriter()
-    val outStr = writer.writeYaml(doc.definition)
+    val outStr = writer.writeYaml(definition)
     assertTrue(outStr.contains("Monster"))
+
+    val reparsed = parser.parseString(outStr, OpenApiParser.Format.YAML)
+    assertEquals(definition.info, reparsed.info)
+    assertEquals(definition.servers, reparsed.servers)
+    assertEquals(definition.paths.keys, reparsed.paths.keys)
+    assertEquals(definition.components?.schemas?.keys, reparsed.components?.schemas?.keys)
+    assertEquals(
+        definition.components?.schemas?.get("Monster")?.properties,
+        reparsed.components?.schemas?.get("Monster")?.properties)
   }
 }

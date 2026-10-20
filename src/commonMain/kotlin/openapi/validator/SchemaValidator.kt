@@ -224,7 +224,7 @@ object SchemaValidator : OpenApiValidationRule {
       issues: MutableList<OpenApiIssue>,
       state: SchemaValidationState
   ) {
-    if ((media.ref != null) or (media.reference != null)) return
+    if (media.ref != null || media.reference != null) return
     media.schema?.let { validateSchemaProperty(it, "$path.schema", issues, state) }
     media.itemSchema?.let { validateSchemaProperty(it, "$path.itemSchema", issues, state) }
   }
@@ -480,7 +480,7 @@ object SchemaValidator : OpenApiValidationRule {
     if (!state.properties.add(schema)) return
     val defsInScope = mergeDefsScope(defsScope, schema.defs.keys)
     val effectiveDialect = resolveDialect(schema.schemaDialect, currentDialect)
-    if ((schema.schemaDialect != null) and !isKnownDialect(effectiveDialect)) {
+    if (schema.schemaDialect != null && !isKnownDialect(effectiveDialect)) {
       issues +=
           OpenApiIssue(
               severity = OpenApiIssueSeverity.WARNING,
@@ -725,7 +725,7 @@ object SchemaValidator : OpenApiValidationRule {
                 path = "$path.contentEncoding",
                 message = "contentEncoding must not be blank.")
       }
-      if (types.isNotEmpty() and !types.contains("string")) {
+      if (!types.contains("string")) {
         issues +=
             OpenApiIssue(
                 severity = OpenApiIssueSeverity.WARNING,
@@ -761,7 +761,7 @@ object SchemaValidator : OpenApiValidationRule {
               message = "Schema \$ref '$ref' does not resolve to components.schemas.")
     }
     val defsRef = extractDefsRefName(ref)
-    if ((defsRef != null) and defsScope.isNotEmpty() and !defsScope.contains(defsRef)) {
+    if (defsRef != null && defsScope.isNotEmpty() && !defsScope.contains(defsRef)) {
       issues +=
           OpenApiIssue(
               severity = OpenApiIssueSeverity.ERROR,
@@ -916,7 +916,7 @@ object SchemaValidator : OpenApiValidationRule {
       anyOfSchemas: List<SchemaProperty>,
       allOfSchemas: List<SchemaProperty>
   ): Boolean {
-    return (oneOfRefs + anyOfRefs + allOfRefs).isNotEmpty() or
+    return (oneOfRefs + anyOfRefs + allOfRefs).isNotEmpty() ||
         (oneOfSchemas + anyOfSchemas + allOfSchemas).isNotEmpty()
   }
 
@@ -981,7 +981,7 @@ object SchemaValidator : OpenApiValidationRule {
       }
     }
 
-    if (xmlObj.wrapped and types.isNotEmpty() and !isArray) {
+    if (xmlObj.wrapped && !isArray) {
       issues +=
           OpenApiIssue(
               severity = OpenApiIssueSeverity.ERROR,
@@ -989,7 +989,7 @@ object SchemaValidator : OpenApiValidationRule {
               message = "xml.wrapped is only valid for array schemas.")
     }
 
-    if ((nodeType == "attribute") and types.isNotEmpty() and isArray) {
+    if (nodeType == "attribute" && isArray) {
       issues +=
           OpenApiIssue(
               severity = OpenApiIssueSeverity.ERROR,

@@ -17,6 +17,7 @@ import domain.Info
 import domain.Link
 import domain.MediaTypeObject
 import domain.OpenApiArray
+import domain.OpenApiBoolean
 import domain.OpenApiDefinition
 import domain.OpenApiObject
 import domain.OpenApiString
@@ -29,6 +30,7 @@ import domain.ReferenceObject
 import domain.RequestBody
 import domain.SchemaProperty
 import domain.stringOrNull
+import domain.toDisplayString
 import kotlinx.serialization.json.Json
 import openapi.OpenApiWriter
 import openapi.get
@@ -40,12 +42,12 @@ object EndpointMethodGenerator {
   private val openApiWriter = OpenApiWriter()
 
   /**
-   * Encodes an arbitrary value into a compact JSON string.
+   * Encodes an [OpenApiValue] into a compact JSON string.
    *
    * @param value Value to encode.
    * @return Compact JSON string.
    */
-  fun encodeCompactJson(value: Any?): String = OpenApiValues.encodeAnyToString(value)
+  fun encodeCompactJson(value: OpenApiValue): String = OpenApiValues.encodeToString(value)
 
   /**
    * Renders `x-` specification extensions into a compact JSON string.
@@ -55,7 +57,7 @@ object EndpointMethodGenerator {
    */
   fun renderExtensions(extensions: Map<String, OpenApiValue>): String {
     val filtered = extensions.filterKeys { it.startsWith("x-") }
-    return encodeCompactJson(filtered)
+    return encodeCompactJson(OpenApiObject(filtered))
   }
 
   private fun renderExternalDocs(docs: ExternalDocumentation): String =
@@ -91,7 +93,8 @@ object EndpointMethodGenerator {
     }
     if (ep.servers.isNotEmpty()) {
       val serversJson =
-          encodeCompactJson(ep.servers.map { psi.metadata.InfoMetadataCodec.serverToDocValue(it) })
+          encodeCompactJson(
+              OpenApiArray(ep.servers.map { psi.metadata.InfoMetadataCodec.serverToDocValue(it) }))
       lines.add("     * @servers $serversJson")
     }
     if (!ep.operationIdExplicit) {
@@ -150,7 +153,7 @@ object EndpointMethodGenerator {
     val requestBody = ep.requestBody
     if (requestBody != null) {
       val docVal = requestBodyToDocValue(requestBody)
-      if (docVal.isNotEmpty()) {
+      if (docVal.properties.isNotEmpty()) {
         lines.add("     * @requestBody ${encodeCompactJson(docVal)}")
       }
     }
@@ -193,14 +196,14 @@ object EndpointMethodGenerator {
       lines.add("     * @callbacks ${renderCallbacks(ep.callbacks)}")
     }
     if (ep.extensions.isNotEmpty()) {
-      lines.add("     * @extensions ${encodeCompactJson(ep.extensions)}")
+      lines.add("     * @extensions ${encodeCompactJson(OpenApiObject(ep.extensions))}")
     }
     if (lines.isEmpty()) return ""
     return "    /**\n" + lines.joinToString("\n") + "\n     */\n"
   }
 
   private fun renderSecurityRequirement(requirement: Map<String, List<String>>): String {
-    return encodeCompactJson(requirement)
+    return psi.metadata.SecurityMetadataCodec.renderSecurityRequirement(requirement)
   }
 
   private fun parameterStyleValue(style: ParameterStyle): String {
@@ -227,38 +230,27 @@ object EndpointMethodGenerator {
       return when {
         example.externalValue != null -> "external:${example.externalValue}"
         example.serializedValue != null -> example.serializedValue
-        example.value != null -> formatExamplePayload(example.value)
-        else -> formatExamplePayload(example.dataValue as OpenApiValue)
+        example.value != null -> example.value.toDisplayString()
+        else -> (example.dataValue as OpenApiValue).toDisplayString()
       }
     }
     return encodeCompactJson(exampleObjectToDocValue(example))
   }
 
-  private fun formatExamplePayload(payload: OpenApiValue): String {
-    val isContainer = (payload is OpenApiArray) or (payload is OpenApiObject)
-    return if (payload is OpenApiString) {
-      payload.value
-    } else if (isContainer) {
-      encodeCompactJson(payload)
-    } else {
-      payload.toUntyped().toString()
-    }
-  }
-
   private fun renderResponseHeaders(headers: Map<String, Header>): String {
     val filtered = headers.filterKeys { !it.equals("Content-Type", ignoreCase = true) }
     val mapped = filtered.mapValues { headerToDocValue(it.value) }
-    return encodeCompactJson(mapped)
+    return encodeCompactJson(OpenApiObject(mapped))
   }
 
   private fun renderResponseLinks(links: Map<String, Link>): String {
     val mapped = links.mapValues { linkToDocValue(it.value) }
-    return encodeCompactJson(mapped)
+    return encodeCompactJson(OpenApiObject(mapped))
   }
 
   private fun renderResponseContent(content: Map<String, MediaTypeObject>): String {
     val mapped = content.mapValues { mediaTypeToDocValue(it.value) }
-    return encodeCompactJson(mapped)
+    return encodeCompactJson(OpenApiObject(mapped))
   }
 
   /**
@@ -283,7 +275,7 @@ object EndpointMethodGenerator {
     val json = openApiWriter.writeJson(tempDefinition)
     val node = Json.parseToJsonElement(json)
     val callbacksNode = node.get("paths")!!.get("/_callbacks")!!.get("post")!!.get("callbacks")!!
-    return encodeCompactJson(callbacksNode)
+    return OpenApiValues.encodeJsonElementToString(callbacksNode)
   }
 
   private fun renderParamSchema(schema: SchemaProperty): String {
@@ -293,162 +285,64 @@ object EndpointMethodGenerator {
 
   private fun renderParamContent(content: Map<String, MediaTypeObject>): String {
     val mapped = content.mapValues { mediaTypeToDocValue(it.value) }
-    return encodeCompactJson(mapped)
+    return encodeCompactJson(OpenApiObject(mapped))
   }
 
-  private fun requestBodyToDocValue(body: RequestBody): Map<String, Any?> {
+  private fun requestBodyToDocValue(body: RequestBody): OpenApiObject {
     body.reference?.let {
       return referenceToDocValue(it)
     }
-    val map = linkedMapOf<String, Any?>()
-    map.putIfNotNull("description", body.description)
-    map.putIfTrue("required", body.required)
-    val hasContent = body.contentPresent or body.content.isNotEmpty()
+    val map = LinkedHashMap<String, OpenApiValue>()
+    body.description?.let { map["description"] = OpenApiString(it) }
+    if (body.required) map["required"] = OpenApiBoolean(true)
+    val hasContent = body.contentPresent || body.content.isNotEmpty()
     if (hasContent) {
-      map["content"] = body.content.mapValues { mediaTypeToDocValue(it.value) }
+      map["content"] = OpenApiObject(body.content.mapValues { mediaTypeToDocValue(it.value) })
     }
-    map.putExtensions(body.extensions)
-    return map
+    body.extensions.forEach { (k, v) -> map[k] = v }
+    return OpenApiObject(map)
   }
 
-  private fun headerToDocValue(header: Header): Any {
-    header.reference?.let {
-      return referenceToDocValue(it)
+  private fun headerToDocValue(header: Header): OpenApiObject {
+    val map =
+        LinkedHashMap<String, OpenApiValue>(openApiWriter.headerToObject(header, false).properties)
+    if (header.reference == null) {
+      if (header.style != null) map["style"] = OpenApiString(parameterStyleValue(header.style))
+      header.explode?.let { map["explode"] = OpenApiBoolean(it) }
+      header.example?.let { map["example"] = exampleObjectToDocValue(it) }
     }
-    val map = linkedMapOf<String, Any?>()
-    map.putIfNotNull("description", header.description)
-    map.putIfTrue("required", header.required)
-    map.putIfTrue("deprecated", header.deprecated)
-    if (header.style != null) map["style"] = parameterStyleValue(header.style)
-    map.putIfNotNull("explode", header.explode)
-    if (header.content.isNotEmpty()) {
-      map["content"] = header.content.mapValues { mediaTypeToDocValue(it.value) }
-    } else if (header.schema != null) {
-      map["schema"] = schemaPropertyToDocValue(header.schema)
-    }
-    header.example?.let { map["example"] = exampleObjectToDocValue(it) }
-    if (header.examples.isNotEmpty()) {
-      map["examples"] = header.examples.mapValues { exampleObjectToDocValue(it.value) }
-    }
-    map.putExtensions(header.extensions)
-    return map
+    return OpenApiObject(map)
   }
 
   /**
-   * Converts a [Link] into a JSON-serializable doc value.
+   * Converts a [Link] into a strongly-typed [OpenApiObject] doc value.
    *
    * @param link Link object.
-   * @return Serializable doc value.
+   * @return [OpenApiObject] doc value.
    */
-  fun linkToDocValue(link: Link): Any {
-    link.reference?.let {
-      return referenceToDocValue(it)
-    }
-    link.ref?.let {
-      val refMap = linkedMapOf<String, Any?>("\$ref" to it)
-      refMap.putIfNotNull("description", link.description)
-      return refMap
-    }
-    val map = linkedMapOf<String, Any?>()
-    map.putIfNotNull("operationId", link.operationId)
-    map.putIfNotNull("operationRef", link.operationRef)
-    map.putIfNotEmpty("parameters", link.parameters)
-    map.putIfNotNull("requestBody", link.requestBody)
-    map.putIfNotNull("description", link.description)
-    link.server?.let { map["server"] = psi.metadata.InfoMetadataCodec.serverToDocValue(it) }
-    map.putExtensions(link.extensions)
-    return map
-  }
+  fun linkToDocValue(link: Link): OpenApiObject = openApiWriter.linkToObject(link)
 
-  private fun mediaTypeToDocValue(mediaType: MediaTypeObject): Any {
-    mediaType.reference?.let {
-      return referenceToDocValue(it)
-    }
-    mediaType.ref?.let {
-      return mapOf("\$ref" to it)
-    }
-    val map = linkedMapOf<String, Any?>()
-    mediaType.schema?.let { map["schema"] = schemaPropertyToDocValue(it) }
-    mediaType.itemSchema?.let { map["itemSchema"] = schemaPropertyToDocValue(it) }
+  private fun mediaTypeToDocValue(mediaType: MediaTypeObject): OpenApiObject {
+    val map =
+        LinkedHashMap<String, OpenApiValue>(openApiWriter.mediaTypeToObject(mediaType).properties)
     mediaType.example?.let { map["example"] = exampleObjectToDocValue(it) }
-    if (mediaType.examples.isNotEmpty()) {
-      map["examples"] = mediaType.examples.mapValues { exampleObjectToDocValue(it.value) }
-    }
-    map.putIfNotEmpty("encoding", mediaType.encoding.mapValues { encodingToDocValue(it.value) })
-    map.putIfNotEmpty("prefixEncoding", mediaType.prefixEncoding.map { encodingToDocValue(it) })
-    mediaType.itemEncoding?.let { map["itemEncoding"] = encodingToDocValue(it) }
-    map.putExtensions(mediaType.extensions)
-    return map
-  }
-
-  private fun encodingToDocValue(encoding: EncodingObject): Map<String, Any?> {
-    val map = linkedMapOf<String, Any?>()
-    map.putIfNotNull("contentType", encoding.contentType)
-    map.putIfNotEmpty("headers", encoding.headers.mapValues { headerToDocValue(it.value) })
-    map.putIfNotNull("style", encoding.style?.let(::parameterStyleValue))
-    map.putIfNotNull("explode", encoding.explode)
-    map.putIfNotNull("allowReserved", encoding.allowReserved)
-    map.putIfNotEmpty("encoding", encoding.encoding.mapValues { encodingToDocValue(it.value) })
-    map.putIfNotEmpty("prefixEncoding", encoding.prefixEncoding.map { encodingToDocValue(it) })
-    map.putIfNotNull("itemEncoding", encoding.itemEncoding?.let(::encodingToDocValue))
-    map.putExtensions(encoding.extensions)
-    return map
+    return OpenApiObject(map)
   }
 
   private fun schemaPropertyToDocValue(schema: SchemaProperty): OpenApiValue =
       psi.dto.SchemaDocTagWriter.schemaPropertyToDocValue(schema)
 
   /**
-   * Converts an [ExampleObject] into a strongly-typed [OpenApiValue] doc value.
+   * Converts an [ExampleObject] into a strongly-typed [OpenApiObject] doc value.
    *
    * @param example Example object.
-   * @return [OpenApiValue] doc representation.
+   * @return [OpenApiObject] doc representation.
    */
-  fun exampleObjectToDocValue(example: ExampleObject): OpenApiValue {
-    example.ref?.let {
-      val refMap = linkedMapOf<String, Any?>("\$ref" to it)
-      refMap.putIfNotNull("summary", example.summary)
-      refMap.putIfNotNull("description", example.description)
-      return OpenApiValues.fromAny(refMap)
-    }
-    val map = linkedMapOf<String, Any?>()
-    map.putIfNotNull("summary", example.summary)
-    map.putIfNotNull("description", example.description)
-    map.putIfNotNull("dataValue", example.dataValue)
-    map.putIfNotNull("serializedValue", example.serializedValue)
-    map.putIfNotNull("externalValue", example.externalValue)
-    map.putIfNotNull("value", example.value)
-    map.putExtensions(example.extensions)
-    return OpenApiValues.fromAny(map)
-  }
+  fun exampleObjectToDocValue(example: ExampleObject): OpenApiObject =
+      openApiWriter.exampleObjectToObject(example)
 
-  private fun referenceToDocValue(reference: ReferenceObject): Map<String, Any?> {
-    val map = linkedMapOf<String, Any?>("\$ref" to reference.ref)
-    map.putIfNotNull("summary", reference.summary)
-    map.putIfNotNull("description", reference.description)
-    map.putExtensions(reference.extensions)
-    return map
-  }
-
-  private fun <T> MutableMap<String, Any?>.putIfNotNull(key: String, value: T?) {
-    if (value != null) this[key] = value
-  }
-
-  private fun <T> MutableMap<String, Any?>.putIfNotEmpty(key: String, value: Collection<T>) {
-    if (value.isNotEmpty()) this[key] = value
-  }
-
-  private fun <K, V> MutableMap<String, Any?>.putIfNotEmpty(key: String, value: Map<K, V>) {
-    if (value.isNotEmpty()) this[key] = value
-  }
-
-  private fun MutableMap<String, Any?>.putIfTrue(key: String, value: Boolean) {
-    if (value) this[key] = true
-  }
-
-  private fun MutableMap<String, Any?>.putExtensions(extensions: Map<String, OpenApiValue>) {
-    extensions.forEach { (key, value) -> this[key] = value }
-  }
+  private fun referenceToDocValue(reference: ReferenceObject): OpenApiObject =
+      openApiWriter.referenceToObject(reference)
 
   /**
    * Generates the Kotlin function signature for an endpoint returning `Result<T>`.

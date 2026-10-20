@@ -3,7 +3,6 @@
  */
 package org.cdd
 
-import getEnvVar
 import performSync
 
 /** Provides the Bi-Directional Synchronization API. */
@@ -15,19 +14,9 @@ object SyncCli {
    * @return Exit code (0 for success, 1 for error).
    */
   fun sync(args: Array<String>): Int {
-    var truth = getEnvVar("CDD_TRUTH") ?: ""
-    var inputDir = getEnvVar("CDD_INPUT_DIR") ?: "."
-
-    var i = 1
-    while (i < args.size) {
-      val arg = args[i]
-      if (arg == "--truth") {
-        if (i + 1 < args.size) truth = args[++i]
-      } else if (arg == "-i" || arg == "--input-dir") {
-        if (i + 1 < args.size) inputDir = args[++i]
-      }
-      i++
-    }
+    val flags = CliArgumentParser.parse(args, defaultInputDir = ".", allowInputDirOnShortI = true)
+    val truth = flags.truth
+    val inputDir = flags.inputDir
 
     if (truth.isEmpty()) {
       println("Missing --truth <class|dao|arazzo|openapi>")

@@ -6,103 +6,105 @@ package psi.metadata
 
 import domain.Components
 import domain.Info
+import domain.OpenApiArray
 import domain.OpenApiDefinition
+import domain.OpenApiObject
+import domain.OpenApiString
 import domain.OpenApiValues
 import domain.SecurityRequirement
 import domain.SecurityScheme
 import kotlinx.serialization.json.Json
 import openapi.OpenApiParser
 import openapi.OpenApiWriter
-import openapi.elements
+import openapi.asArray
+import openapi.asObject
 import openapi.fields
 import openapi.get
-import openapi.isArray
-import openapi.isObject
 import openapi.textValue
 
 /**
- * Result of parsing `@security` and `@securityEmpty` tags from KDoc lines.
+ * Result of extracting security requirements from KDoc lines.
  *
- * @property requirements Parsed list of security requirements.
- * @property explicitEmpty Whether an explicit empty security array (`security: []`) was specified.
+ * @property requirements List of parsed [SecurityRequirement] maps.
+ * @property explicitEmpty Whether `@securityEmpty` was explicitly specified.
  */
-data class SecurityMetadataParseResult(
+data class SecurityExtractResult(
     val requirements: List<SecurityRequirement>,
     val explicitEmpty: Boolean
 )
 
-/**
- * Encodes and decodes OpenAPI [SecurityRequirement] and [SecurityScheme] metadata to and from KDoc
- * tags.
- */
+/** Encodes and decodes OpenAPI security requirements and security schemes in KDoc blocks. */
 object SecurityMetadataCodec {
   private val openApiWriter = OpenApiWriter()
 
   /**
-   * Encodes a single [SecurityRequirement] map into a compact JSON string for `@security`.
+   * Serializes a single [SecurityRequirement] map into a compact JSON string.
    *
-   * @param requirement Security requirement map (`schemeName -> scopes`).
+   * @param requirement Security requirement map.
    * @return Compact JSON string.
    */
-  fun renderSecurityRequirement(requirement: Map<String, List<String>>): String {
-    return OpenApiValues.encodeAnyToString(requirement)
+  fun renderSecurityRequirement(requirement: SecurityRequirement): String {
+    val obj =
+        OpenApiObject(
+            requirement.mapValues { (_, scopes) -> OpenApiArray(scopes.map { OpenApiString(it) }) })
+    return OpenApiValues.encodeToString(obj)
   }
 
   /**
-   * Encodes a map of [SecurityScheme]s into a compact JSON string for `@securitySchemes`.
+   * Serializes a map of [SecurityScheme]s into a compact JSON string for `@securitySchemes`.
    *
-   * @param securitySchemes Security schemes map.
+   * @param schemes Map of security schemes.
    * @return Compact JSON string.
    */
-  fun renderSecuritySchemes(securitySchemes: Map<String, SecurityScheme>): String {
-    if (securitySchemes.isEmpty()) return "{}"
+  fun renderSecuritySchemes(schemes: Map<String, SecurityScheme>): String {
+    if (schemes.isEmpty()) return "{}"
     val tempDefinition =
         OpenApiDefinition(
             info = Info(title = "Security Schemes", version = "0.0.0"),
-            components = Components(securitySchemes = securitySchemes))
+            components = Components(securitySchemes = schemes))
     val json = openApiWriter.writeJson(tempDefinition)
     val node = Json.parseToJsonElement(json)
     val schemesNode = node.get("components")!!.get("securitySchemes")!!
-    return OpenApiValues.encodeAnyToString(schemesNode)
+    return OpenApiValues.encodeJsonElementToString(schemesNode)
   }
 
   /**
-   * Extracts `@security` and `@securityEmpty` declarations from [lines].
+   * Extracts [SecurityExtractResult] from `@security` and `@securityEmpty` tags in [lines].
    *
    * @param lines Normalized KDoc lines.
-   * @return Parsed [SecurityMetadataParseResult].
+   * @return Extracted [SecurityExtractResult].
    */
-  fun extractSecurityLines(lines: List<String>): SecurityMetadataParseResult {
-    val securityLines = lines.filter { it.startsWith("@security ") }
-    val explicitEmpty =
-        lines.any { it == "@securityEmpty" || it.startsWith("@securityEmpty ") } &&
-            securityLines.isEmpty()
+  fun extractSecurityLines(lines: List<String>): SecurityExtractResult {
+    val hasEmptyTag = lines.any { it == "@securityEmpty" || it.startsWith("@securityEmpty ") }
+    val securityLines =
+        lines
+            .filter { it.startsWith("@security") && !it.startsWith("@securitySchemes") }
+            .filterNot { it.startsWith("@securityEmpty") }
+            .map { it.removePrefix("@security").trim() }
+            .filter { it.isNotEmpty() }
 
     val requirements =
-        securityLines.mapNotNull { line ->
-          val raw = line.removePrefix("@security").trim()
-          if (raw.isEmpty()) return@mapNotNull null
-          val node = openapi.parseJsonElementOrNull(raw) ?: return@mapNotNull null
-          if (!node.isObject) return@mapNotNull null
-          node.fields().asSequence().associate { (key, value) ->
-            val scopes =
-                if (value.isArray) {
-                  value.elements().mapNotNull { it.textValue() }
-                } else {
-                  emptyList()
-                }
-            key to scopes
+        securityLines.mapNotNull { json ->
+          val node = openapi.parseJsonElementOrNull(json) ?: return@mapNotNull null
+          val obj = node.asObject() ?: return@mapNotNull null
+          val map = LinkedHashMap<String, List<String>>()
+          obj.fields().forEach { (scheme, scopesNode) ->
+            val arr = scopesNode.asArray()
+            val scopes = if (arr != null) arr.mapNotNull { it.textValue() } else emptyList()
+            map[scheme] = scopes
           }
+          map
         }
-    return SecurityMetadataParseResult(requirements, explicitEmpty)
+
+    return SecurityExtractResult(requirements, hasEmptyTag && requirements.isEmpty())
   }
 
   /**
    * Extracts a map of [SecurityScheme]s from `@securitySchemes` in [lines].
    *
    * @param lines Normalized KDoc lines.
-   * @param parser OpenAPI parser instance used to decode the wrapped component section.
-   * @return Map of security scheme names to [SecurityScheme] objects.
+   * @param parser OpenAPI parser instance.
+   * @return Map of scheme names to [SecurityScheme]s.
    */
   fun extractSecuritySchemesLine(
       lines: List<String>,

@@ -16,22 +16,17 @@ import domain.OpenApiValues
 import domain.SchemaProperty
 import domain.Xml
 import domain.stringOrNull
+import domain.toDisplayString
 import openapi.JsonNode
 import openapi.asArray
 import openapi.asObject
-import openapi.asText
-import openapi.boolean
-import openapi.booleanValue
-import openapi.double
-import openapi.elements
 import openapi.fields
 import openapi.get
 import openapi.has
-import openapi.int
-import openapi.isArray
 import openapi.isBoolean
 import openapi.isObject
 import openapi.isTextual
+import openapi.parser.SchemaNodeParser
 import openapi.text
 import openapi.textValue
 import org.jetbrains.kotlin.psi.KtModifierListOwner
@@ -48,69 +43,7 @@ data class CompositionTagResult(val refs: List<String>, val schemas: List<Schema
  * Extracts OpenAPI schema metadata, constraints, and JSON Schema keywords from Kotlin KDoc blocks.
  */
 object SchemaDocTagParser {
-  private val NUMBER_REGEX = Regex("^-?\\d+(\\.\\d+)?([eE][+-]?\\d+)?$")
-  private val schemaKnownKeys =
-      setOf(
-          "\$ref",
-          "\$dynamicRef",
-          "\$id",
-          "\$schema",
-          "\$anchor",
-          "\$dynamicAnchor",
-          "\$comment",
-          "\$defs",
-          "type",
-          "format",
-          "contentMediaType",
-          "contentEncoding",
-          "minLength",
-          "maxLength",
-          "pattern",
-          "minimum",
-          "maximum",
-          "multipleOf",
-          "exclusiveMinimum",
-          "exclusiveMaximum",
-          "minItems",
-          "maxItems",
-          "uniqueItems",
-          "minProperties",
-          "maxProperties",
-          "items",
-          "prefixItems",
-          "contains",
-          "minContains",
-          "maxContains",
-          "properties",
-          "patternProperties",
-          "propertyNames",
-          "additionalProperties",
-          "required",
-          "dependentRequired",
-          "dependentSchemas",
-          "enum",
-          "description",
-          "title",
-          "default",
-          "const",
-          "deprecated",
-          "readOnly",
-          "writeOnly",
-          "externalDocs",
-          "discriminator",
-          "xml",
-          "oneOf",
-          "anyOf",
-          "allOf",
-          "not",
-          "if",
-          "then",
-          "else",
-          "example",
-          "examples",
-          "unevaluatedProperties",
-          "unevaluatedItems",
-          "contentSchema")
+  private val NUMBER_REGEX = Regex("""^-?\d+(\.\d+)?([eE][+-]?\d+)?$""")
 
   /**
    * Extracts free-form description text (non-tag lines) from [element] KDoc.
@@ -122,7 +55,7 @@ object SchemaDocTagParser {
     val docComment = element.docComment ?: return null
 
     return docComment.text
-        .split("\n")
+        .split('\n')
         .map { cleanKDocLine(it) }
         .filter { it.isNotEmpty() && !it.startsWith("@") }
         .joinToString(" ")
@@ -141,7 +74,7 @@ object SchemaDocTagParser {
     val docComment = element.docComment ?: return null
 
     val seeLine =
-        docComment.text.split("\n").map { cleanKDocLine(it) }.find { it.startsWith("@see") }
+        docComment.text.split('\n').map { cleanKDocLine(it) }.find { it.startsWith("@see") }
             ?: return null
 
     val content = seeLine.removePrefix("@see").trim()
@@ -154,26 +87,26 @@ object SchemaDocTagParser {
   }
 
   /**
-   * Extracts a [domain.Discriminator] object from `@discriminator*` tags in [element] KDoc.
+   * Extracts a [Discriminator] object from `@discriminator*` tags in [element] KDoc.
    *
    * @param element The PSI declaration to inspect.
-   * @return The parsed [domain.Discriminator] or `null`.
+   * @return The parsed [Discriminator] or `null`.
    */
-  fun extractDiscriminator(element: org.jetbrains.kotlin.psi.KtDeclaration): domain.Discriminator? {
+  fun extractDiscriminator(element: org.jetbrains.kotlin.psi.KtDeclaration): Discriminator? {
     val propertyName = extractTagValue(element, "discriminator") ?: return null
     val mappingLiteral = extractTagLiteral(element, "discriminatorMapping")
     val mappingObj = mappingLiteral as? OpenApiObject
     val mapping =
         if (mappingObj != null) {
           mappingObj.properties.entries.associate { (k, v) ->
-            k to (v.stringOrNull() ?: v.toUntyped().toString())
+            k to (v.stringOrNull() ?: v.toDisplayString())
           }
         } else {
           emptyMap()
         }
     val defaultMapping = extractTagValue(element, "discriminatorDefault")
 
-    return domain.Discriminator(
+    return Discriminator(
         propertyName = propertyName, mapping = mapping, defaultMapping = defaultMapping)
   }
 
@@ -313,167 +246,14 @@ object SchemaDocTagParser {
   ): Map<String, List<String>> {
     val raw = extractTagValue(element, tag) ?: return emptyMap()
     val node = openapi.parseJsonElementOrNull(raw)
-    return parseDependentRequiredNode(node)
+    return SchemaNodeParser.parseDependentRequired(node)
   }
 
   private fun parseSchemaPropertyNode(node: JsonNode): SchemaProperty {
-    if (node.isBoolean) {
-      return SchemaProperty(booleanSchema = node.booleanValue())
+    if (node.isBoolean || node.isObject) {
+      return SchemaNodeParser.parseSchemaProperty(node)
     }
-    val obj = node.asObject() ?: return SchemaProperty()
-    val ref = obj.text("\$ref")
-    if (ref != null) return SchemaProperty(ref = ref)
-    val dynamicRef = obj.text("\$dynamicRef")
-    if (dynamicRef != null) return SchemaProperty(dynamicRef = dynamicRef)
-    val customKeywords = parseCustomKeywordsNode(obj)
-
-    return SchemaProperty(
-        booleanSchema = null,
-        types = parseTypesNode(obj),
-        schemaId = obj.text("\$id"),
-        schemaDialect = obj.text("\$schema"),
-        anchor = obj.text("\$anchor"),
-        dynamicAnchor = obj.text("\$dynamicAnchor"),
-        comment = obj.text("\$comment"),
-        format = obj.text("format"),
-        contentMediaType = obj.text("contentMediaType"),
-        contentEncoding = obj.text("contentEncoding"),
-        minLength = obj.int("minLength"),
-        maxLength = obj.int("maxLength"),
-        pattern = obj.text("pattern"),
-        minimum = obj.double("minimum"),
-        maximum = obj.double("maximum"),
-        multipleOf = obj.double("multipleOf"),
-        exclusiveMinimum = obj.double("exclusiveMinimum"),
-        exclusiveMaximum = obj.double("exclusiveMaximum"),
-        minItems = obj.int("minItems"),
-        maxItems = obj.int("maxItems"),
-        uniqueItems = obj.boolean("uniqueItems"),
-        minProperties = obj.int("minProperties"),
-        maxProperties = obj.int("maxProperties"),
-        items = obj.get("items")?.let { parseSchemaPropertyNode(it) },
-        prefixItems = parseSchemaPropertyListNode(obj.get("prefixItems")),
-        contains = obj.get("contains")?.let { parseSchemaPropertyNode(it) },
-        minContains = obj.int("minContains"),
-        maxContains = obj.int("maxContains"),
-        properties = parseSchemaPropertiesNode(obj.get("properties")),
-        required = obj.get("required").asArray()?.mapNotNull { it.textValue() } ?: emptyList(),
-        additionalProperties = parseAdditionalPropertiesNode(obj.get("additionalProperties")),
-        defs = parseSchemaPropertiesNode(obj.get("\$defs")),
-        patternProperties = parseSchemaPropertiesNode(obj.get("patternProperties")),
-        propertyNames = obj.get("propertyNames")?.let { parseSchemaPropertyNode(it) },
-        dependentRequired = parseDependentRequiredNode(obj.get("dependentRequired")),
-        dependentSchemas = parseSchemaPropertiesNode(obj.get("dependentSchemas")),
-        description = obj.text("description"),
-        title = obj.text("title"),
-        defaultValue = obj.get("default")?.let { nodeToValue(it) },
-        constValue = obj.get("const")?.let { nodeToValue(it) },
-        deprecated = obj.boolean("deprecated") ?: false,
-        readOnly = obj.boolean("readOnly") ?: false,
-        writeOnly = obj.boolean("writeOnly") ?: false,
-        externalDocs = parseExternalDocsNode(obj.get("externalDocs")),
-        discriminator = parseDiscriminatorNode(obj.get("discriminator")),
-        enumValues = obj.get("enum").asArray()?.map { nodeToValue(it) },
-        oneOf = parseSchemaPropertyListNode(obj.get("oneOf")),
-        anyOf = parseSchemaPropertyListNode(obj.get("anyOf")),
-        allOf = parseSchemaPropertyListNode(obj.get("allOf")),
-        not = obj.get("not")?.let { parseSchemaPropertyNode(it) },
-        ifSchema = obj.get("if")?.let { parseSchemaPropertyNode(it) },
-        thenSchema = obj.get("then")?.let { parseSchemaPropertyNode(it) },
-        elseSchema = obj.get("else")?.let { parseSchemaPropertyNode(it) },
-        example = obj.get("example")?.let { nodeToValue(it) },
-        examples = parseSchemaExamplesListNode(obj.get("examples")),
-        xml = parseXmlNode(obj.get("xml")),
-        unevaluatedProperties =
-            obj.get("unevaluatedProperties")?.let { parseSchemaPropertyNode(it) },
-        unevaluatedItems = obj.get("unevaluatedItems")?.let { parseSchemaPropertyNode(it) },
-        contentSchema = obj.get("contentSchema")?.let { parseSchemaPropertyNode(it) },
-        customKeywords = customKeywords)
-  }
-
-  private fun parseCustomKeywordsNode(obj: JsonNode): Map<String, OpenApiValue> {
-    return obj.fields()
-        .asSequence()
-        .filter { (key, _) -> !key.startsWith("x-") && key !in schemaKnownKeys }
-        .associate { (key, value) -> key to nodeToValue(value) }
-  }
-
-  private fun parseSchemaPropertiesNode(node: JsonNode?): Map<String, SchemaProperty> {
-    val obj = node.asObject() ?: return emptyMap()
-    return obj.fields().asSequence().associate { (name, raw) ->
-      name to parseSchemaPropertyNode(raw)
-    }
-  }
-
-  private fun parseSchemaPropertyListNode(node: JsonNode?): List<SchemaProperty> {
-    val array = node.asArray() ?: return emptyList()
-    return array.map { parseSchemaPropertyNode(it) }
-  }
-
-  private fun parseAdditionalPropertiesNode(node: JsonNode?): SchemaProperty? {
-    return when {
-      node == null -> null
-      node.isBoolean -> SchemaProperty(booleanSchema = node.booleanValue())
-      node.isObject -> parseSchemaPropertyNode(node)
-      else -> null
-    }
-  }
-
-  private fun parseDependentRequiredNode(node: JsonNode?): Map<String, List<String>> {
-    val obj = node.asObject() ?: return emptyMap()
-    return obj.fields().asSequence().associate { (key, raw) ->
-      val arr = raw.asArray()
-      val list = if (arr != null) arr.mapNotNull { it.textValue() } else emptyList()
-      key to list
-    }
-  }
-
-  private fun parseTypesNode(obj: JsonNode): Set<String> {
-    val node = obj.get("type") ?: return emptySet()
-    return when {
-      node.isTextual -> setOf(node.asText()!!)
-      node.isArray -> node.elements().mapNotNull { it.textValue() }.toSet()
-      else -> emptySet()
-    }
-  }
-
-  private fun parseExternalDocsNode(node: JsonNode?): domain.ExternalDocumentation? {
-    val obj = node.asObject() ?: return null
-    val url = obj.text("url") ?: return null
-    return domain.ExternalDocumentation(url = url, description = obj.text("description"))
-  }
-
-  private fun parseDiscriminatorNode(node: JsonNode?): domain.Discriminator? {
-    val obj = node.asObject() ?: return null
-    val mappingObj = obj.get("mapping").asObject()
-    val mapping =
-        if (mappingObj != null) {
-          mappingObj.fields().asSequence().associate { (k, v) ->
-            k to (v.textValue() ?: v.toString())
-          }
-        } else {
-          emptyMap()
-        }
-    return domain.Discriminator(
-        propertyName = obj.text("propertyName") ?: "type",
-        mapping = mapping,
-        defaultMapping = obj.text("defaultMapping"))
-  }
-
-  private fun parseXmlNode(node: JsonNode?): Xml? {
-    val obj = node.asObject() ?: return null
-    return Xml(
-        name = obj.text("name"),
-        namespace = obj.text("namespace"),
-        prefix = obj.text("prefix"),
-        nodeType = obj.text("nodeType"),
-        attribute = obj.boolean("attribute") ?: false,
-        wrapped = obj.boolean("wrapped") ?: false)
-  }
-
-  private fun parseSchemaExamplesListNode(node: JsonNode?): List<OpenApiValue>? {
-    val arr = node.asArray() ?: return null
-    return arr.map { nodeToValue(it) }
+    return SchemaProperty()
   }
 
   /**
@@ -489,7 +269,7 @@ object SchemaDocTagParser {
 
     val exampleLines =
         docComment.text
-            .split("\n")
+            .split('\n')
             .map { cleanKDocLine(it) }
             .filter { it.startsWith("@example") && !it.startsWith("@examples") }
             .map { it.removePrefix("@example").trim() }
@@ -541,7 +321,7 @@ object SchemaDocTagParser {
     val docComment = element.docComment ?: return null
     val values =
         docComment.text
-            .split("\n")
+            .split('\n')
             .map { cleanKDocLine(it) }
             .filter { it == "@enum" || it.startsWith("@enum ") }
             .map { it.removePrefix("@enum").trim() }
@@ -577,7 +357,7 @@ object SchemaDocTagParser {
 
     val line =
         docComment.text
-            .split("\n")
+            .split('\n')
             .map { cleanKDocLine(it) }
             .find { it == "@$tag" || it.startsWith("@$tag ") } ?: return null
 
@@ -593,7 +373,7 @@ object SchemaDocTagParser {
       "false" -> return OpenApiBoolean(false)
     }
 
-    if (trimmed.startsWith("{") || trimmed.startsWith("[") || trimmed.startsWith("\"")) {
+    if (trimmed.startsWith('{') || trimmed.startsWith('[') || trimmed.startsWith('"')) {
       val parsed = openapi.parseJsonElementOrNull(trimmed)
       if (parsed != null) return nodeToValue(parsed)
     }
@@ -659,7 +439,7 @@ object SchemaDocTagParser {
    */
   fun hasTag(element: org.jetbrains.kotlin.psi.KtDeclaration, tag: String): Boolean {
     val docComment = element.docComment ?: return false
-    val normalized = docComment.text.split("\n").map { cleanKDocLine(it) }
+    val normalized = docComment.text.split('\n').map { cleanKDocLine(it) }
 
     return normalized.any { it == "@$tag" || it.startsWith("@$tag ") }
   }

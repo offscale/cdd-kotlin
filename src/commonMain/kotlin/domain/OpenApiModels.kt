@@ -140,6 +140,44 @@ data class OpenApiDefinition(
 )
 
 /**
+ * Strongly-typed semantic version representation for an OpenAPI specification version (`3.0.x`,
+ * `3.1.x`, `3.2.x`).
+ *
+ * @property major Major version number.
+ * @property minor Minor version number.
+ * @property patch Patch version number.
+ * @property raw Original version string.
+ */
+data class OpenApiVersion(val major: Int, val minor: Int, val patch: Int, val raw: String) {
+  /** Companion factory methods for [OpenApiVersion]. */
+  companion object {
+    /**
+     * Parses a semantic version string (`MAJOR.MINOR.PATCH`) into an [OpenApiVersion], or `null` if
+     * malformed.
+     *
+     * @param raw Raw version string.
+     * @return Parsed [OpenApiVersion] or `null`.
+     */
+    fun parse(raw: String): OpenApiVersion? {
+      val parts = raw.trim().split('.')
+      if (parts.size < 2) return null
+      val major = parts[0].toIntOrNull() ?: return null
+      val minor = parts[1].toIntOrNull() ?: return null
+      val patchPart = if (parts.size > 2) parts[2].substringBefore('-') else "0"
+      val patch = patchPart.toIntOrNull() ?: 0
+      return OpenApiVersion(major, minor, patch, raw)
+    }
+  }
+}
+
+/**
+ * Returns the strongly-typed [OpenApiVersion] parsed from [OpenApiDefinition.openapi], or `null` if
+ * malformed.
+ */
+val OpenApiDefinition.parsedVersion: OpenApiVersion?
+  get() = OpenApiVersion.parse(openapi)
+
+/**
  * Holds a set of reusable objects for different aspects of the OAS. All objects defined within the
  * Components Object will have no effect on the API unless they are explicitly referenced from
  * outside the Components Object.

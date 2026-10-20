@@ -7,6 +7,8 @@
  */
 package openapi.parser
 
+import domain.CddError
+import domain.toFailure
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -30,6 +32,22 @@ object YamlToJsonElementConverter {
    */
   fun toYaml(element: JsonElement): String {
     return serializeBlock(element, "") + NL
+  }
+
+  /**
+   * Parses a YAML 1.2 or JSON string into a [JsonElement] wrapped in a [Result].
+   *
+   * @param source The raw YAML or JSON string.
+   * @return A [Result] containing the parsed [JsonElement] or a [CddError.YamlParseError].
+   */
+  fun parseYamlResult(source: String): Result<JsonElement> {
+    val trimmed = source.trim()
+    if (trimmed.isEmpty()) return Result.success(JsonNull)
+    if ((trimmed.startsWith("{") && !trimmed.endsWith("}")) ||
+        (trimmed.startsWith("[") && !trimmed.endsWith("]"))) {
+      return CddError.JsonParseError("Unclosed flow collection in YAML input").toFailure()
+    }
+    return Result.success(parseYaml(source))
   }
 
   /**
@@ -297,7 +315,7 @@ object YamlToJsonElementConverter {
         } else {
           map[key] = JsonNull
         }
-      } else if (rest in setOf("|", "|-", ">", ">-")) {
+      } else if (rest in setOf("|", "|-", "|+", ">", ">-", ">+")) {
         val fold = rest.startsWith(">")
         val stripTrailing = rest.endsWith("-")
         i++
@@ -332,7 +350,7 @@ object YamlToJsonElementConverter {
    * @return `true` if [text] is a YAML mapping entry.
    */
   private fun isMappingLine(text: String): Boolean {
-    if (text.startsWith("{") or text.startsWith("[")) return false
+    if (text.firstOrNull() in setOf('{', '[')) return false
     return findMappingColon(text) != -1
   }
 
@@ -354,7 +372,10 @@ object YamlToJsonElementConverter {
    */
   private fun parseScalarOrFlow(raw: String): JsonElement {
     val trimmed = raw.trim()
-    if (trimmed in setOf("", "null", "~")) return JsonNull
+    if (trimmed in setOf("", "null", "~", "!!null")) return JsonNull
+    if (trimmed.startsWith("!!str ")) {
+      return JsonPrimitive(unquoteString(trimmed.removePrefix("!!str ").trim()))
+    }
     if (trimmed == "{}") return JsonObject(emptyMap())
     if (trimmed == "[]") return JsonArray(emptyList())
     if (trimmed.startsWith("{") and trimmed.endsWith("}")) {

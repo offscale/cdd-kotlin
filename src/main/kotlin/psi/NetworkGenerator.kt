@@ -159,28 +159,18 @@ class NetworkGenerator {
     val basePackage = packageName.substringBeforeLast(".")
     baseImports.add("${basePackage}.models.*")
 
-    val importsBlock =
-        """
-            package $packageName
-            
-            ${baseImports.sorted().joinToString("\n") { "import $it" }}
-            
-            // Result is part of kotlin standard library since 1.3
-        """
-            .trimIndent()
-
+    val nl = 10.toChar()
+    val q = '"'
     val interfaceName = "I$apiName"
     val implName = apiName
 
-    // Generate Interface Methods
     val interfaceMethods =
-        endpoints.joinToString("\n\n") { ep ->
+        endpoints.joinToString("$nl$nl") { ep ->
           val signature = psi.network.EndpointMethodGenerator.generateMethodSignature(ep)
           val doc = psi.network.EndpointMethodGenerator.generateKDoc(ep)
           "$doc    $signature"
         }
 
-    // Generate Implementation Methods
     val implMethodList = mutableListOf<String>()
     for (ep in endpoints) {
       val doc = psi.network.EndpointMethodGenerator.generateKDoc(ep)
@@ -190,15 +180,13 @@ class NetworkGenerator {
           }
       implMethodList.add("$doc    $impl")
     }
-    val implMethods = implMethodList.joinToString("\n\n")
+    val implMethods = implMethodList.joinToString("$nl$nl")
 
     val helperFunctions = psi.network.ParameterSerializerGenerator.buildHelperFunctions(endpoints)
 
-    // Server Logic
     val defaultUrl = if (resolvedServers.isNotEmpty()) resolvedServers.first().url else "/"
     val serverSupport = psi.network.ServerUrlResolverGenerator.buildServerSupport(resolvedServers)
 
-    // Companion Object (Servers + Auth Factory)
     val companionObject =
         buildCompanionObject(resolvedServers, resolvedSecuritySchemes, serverSupport)
 
@@ -215,9 +203,9 @@ class NetworkGenerator {
                 "defaultBaseUrl(serverIndex, serverName)"
               }
           parts.add("private val baseUrl: String = $defaultCall")
-          parts.joinToString(",\n                ")
+          parts.joinToString(",$nl                ")
         } else {
-          "private val baseUrl: String = \"${psi.network.ServerUrlResolverGenerator.escapeKotlinString(defaultUrl)}\""
+          "private val baseUrl: String = $q${psi.network.ServerUrlResolverGenerator.escapeKotlinString(defaultUrl)}$q"
         }
 
     val interfaceDoc =
@@ -225,26 +213,36 @@ class NetworkGenerator {
             resolvedMetadata, resolvedWebhooks, resolvedServers, resolvedSecuritySchemes)
 
     val content =
-        """
-            $importsBlock
-            
-            $interfaceDoc
-            interface $interfaceName {
-            $interfaceMethods
-            }
-            
-            class $implName(
-                private val client: HttpClient,
-                $baseUrlParam
-            ) : $interfaceName {
-            $implMethods
-            $helperFunctions
-            $companionObject
-            }
-            
-            class ApiException(message: String) : Exception(message)
-        """
-            .trimIndent()
+        buildKotlinFile(packageName) {
+          baseImports.sorted().forEach { import(it) }
+          line("// Result is part of kotlin standard library since 1.3")
+          line()
+          if (interfaceDoc.isNotEmpty()) {
+            raw("$interfaceDoc$nl")
+          }
+          line("interface $interfaceName {")
+          if (interfaceMethods.isNotEmpty()) {
+            raw("$interfaceMethods$nl")
+          }
+          line("}")
+          line()
+          line("class $implName(")
+          line("    private val client: HttpClient,")
+          line("    $baseUrlParam")
+          line(") : $interfaceName {")
+          if (implMethods.isNotEmpty()) {
+            raw("$implMethods$nl")
+          }
+          if (helperFunctions.isNotEmpty()) {
+            raw("$helperFunctions$nl")
+          }
+          if (companionObject.isNotEmpty()) {
+            raw("$companionObject$nl")
+          }
+          line("}")
+          line()
+          line("class ApiException(message: String) : Exception(message)")
+        }
 
     return Result.success(psiFactory.createFile("$apiName.kt", content))
   }
@@ -265,7 +263,8 @@ class NetworkGenerator {
     if (servers.isNotEmpty()) {
       val serversJson =
           psi.network.EndpointMethodGenerator.encodeCompactJson(
-              servers.map { psi.metadata.InfoMetadataCodec.serverToDocValue(it) })
+              domain.OpenApiArray(
+                  servers.map { psi.metadata.InfoMetadataCodec.serverToDocValue(it) }))
       lines.add(" * @servers $serversJson")
     }
     if (metadata.securityExplicitEmpty && metadata.security.isEmpty()) {
@@ -286,7 +285,7 @@ class NetworkGenerator {
     }
     if (metadata.extensions.isNotEmpty()) {
       lines.add(
-          " * @extensions ${psi.network.EndpointMethodGenerator.encodeCompactJson(metadata.extensions)}")
+          " * @extensions ${psi.network.EndpointMethodGenerator.encodeCompactJson(domain.OpenApiObject(metadata.extensions))}")
     }
     if (metadata.pathsExtensions.isNotEmpty()) {
       lines.add(
@@ -320,7 +319,7 @@ class NetworkGenerator {
             psi.network.EndpointMethodGenerator.exampleObjectToDocValue(it.value)
           }
       lines.add(
-          " * @componentExamples ${psi.network.EndpointMethodGenerator.encodeCompactJson(mapped)}")
+          " * @componentExamples ${psi.network.EndpointMethodGenerator.encodeCompactJson(domain.OpenApiObject(mapped))}")
     }
     if (metadata.componentLinks.isNotEmpty()) {
       val mapped =
@@ -328,7 +327,7 @@ class NetworkGenerator {
             psi.network.EndpointMethodGenerator.linkToDocValue(it.value)
           }
       lines.add(
-          " * @componentLinks ${psi.network.EndpointMethodGenerator.encodeCompactJson(mapped)}")
+          " * @componentLinks ${psi.network.EndpointMethodGenerator.encodeCompactJson(domain.OpenApiObject(mapped))}")
     }
     if (metadata.componentCallbacks.isNotEmpty()) {
       lines.add(

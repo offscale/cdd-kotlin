@@ -1373,9 +1373,37 @@ class OpenApiWriterTest {
                         variables = mapOf("env" to ServerVariable(default = "prod", enum = null)))),
             components =
                 Components(
+                    requestBodies =
+                        mapOf(
+                            "EmptyBody" to
+                                RequestBody(description = "empty", contentPresent = false),
+                            "EmptyTrueFlagBody" to
+                                RequestBody(
+                                    description = "empty-present",
+                                    content = emptyMap(),
+                                    contentPresent = true),
+                            "NonEmptyFalseFlagBody" to
+                                RequestBody(
+                                    description = "non-empty",
+                                    content =
+                                        mapOf(
+                                            "text/plain" to
+                                                MediaTypeObject(schema = SchemaProperty("string"))),
+                                    contentPresent = false)),
                     headers =
                         mapOf(
                             "HNoSchema" to Header(type = "String", schema = null),
+                            "HEmptyEx" to
+                                Header(
+                                    type = "String",
+                                    schema = SchemaProperty(types = setOf("string")),
+                                    explode = null,
+                                    example = ExampleObject()),
+                            "HWithEx" to
+                                Header(
+                                    type = "String",
+                                    schema = SchemaProperty(types = setOf("string")),
+                                    example = ExampleObject(value = OpenApiString("hx"))),
                             "HNullStyle" to
                                 Header(
                                     type = "String",
@@ -1383,9 +1411,71 @@ class OpenApiWriterTest {
                                     style = null))))
     assertTrue(writer.writeJson(oas3HeaderDef).isNotEmpty())
 
+    val bs = 92.toChar()
     val yamlFlowAndBlock =
         openapi.parser.YamlToJsonElementConverter.parseYaml(
-            "- {a: {x: 1}, b: [2, 3], }\n- \"\\q\"\n- emptyBlock: |\n")
+            "- {a: {x: 1}, b: [2, 3], }\n- \"${bs}q\"\n- emptyBlock: |\n")
     assertNotNull(yamlFlowAndBlock)
+
+    val sw2CoverageDef =
+        OpenApiDefinition(
+            swagger = "2.0",
+            info = Info("SW2", "1.0"),
+            paths =
+                mapOf(
+                    "/sw2" to
+                        PathItem(
+                            get =
+                                EndpointDefinition(
+                                    path = "/sw2",
+                                    method = HttpMethod.GET,
+                                    operationId = "sw2Get",
+                                    parameters =
+                                        listOf(
+                                            EndpointParameter(
+                                                name = "extEx",
+                                                type = "string",
+                                                location = ParameterLocation.QUERY,
+                                                example =
+                                                    ExampleObject(
+                                                        externalValue =
+                                                            "https://example.com/ex.json")),
+                                            EndpointParameter(
+                                                name = "noSchemaParam",
+                                                type = "string",
+                                                location = ParameterLocation.QUERY,
+                                                schema = null)),
+                                    responses =
+                                        mapOf(
+                                            "200" to
+                                                EndpointResponse(
+                                                    statusCode = "200",
+                                                    description = "ok",
+                                                    headers =
+                                                        mapOf(
+                                                            "X-NoSchema" to
+                                                                Header(
+                                                                    type = "string", schema = null),
+                                                            "X-ObjSchema" to
+                                                                Header(
+                                                                    type = "string",
+                                                                    schema =
+                                                                        SchemaProperty(
+                                                                            types =
+                                                                                setOf("object"))),
+                                                            "X-Arr" to
+                                                                Header(
+                                                                    type = "array",
+                                                                    schema =
+                                                                        SchemaProperty(
+                                                                            types = setOf("array"),
+                                                                            items =
+                                                                                SchemaProperty(
+                                                                                    "string")))),
+                                                    examples =
+                                                        mapOf(
+                                                            "application/json" to
+                                                                ExampleObject(value = null))))))))
+    assertTrue(writer.writeJson(sw2CoverageDef).contains("X-Arr"))
   }
 }

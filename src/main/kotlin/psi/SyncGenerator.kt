@@ -4,40 +4,51 @@
 package psi
 
 import domain.CddError
+import domain.SchemaDefinition
+import domain.SchemaProperty
 import domain.toFailure
 import java.io.File
+import org.jetbrains.kotlin.psi.KtCallExpression
+import org.jetbrains.kotlin.psi.KtObjectDeclaration
+import org.jetbrains.kotlin.psi.KtProperty
+import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 import writeToFile
 
 /**
  * Handles bi-directional synchronization of domain models, DAOs/ORM constraints, and OpenAPI specs.
  */
 object SyncGenerator {
-  private val PACKAGE_REGEX = Regex("""^\s*package\s+([A-Za-z0-9_.]+)""", RegexOption.MULTILINE)
-  private val TABLE_REGEX =
-      Regex("""object\s+([A-Za-z0-9_]+)Table\s*:\s*Table\([^)]*\)\s*\{([^}]*)\}""")
-  private val COL_REGEX =
-      Regex("""val\s+([A-Za-z0-9_]+)Column\s*=\s*(integer|long|double|bool|varchar|text)\(""")
-
   private fun extractBasePackage(allCode: String): String {
-    val match = PACKAGE_REGEX.find(allCode) ?: return "org.example"
+    val file = PsiInfrastructure.createPsiFactory().createFile("SyncSource.kt", allCode)
+    val pkgFqName = file.packageDirective!!.text.removePrefix("package").trim()
     val stripped =
-        match.groupValues[1]
+        pkgFqName
             .removeSuffix(".models")
             .removeSuffix(".dao")
             .removeSuffix(".network")
             .removeSuffix(".server")
+            .removePrefix(".")
+            .trim()
     return stripped.ifBlank { "org.example" }
   }
 
   private fun writeModelSchemas(
       dir: File,
       basePackage: String,
-      schemas: Collection<domain.SchemaDefinition>
+      schemas: Collection<SchemaDefinition>
   ): Result<Unit> {
     val dtoGen = DtoGenerator()
+    val dtoMerger = DtoMerger()
     for (schema in schemas) {
-      val dtoSource = dtoGen.generateDto("$basePackage.models", schema).text
       val modelFile = File(dir, "models/${schema.safeName}.kt")
+      val dtoSource =
+          if (modelFile.isFile) {
+            dtoMerger.mergeDto(modelFile.readText(), schema).getOrElse {
+              dtoGen.generateDto("$basePackage.models", schema).text
+            }
+          } else {
+            dtoGen.generateDto("$basePackage.models", schema).text
+          }
       writeToFile(modelFile.absolutePath, dtoSource).getOrElse {
         return Result.failure(it)
       }
@@ -45,40 +56,72 @@ object SyncGenerator {
     return Result.success(Unit)
   }
 
-  private fun parseDaoTableSchemas(allCode: String): List<domain.SchemaDefinition> {
-    return TABLE_REGEX.findAll(allCode)
-        .map { match ->
-          val modelName = match.groupValues[1]
-          val body = match.groupValues[2]
-          val props = LinkedHashMap<String, domain.SchemaProperty>()
-          val required = mutableListOf<String>()
-          for (colMatch in COL_REGEX.findAll(body)) {
-            val colName = colMatch.groupValues[1]
-            val colKind = colMatch.groupValues[2]
-            val oasType =
-                when (colKind) {
-                  "integer",
-                  "long" -> "integer"
-                  "double" -> "number"
-                  "bool" -> "boolean"
-                  else -> "string"
-                }
-            val format = if (colKind == "long") "int64" else null
-            props[colName] = domain.SchemaProperty(types = setOf(oasType), format = format)
-            required.add(colName)
-          }
-          domain.SchemaDefinition(
-              name = modelName, type = "object", properties = props, required = required)
+  private fun parseDaoTableSchemas(allCode: String): List<SchemaDefinition> {
+    val file = PsiInfrastructure.createPsiFactory().createFile("DaoTables.kt", allCode)
+    val objects =
+        file.collectDescendantsOfType<KtObjectDeclaration>().filter { !it.isObjectLiteral() }
+    val schemas = mutableListOf<SchemaDefinition>()
+    for (obj in objects) {
+      val objName = obj.name!!
+      if (!objName.endsWith("Table")) continue
+      val modelName = objName.removeSuffix("Table")
+      if (modelName.isBlank()) continue
+      val props = LinkedHashMap<String, SchemaProperty>()
+      val required = mutableListOf<String>()
+      for (prop in obj.body?.properties.orEmpty()) {
+        val parsedCol = parseColumnProperty(prop) ?: continue
+        props[parsedCol.name] = parsedCol.schema
+        if (!parsedCol.isNullable) {
+          required.add(parsedCol.name)
         }
-        .toList()
+      }
+      schemas.add(
+          SchemaDefinition(
+              name = modelName, type = "object", properties = props, required = required))
+    }
+    return schemas
+  }
+
+  private data class ParsedDaoColumn(
+      val name: String,
+      val schema: SchemaProperty,
+      val isNullable: Boolean
+  )
+
+  private fun parseColumnProperty(prop: KtProperty): ParsedDaoColumn? {
+    val propName = prop.name!!
+    if (!propName.endsWith("Column")) return null
+    val colName = propName.removeSuffix("Column")
+    if (prop.initializer == null) return null
+    val callChain =
+        prop.collectDescendantsOfType<KtCallExpression>().map { it.calleeExpression!!.text }
+    val colKind =
+        callChain.firstOrNull {
+          it in setOf("integer", "long", "double", "bool", "varchar", "text")
+        } ?: return null
+    val isNullable = callChain.contains("nullable")
+    val oasType =
+        when (colKind) {
+          "integer",
+          "long" -> "integer"
+          "double" -> "number"
+          "bool" -> "boolean"
+          else -> "string"
+        }
+    val format = if (colKind == "long") "int64" else null
+    val types = if (isNullable) setOf(oasType, "null") else setOf(oasType)
+    return ParsedDaoColumn(
+        name = colName,
+        schema = SchemaProperty(types = types, format = format),
+        isNullable = isNullable)
   }
 
   /**
    * Synchronizes the project in [inputDir] to align with [truth].
    *
    * @param inputDir The root directory of the source code.
-   * @param truth The designated source of truth (`class`, `dao` / `sqlalchemy`, `arazzo` /
-   *   `workflow`, or `openapi`).
+   * @param truth The designated source of truth (`class` / `model`, `dao` / `sqlalchemy`, `arazzo`
+   *   / `workflow`, or `openapi`).
    * @return A [Result] indicating success or a [CddError].
    */
   fun synchronize(inputDir: String, truth: String): Result<Unit> {
@@ -89,13 +132,13 @@ object SyncGenerator {
     }
 
     val ktFiles = dir.walk().toList().filter { it.isFile && it.extension == "kt" }
-    val allCode = ktFiles.joinToString("\n") { it.readText() }
+    val allCode = ktFiles.joinToString("\n".trimEnd() + '\n') { it.readText() }
     val basePackage = extractBasePackage(allCode)
 
     val dtoParser = DtoParser()
     val currentSchemas = dtoParser.parse(allCode)
 
-    if (truth == "class") {
+    if (truth == "class" || truth == "model") {
       val daoGen = DaoGenerator()
       val newDaosMap = daoGen.generateDaos(basePackage, currentSchemas)
       for ((relativePath, content) in newDaosMap) {

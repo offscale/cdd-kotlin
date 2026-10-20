@@ -187,6 +187,9 @@ class McpPeerTest {
             "org.example",
             domain.OpenApiDefinition(
                 info = domain.Info("T", "1"),
+                components =
+                    domain.Components(
+                        schemas = mapOf("User" to domain.SchemaDefinition(name = "User"))),
                 paths =
                     mapOf(
                         "/users/{id}" to
@@ -195,8 +198,33 @@ class McpPeerTest {
                                     domain.EndpointDefinition(
                                         path = "/users/{id}",
                                         method = domain.HttpMethod.GET,
-                                        operationId = "")))))
+                                        operationId = "",
+                                        summary = "Get \"user\" summary",
+                                        parameters =
+                                            listOf(
+                                                domain.EndpointParameter(
+                                                    name = "id",
+                                                    type = "String",
+                                                    location = domain.ParameterLocation.PATH,
+                                                    isRequired = true),
+                                                domain.EndpointParameter(
+                                                    name = "opt",
+                                                    type = "String",
+                                                    location = domain.ParameterLocation.QUERY,
+                                                    isRequired = false))),
+                                post =
+                                    domain.EndpointDefinition(
+                                        path = "/users/{id}",
+                                        method = domain.HttpMethod.POST,
+                                        operationId = "postUser",
+                                        description = "Post user desc"),
+                                put =
+                                    domain.EndpointDefinition(
+                                        path = "/users/{id}",
+                                        method = domain.HttpMethod.PUT,
+                                        operationId = "putUser")))))
     assertTrue(files["McpToolAdapter.kt"]!!.contains("get_users_id"))
+    assertTrue(files["McpResourceAdapter.kt"]!!.contains("openapi://spec/schemas/User"))
 
     val filesEmptyPaths =
         McpClientGenerator.generateMcpFiles(

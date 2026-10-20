@@ -210,6 +210,19 @@ class DomainModelsCoverageTest {
     assertEquals(true, components.parameters["limit"]?.deprecated)
     assertEquals("state", components.schemas["User"]?.thenSchema?.required?.first())
     assertEquals("province", components.schemas["User"]?.elseSchema?.required?.first())
+
+    val writer = openapi.OpenApiWriter()
+    val json = writer.writeJson(root)
+    val reparsed = openapi.OpenApiParser().parseString(json, openapi.OpenApiParser.Format.JSON)
+    assertEquals(root.openapi, reparsed.openapi)
+    assertEquals(root.self, reparsed.self)
+    assertEquals(root.info, reparsed.info)
+    assertEquals(root.servers, reparsed.servers)
+    assertEquals(root.tags, reparsed.tags)
+    assertEquals(root.externalDocs, reparsed.externalDocs)
+    assertEquals(
+        root.components?.schemas?.get("User")?.thenSchema,
+        reparsed.components?.schemas?.get("User")?.thenSchema)
   }
 
   @Test

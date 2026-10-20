@@ -1,6 +1,10 @@
 /** Encodes and decodes OpenAPI Tag metadata (`@tags` and `@tag`) for Kotlin KDoc round-tripping. */
 package psi.metadata
 
+import domain.OpenApiArray
+import domain.OpenApiObject
+import domain.OpenApiString
+import domain.OpenApiValue
 import domain.OpenApiValues
 import domain.Tag
 import openapi.JsonNode
@@ -8,58 +12,68 @@ import openapi.asObject
 import openapi.elements
 import openapi.get
 import openapi.isArray
+import openapi.isObject
 import openapi.text
 
-/** Encodes and decodes OpenAPI [Tag] metadata to and from KDoc tag lines. */
+/** Encodes and decodes OpenAPI [Tag] definitions in KDoc blocks. */
 object TagsMetadataCodec {
   /**
-   * Encodes a list of [Tag] objects into a compact JSON array string for `@tags`.
+   * Serializes a list of [Tag]s into a compact JSON array string for `@tags`.
    *
-   * @param tags List of Tag objects.
+   * @param tags List of tags.
    * @return Compact JSON string.
    */
   fun renderTags(tags: List<Tag>): String {
-    val tagValues = tags.map { tagToDocValue(it) }
-    return OpenApiValues.encodeAnyToString(tagValues)
+    val mapped = tags.map { tagToDocValue(it) }
+    return OpenApiValues.encodeToString(OpenApiArray(mapped))
   }
 
   /**
-   * Converts a [Tag] object into a serializable map.
+   * Converts a [Tag] into an [OpenApiObject] suitable for JSON serialization.
    *
-   * @param tag The Tag object.
-   * @return Map representation.
+   * @param tag Tag to convert.
+   * @return [OpenApiObject] representation.
    */
-  fun tagToDocValue(tag: Tag): Map<String, Any?> {
-    val map = linkedMapOf<String, Any?>()
-    map["name"] = tag.name
-    if (tag.summary != null) map["summary"] = tag.summary
-    if (tag.description != null) map["description"] = tag.description
+  fun tagToDocValue(tag: Tag): OpenApiObject {
+    val map = LinkedHashMap<String, OpenApiValue>()
+    map["name"] = OpenApiString(tag.name)
+    tag.summary?.let { map["summary"] = OpenApiString(it) }
+    tag.description?.let { map["description"] = OpenApiString(it) }
     tag.externalDocs?.let { map["externalDocs"] = InfoMetadataCodec.externalDocsToDocValue(it) }
-    if (tag.parent != null) map["parent"] = tag.parent
-    if (tag.kind != null) map["kind"] = tag.kind
-    tag.extensions.forEach { (k, v) -> if (k.startsWith("x-")) map[k] = v }
-    return map
+    tag.parent?.let { map["parent"] = OpenApiString(it) }
+    tag.kind?.let { map["kind"] = OpenApiString(it) }
+    tag.extensions.forEach { (key, value) ->
+      if (key.startsWith("x-")) {
+        map[key] = value
+      }
+    }
+    return OpenApiObject(map)
   }
 
   /**
-   * Decodes a list of [Tag] objects from the `@tags` KDoc tag in [lines].
+   * Extracts structured [Tag] objects from `@tags` JSON lines in [lines].
    *
    * @param lines Normalized KDoc lines.
    * @return List of parsed [Tag]s.
    */
   fun extractTagObjects(lines: List<String>): List<Tag> {
-    val line = lines.firstOrNull { it.startsWith("@tags") } ?: return emptyList()
-    val json = line.removePrefix("@tags").trim()
+    val tagsLine = lines.firstOrNull { it.startsWith("@tags") } ?: return emptyList()
+    val json = tagsLine.removePrefix("@tags").trim()
     if (json.isEmpty()) return emptyList()
     val node = openapi.parseJsonElementOrNull(json) ?: return emptyList()
-    if (!node.isArray) return emptyList()
-    return node.elements().mapNotNull { parseTagNode(it) }
+    val items =
+        when {
+          node.isArray -> node.elements()
+          node.isObject -> listOf(node)
+          else -> emptyList()
+        }
+    return items.mapNotNull { parseTagNode(it) }
   }
 
   /**
-   * Parses a [Tag] object from a [JsonNode].
+   * Parses a [JsonNode] into a [Tag].
    *
-   * @param node The JSON node.
+   * @param node JSON node.
    * @return Parsed [Tag] or `null`.
    */
   fun parseTagNode(node: JsonNode?): Tag? {

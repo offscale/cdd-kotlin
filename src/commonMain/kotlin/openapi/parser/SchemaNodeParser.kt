@@ -351,7 +351,13 @@ object SchemaNodeParser {
     }
   }
 
-  private fun parseDependentRequired(node: JsonNode?): Map<String, List<String>> {
+  /**
+   * Parses a JSON object mapping property names to lists of required dependent property names.
+   *
+   * @param node The JSON node representing `dependentRequired`.
+   * @return Map of property name to dependent required property names.
+   */
+  fun parseDependentRequired(node: JsonNode?): Map<String, List<String>> {
     val obj = node.asObject() ?: return emptyMap()
     return obj.fields().asSequence().associate { (key, _) ->
       key to Swagger2Upgrader.parseStringArray(obj, key)

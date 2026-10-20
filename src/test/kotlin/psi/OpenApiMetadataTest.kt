@@ -272,11 +272,11 @@ class OpenApiMetadataTest {
                             extensions = mapOf("x-var" to OpenApiString("v")))),
             extensions = mapOf("x-srv" to OpenApiString("s")))
     val serverDoc = psi.metadata.InfoMetadataCodec.serverToDocValue(server)
-    val serverJson = OpenApiValues.encodeAnyToString(listOf(serverDoc))
+    val serverJson = OpenApiValues.encodeToString(OpenApiArray(listOf(serverDoc)))
     assertEquals(
         listOf(server),
         psi.metadata.InfoMetadataCodec.extractServersLine(listOf("@servers $serverJson")))
-    val singleServerJson = OpenApiValues.encodeAnyToString(serverDoc)
+    val singleServerJson = OpenApiValues.encodeToString(serverDoc)
     assertEquals(
         listOf(server),
         psi.metadata.InfoMetadataCodec.extractServersLine(listOf("@servers $singleServerJson")))
@@ -342,6 +342,12 @@ class OpenApiMetadataTest {
     val tagsJson = psi.metadata.TagsMetadataCodec.renderTags(listOf(tag))
     assertEquals(
         listOf(tag), psi.metadata.TagsMetadataCodec.extractTagObjects(listOf("@tags $tagsJson")))
+    val singleTagJson =
+        OpenApiValues.encodeToString(psi.metadata.TagsMetadataCodec.tagToDocValue(tag))
+    assertEquals(
+        listOf(tag),
+        psi.metadata.TagsMetadataCodec.extractTagObjects(listOf("@tags $singleTagJson")))
+    assertTrue(psi.metadata.TagsMetadataCodec.extractTagObjects(listOf("@tags 123")).isEmpty())
     assertTrue(psi.metadata.TagsMetadataCodec.extractTagObjects(listOf("@tags")).isEmpty())
     assertTrue(psi.metadata.TagsMetadataCodec.extractTagObjects(listOf("@tags {bad")).isEmpty())
     assertTrue(psi.metadata.TagsMetadataCodec.extractTagObjects(listOf("@tags {}")).isEmpty())
@@ -349,7 +355,8 @@ class OpenApiMetadataTest {
     assertNull(psi.metadata.TagsMetadataCodec.parseTagNode(null))
 
     val minTag = Tag(name = "min", extensions = mapOf("non-x" to OpenApiString("ignore")))
-    assertFalse(psi.metadata.TagsMetadataCodec.tagToDocValue(minTag).containsKey("non-x"))
+    assertFalse(
+        psi.metadata.TagsMetadataCodec.tagToDocValue(minTag).properties.containsKey("non-x"))
 
     // InfoMetadataCodec minimal & non-x extensions & edge cases
     val minInfo =
@@ -360,7 +367,7 @@ class OpenApiMetadataTest {
             license = License(name = "MIT", extensions = mapOf("non-x" to OpenApiString("ignore"))),
             extensions = mapOf("non-x" to OpenApiString("ignore")))
     val minInfoDoc = psi.metadata.InfoMetadataCodec.infoToDocValue(minInfo)
-    assertFalse(minInfoDoc.containsKey("non-x"))
+    assertFalse(minInfoDoc.properties.containsKey("non-x"))
     assertNull(psi.metadata.InfoMetadataCodec.extractInfoLine(listOf("@info {\"version\":\"1\"}")))
     assertNull(
         psi.metadata.InfoMetadataCodec.parseLicenseNode(
@@ -370,7 +377,9 @@ class OpenApiMetadataTest {
         ExternalDocumentation(
             url = "https://u.example.com", extensions = mapOf("non-x" to OpenApiString("ignore")))
     assertFalse(
-        psi.metadata.InfoMetadataCodec.externalDocsToDocValue(minExtDocs).containsKey("non-x"))
+        psi.metadata.InfoMetadataCodec.externalDocsToDocValue(minExtDocs)
+            .properties
+            .containsKey("non-x"))
     assertNull(psi.metadata.InfoMetadataCodec.extractExternalDocsLine(listOf("@see   ")))
     assertNull(
         psi.metadata.InfoMetadataCodec.parseExternalDocsNode(
@@ -381,7 +390,10 @@ class OpenApiMetadataTest {
             url = "https://s.example.com",
             variables = emptyMap(),
             extensions = mapOf("non-x" to OpenApiString("ignore")))
-    assertFalse(psi.metadata.InfoMetadataCodec.serverToDocValue(minServer).containsKey("variables"))
+    assertFalse(
+        psi.metadata.InfoMetadataCodec.serverToDocValue(minServer)
+            .properties
+            .containsKey("variables"))
     val srvMinVar =
         Server(
             url = "https://s.example.com",
@@ -393,7 +405,10 @@ class OpenApiMetadataTest {
                             enum = emptyList(),
                             description = null,
                             extensions = mapOf("non-x" to OpenApiString("ignore")))))
-    assertTrue(psi.metadata.InfoMetadataCodec.serverToDocValue(srvMinVar).containsKey("variables"))
+    assertTrue(
+        psi.metadata.InfoMetadataCodec.serverToDocValue(srvMinVar)
+            .properties
+            .containsKey("variables"))
     assertNull(
         psi.metadata.InfoMetadataCodec.parseServerNode(
             kotlinx.serialization.json.Json.parseToJsonElement("123")))

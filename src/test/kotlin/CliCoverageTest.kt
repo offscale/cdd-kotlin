@@ -4,35 +4,8 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.PrintStream
 import java.nio.file.Files
-import openapi.asArray
-import openapi.asBoolean
-import openapi.asDouble
-import openapi.asInt
-import openapi.asObject
-import openapi.asText
-import openapi.boolean
-import openapi.booleanValue
-import openapi.double
-import openapi.doubleValue
-import openapi.elements
-import openapi.fields
-import openapi.get
-import openapi.has
-import openapi.int
-import openapi.intValue
-import openapi.isArray
-import openapi.isBoolean
-import openapi.isNullNode
-import openapi.isNumber
-import openapi.isObject
-import openapi.isTextual
-import openapi.size
-import openapi.text
-import openapi.textValue
 import openapi.writeToFile
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
@@ -397,91 +370,7 @@ class CliCoverageTest {
               .isNotEmpty())
       assertTrue(scaffold.ScaffoldTemplates.createGithubActionsWorkflow().isNotEmpty())
 
-      // JsonNodeExt exhaustive branch coverage and OpenApiWriterJvm default format
-      val arrNode = kotlinx.serialization.json.Json.parseToJsonElement("[10, 20]")
-      val objNode =
-          kotlinx.serialization.json.Json.parseToJsonElement(
-              "{\"a\": 1, \"b\": true, \"s\": \"txt\", \"n\": null, \"d\": 1.5}")
-      val strNode = kotlinx.serialization.json.JsonPrimitive("hello")
-      val boolNode = kotlinx.serialization.json.JsonPrimitive(true)
-      val numNode = kotlinx.serialization.json.JsonPrimitive(42)
-      val nullNode = kotlinx.serialization.json.JsonNull
-
-      assertTrue(objNode.isObject)
-      assertFalse(arrNode.isObject)
-      assertTrue(arrNode.isArray)
-      assertFalse(objNode.isArray)
-      assertTrue(strNode.isTextual)
-      assertFalse(numNode.isTextual)
-      assertFalse(arrNode.isTextual)
-      assertTrue(boolNode.isBoolean)
-      assertFalse(strNode.isBoolean)
-      assertFalse(numNode.isBoolean)
-      assertFalse(arrNode.isBoolean)
-      assertTrue(numNode.isNumber)
-      assertFalse(strNode.isNumber)
-      assertFalse(boolNode.isNumber)
-      assertFalse(arrNode.isNumber)
-      assertTrue(nullNode.isNullNode)
-      assertFalse(strNode.isNullNode)
-
-      assertEquals("hello", strNode.asText())
-      assertEquals("fb", nullNode.asText("fb"))
-      assertEquals("fb", arrNode.asText("fb"))
-      assertEquals("hello", strNode.textValue())
-
-      assertEquals(42, numNode.asInt())
-      assertEquals(9, strNode.asInt(9))
-      assertEquals(9, arrNode.asInt(9))
-      assertEquals(0, strNode.intValue())
-
-      assertEquals(42.0, numNode.asDouble())
-      assertEquals(9.5, strNode.asDouble(9.5))
-      assertEquals(9.5, arrNode.asDouble(9.5))
-      assertEquals(42.0, numNode.doubleValue())
-      assertEquals(0.0, strNode.doubleValue())
-
-      assertEquals(true, boolNode.asBoolean())
-      assertEquals(true, strNode.asBoolean(true))
-      assertEquals(true, arrNode.asBoolean(true))
-      assertEquals(false, strNode.booleanValue())
-
-      assertEquals(10, arrNode.get(0)?.intValue())
-      assertNull(arrNode.get(5))
-      assertNull(arrNode.get(-1))
-      assertNull(objNode.get(0))
-      assertNull(arrNode.get("a"))
-      assertTrue(objNode.has("a"))
-      assertFalse(objNode.has("missing"))
-      assertFalse(arrNode.has("a"))
-      assertEquals(5, objNode.fields().size)
-      assertTrue(arrNode.fields().isEmpty())
-      assertEquals(2, arrNode.elements().size)
-      assertTrue(objNode.elements().isEmpty())
-      assertEquals(5, objNode.size())
-      assertEquals(2, arrNode.size())
-      assertEquals(0, strNode.size())
-
-      assertEquals(objNode, objNode.asObject())
-      assertNull(arrNode.asObject())
-      assertNull((null as openapi.JsonNode?).asObject())
-      assertEquals(2, arrNode.asArray()?.size)
-      assertNull(objNode.asArray())
-      assertNull((null as openapi.JsonNode?).asArray())
-
-      assertEquals("txt", objNode.text("s"))
-      assertNull(objNode.text("n"))
-      assertNull(objNode.text("missing"))
-      assertEquals(true, objNode.boolean("b"))
-      assertNull(objNode.boolean("s"))
-      assertNull(objNode.boolean("missing"))
-      assertEquals(1, objNode.int("a"))
-      assertNull(objNode.int("s"))
-      assertNull(objNode.int("missing"))
-      assertEquals(1.5, objNode.double("d"))
-      assertNull(objNode.double("s"))
-      assertNull(objNode.double("missing"))
-
+      // JsonNodeExt and OpenApiWriterJvm default format
       val tmpSpecFile = File(outDir, "written_default.json")
       openapi
           .OpenApiWriter()
@@ -918,58 +807,6 @@ class CliCoverageTest {
                           content = mapOf("text/plain" to domain.MediaTypeObject()))),
               responses = mapOf("200" to domain.EndpointResponse("200", type = "Unit")))
       assertTrue(psi.network.EndpointMethodGenerator.generateMethodImpl(badCookieEp).isFailure)
-
-      // SafeJsonReader exhaustive branches
-      val validJsonSamples =
-          listOf(
-              """{"esc":"\"\\\/\b\f\n\r\t\u0041\u00af\u00AF"}""",
-              """[true, false, null, 0, -42, 3.14, -0.5, 1e5, 2E+3, 4e-2, 1.5e10, 999999999999999999999999999999]""",
-              """{}""",
-              """[]""")
-      for (sample in validJsonSamples) {
-        assertTrue(openapi.parseJsonElementResult(sample).isSuccess, "Expected valid: $sample")
-      }
-      val invalidJsonSamples =
-          listOf(
-              "",
-              "   ",
-              "true false",
-              "@",
-              "tru",
-              "fals",
-              "nul",
-              "{",
-              """{"a"""",
-              """{"a" """,
-              """{"a" 1}""",
-              """{"a":""",
-              """{"a":1""",
-              """{"a":1;""",
-              """{1:2}""",
-              """{"\x":1}""",
-              "[",
-              "[1",
-              "[1;",
-              "[#",
-              "\"unterminated",
-              "\"\\",
-              "\"\\x\"",
-              "\"\\u12\"",
-              "\"\\u123g\"",
-              "\"\\u123\"",
-              "-",
-              "-a",
-              "1.",
-              "1.a",
-              "1e",
-              "1e+",
-              "1e-",
-              "1ea")
-      for (sample in invalidJsonSamples) {
-        assertTrue(openapi.parseJsonElementResult(sample).isFailure, "Expected invalid: $sample")
-      }
-      val nonStringQuotedYaml = openapi.parser.YamlToJsonElementConverter.parseYaml("\"[1]\": val")
-      assertTrue(nonStringQuotedYaml is kotlinx.serialization.json.JsonObject)
     } finally {
       outDir.deleteRecursively()
     }

@@ -183,7 +183,7 @@ object ValidationCommon {
    * @return `true` if valid.
    */
   fun isValidHeaderToken(token: String): Boolean {
-    return token.isNotEmpty() && HEADER_TOKEN_REGEX.matches(token)
+    return HEADER_TOKEN_REGEX.matches(token)
   }
 
   /**
@@ -194,7 +194,7 @@ object ValidationCommon {
    */
   fun isValidMediaTypeKey(value: String): Boolean {
     val main = value.trim().substringBefore(";").trim()
-    return (main == "*/*") or MEDIA_TYPE_MAIN_REGEX.matches(main)
+    return main == "*/*" || MEDIA_TYPE_MAIN_REGEX.matches(main)
   }
 
   /**
@@ -205,7 +205,7 @@ object ValidationCommon {
    */
   fun looksLikeUriReference(value: String): Boolean {
     val prefixes = listOf("#", "./", "../", "/", "urn:")
-    return prefixes.any { value.startsWith(it) } or value.contains("://")
+    return prefixes.any { value.startsWith(it) } || value.contains("://")
   }
 
   /**

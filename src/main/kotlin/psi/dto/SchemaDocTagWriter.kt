@@ -12,6 +12,7 @@ import domain.OpenApiValue
 import domain.OpenApiValues
 import domain.SchemaDefinition
 import domain.SchemaProperty
+import openapi.SchemaJsonCodec
 
 /**
  * Encodes OpenAPI [SchemaDefinition] and [SchemaProperty] constraints, annotations, and metadata
@@ -41,7 +42,8 @@ object SchemaDocTagWriter {
       val disc = definition.discriminator
       lines.add("@discriminator ${disc.propertyName}")
       if (disc.mapping.isNotEmpty()) {
-        lines.add("@discriminatorMapping ${OpenApiValues.encodeAnyToString(disc.mapping)}")
+        val mappingObj = OpenApiObject(disc.mapping.mapValues { (_, v) -> OpenApiString(v) })
+        lines.add("@discriminatorMapping ${OpenApiValues.encodeToString(mappingObj)}")
       }
       if (disc.defaultMapping != null) {
         lines.add("@discriminatorDefault ${disc.defaultMapping}")
@@ -164,12 +166,13 @@ object SchemaDocTagWriter {
     }
 
     if (lines.isEmpty()) return ""
-    val sb = StringBuilder("/**\n")
+    val sb = StringBuilder()
+    sb.appendLine("/**")
     lines.forEachIndexed { index, line ->
-      if (index > 0) sb.append(" *\n")
-      sb.append(" * ").append(line).append("\n")
+      if (index > 0) sb.appendLine(" *")
+      sb.append(" * ").appendLine(line)
     }
-    sb.append(" */\n")
+    sb.appendLine(" */")
     return sb.toString()
   }
 
@@ -193,9 +196,10 @@ object SchemaDocTagWriter {
       val disc = prop.discriminator
       lines.add("@discriminator ${disc.propertyName}")
       if (disc.mapping.isNotEmpty()) {
-        lines.add("@discriminatorMapping ${OpenApiValues.encodeAnyToString(disc.mapping)}")
+        val mappingObj = OpenApiObject(disc.mapping.mapValues { (_, v) -> OpenApiString(v) })
+        lines.add("@discriminatorMapping ${OpenApiValues.encodeToString(mappingObj)}")
       }
-      if (disc.defaultMapping != null) {
+      if (prop.discriminator.defaultMapping != null) {
         lines.add("@discriminatorDefault ${disc.defaultMapping}")
       }
     }
@@ -290,12 +294,13 @@ object SchemaDocTagWriter {
     }
 
     if (lines.isEmpty()) return ""
-    val sb = StringBuilder("    /**\n")
+    val sb = StringBuilder()
+    sb.appendLine("    /**")
     lines.forEachIndexed { index, line ->
-      if (index > 0) sb.append("     *\n")
-      sb.append("     * ").append(line).append("\n")
+      if (index > 0) sb.appendLine("     *")
+      sb.append("     * ").appendLine(line)
     }
-    sb.append("     */\n")
+    sb.appendLine("     */")
     return sb.toString()
   }
 
@@ -307,7 +312,8 @@ object SchemaDocTagWriter {
    * @return The annotation line or empty string.
    */
   fun buildDeprecatedAnnotation(isDeprecated: Boolean, indent: String = ""): String {
-    return if (isDeprecated) "${indent}@Deprecated(\"Deprecated\")\n" else ""
+    return if (isDeprecated) buildString { appendLine("""$indent@Deprecated("Deprecated")""") }
+    else ""
   }
 
   private fun renderDocValue(value: OpenApiValue): String {
@@ -318,209 +324,61 @@ object SchemaDocTagWriter {
       is OpenApiInt -> value.value.toString()
       is OpenApiNumber -> value.value.toString()
       is OpenApiArray,
-      is OpenApiObject -> OpenApiValues.encodeAnyToString(value)
+      is OpenApiObject -> OpenApiValues.encodeToString(value)
     }
   }
 
   private fun renderExamplesList(values: List<OpenApiValue>): String {
-    return OpenApiValues.encodeAnyToString(values)
+    return OpenApiValues.encodeToString(OpenApiArray(values))
   }
 
   private fun renderEnumValue(value: OpenApiValue): String {
-    return OpenApiValues.encodeAnyToString(value)
+    return OpenApiValues.encodeToString(value)
   }
 
   private fun renderSchema(schema: SchemaProperty): String {
-    return OpenApiValues.encodeAnyToString(schemaPropertyToDocValue(schema))
+    return OpenApiValues.encodeToString(schemaPropertyToDocValue(schema))
   }
 
   private fun renderSchemaMap(map: Map<String, SchemaProperty>): String {
     val converted = map.mapValues { schemaPropertyToDocValue(it.value) }
-    return OpenApiValues.encodeAnyToString(converted)
+    return OpenApiValues.encodeToString(OpenApiObject(converted))
   }
 
   private fun renderSchemaList(list: List<SchemaProperty>): String {
     val converted = list.map { schemaPropertyToDocValue(it) }
-    return OpenApiValues.encodeAnyToString(converted)
+    return OpenApiValues.encodeToString(OpenApiArray(converted))
   }
 
   private fun renderSchemaComposition(refs: List<String>, inlines: List<SchemaProperty>): String {
-    val entries = mutableListOf<Any>()
-    refs.forEach { token ->
-      val ref = if (looksLikeRef(token)) token else "#/components/schemas/$token"
-      entries.add(mapOf("\$ref" to ref))
-    }
-    entries.addAll(inlines.map { schemaPropertyToDocValue(it) })
-    return OpenApiValues.encodeAnyToString(entries)
+    val entries = SchemaJsonCodec.schemaCompositionToValues(refs, inlines)
+    return OpenApiValues.encodeToString(OpenApiArray(entries))
   }
 
   private fun renderStringListMap(map: Map<String, List<String>>): String {
-    return OpenApiValues.encodeAnyToString(map)
+    val obj =
+        OpenApiObject(map.mapValues { (_, list) -> OpenApiArray(list.map { OpenApiString(it) }) })
+    return OpenApiValues.encodeToString(obj)
   }
 
   private fun renderCustomKeywords(map: Map<String, OpenApiValue>): String {
-    return OpenApiValues.encodeAnyToString(map)
-  }
-
-  private fun looksLikeRef(token: String): Boolean {
-    return token.startsWith("#") ||
-        token.startsWith("./") ||
-        token.contains("/") ||
-        token.endsWith(".json") ||
-        token.endsWith(".yaml")
+    return OpenApiValues.encodeToString(OpenApiObject(map))
   }
 
   /**
    * Converts a [SchemaProperty] into its strongly-typed [OpenApiValue] KDoc tag value
-   * representation.
+   * representation by delegating to [SchemaJsonCodec].
    *
    * @param schema The schema property to convert.
    * @return The [OpenApiBoolean] or [OpenApiObject] representation.
    */
   fun schemaPropertyToDocValue(schema: SchemaProperty): OpenApiValue {
-    schema.booleanSchema?.let {
-      return OpenApiBoolean(it)
-    }
     schema.ref?.let {
       return OpenApiObject(mapOf("\$ref" to OpenApiString(it)))
     }
     schema.dynamicRef?.let {
       return OpenApiObject(mapOf("\$dynamicRef" to OpenApiString(it)))
     }
-
-    val map = linkedMapOf<String, Any?>()
-    val typeValue = schemaTypeValue(schema.types)
-    typeValue?.let { map["type"] = it }
-
-    map.putIfNotNull("\$id", schema.schemaId)
-    map.putIfNotNull("\$schema", schema.schemaDialect)
-    map.putIfNotNull("\$anchor", schema.anchor)
-    map.putIfNotNull("\$dynamicAnchor", schema.dynamicAnchor)
-    map.putIfNotNull("\$comment", schema.comment)
-    map.putIfNotNull("format", schema.format)
-    map.putIfNotNull("contentMediaType", schema.contentMediaType)
-    map.putIfNotNull("contentEncoding", schema.contentEncoding)
-    map.putIfNotNull("minLength", schema.minLength)
-    map.putIfNotNull("maxLength", schema.maxLength)
-    map.putIfNotNull("pattern", schema.pattern)
-    schema.enumValues?.let { map["enum"] = it }
-    map.putIfNotNull("minimum", schema.minimum)
-    map.putIfNotNull("maximum", schema.maximum)
-    map.putIfNotNull("multipleOf", schema.multipleOf)
-    map.putIfNotNull("exclusiveMinimum", schema.exclusiveMinimum)
-    map.putIfNotNull("exclusiveMaximum", schema.exclusiveMaximum)
-    map.putIfNotNull("minItems", schema.minItems)
-    map.putIfNotNull("maxItems", schema.maxItems)
-    map.putIfNotNull("uniqueItems", schema.uniqueItems)
-    map.putIfNotNull("minProperties", schema.minProperties)
-    map.putIfNotNull("maxProperties", schema.maxProperties)
-
-    schema.items?.let { map["items"] = schemaPropertyToDocValue(it) }
-    map.putIfNotEmpty("prefixItems", schema.prefixItems.map { schemaPropertyToDocValue(it) })
-    schema.contains?.let { map["contains"] = schemaPropertyToDocValue(it) }
-    map.putIfNotNull("minContains", schema.minContains)
-    map.putIfNotNull("maxContains", schema.maxContains)
-
-    if (schema.properties.isNotEmpty()) {
-      map["properties"] = schema.properties.mapValues { schemaPropertyToDocValue(it.value) }
-    }
-    if (schema.patternProperties.isNotEmpty()) {
-      map["patternProperties"] =
-          schema.patternProperties.mapValues { schemaPropertyToDocValue(it.value) }
-    }
-    schema.propertyNames?.let { map["propertyNames"] = schemaPropertyToDocValue(it) }
-    schema.additionalProperties?.let { map["additionalProperties"] = schemaPropertyToDocValue(it) }
-    map.putIfNotEmpty("required", schema.required)
-    map.putIfNotEmpty("\$defs", schema.defs.mapValues { schemaPropertyToDocValue(it.value) })
-    map.putIfNotEmpty("dependentRequired", schema.dependentRequired)
-    if (schema.dependentSchemas.isNotEmpty()) {
-      map["dependentSchemas"] =
-          schema.dependentSchemas.mapValues { schemaPropertyToDocValue(it.value) }
-    }
-
-    map.putIfNotNull("description", schema.description)
-    map.putIfNotNull("title", schema.title)
-    map.putIfNotNull("default", schema.defaultValue)
-    map.putIfNotNull("const", schema.constValue)
-    map.putIfTrue("deprecated", schema.deprecated)
-    map.putIfTrue("readOnly", schema.readOnly)
-    map.putIfTrue("writeOnly", schema.writeOnly)
-
-    schema.externalDocs?.let { docs ->
-      val docsMap = linkedMapOf<String, Any?>("url" to docs.url)
-      docs.description?.let { docsMap["description"] = it }
-      docsMap.putExtensions(docs.extensions)
-      map["externalDocs"] = docsMap
-    }
-    schema.discriminator?.let { disc ->
-      val discMap = linkedMapOf<String, Any?>("propertyName" to disc.propertyName)
-      if (disc.mapping.isNotEmpty()) discMap["mapping"] = disc.mapping
-      disc.defaultMapping?.let { discMap["defaultMapping"] = it }
-      discMap.putExtensions(disc.extensions)
-      map["discriminator"] = discMap
-    }
-    schema.xml?.let { xml ->
-      val xmlMap = linkedMapOf<String, Any?>()
-      xml.name?.let { xmlMap["name"] = it }
-      xml.namespace?.let { xmlMap["namespace"] = it }
-      xml.prefix?.let { xmlMap["prefix"] = it }
-      xml.nodeType?.let { xmlMap["nodeType"] = it }
-      if (xml.attribute) xmlMap["attribute"] = true
-      if (xml.wrapped) xmlMap["wrapped"] = true
-      xmlMap.putExtensions(xml.extensions)
-      if (xmlMap.isNotEmpty()) map["xml"] = xmlMap
-    }
-
-    map.putIfNotEmpty("oneOf", schema.oneOf.map { schemaPropertyToDocValue(it) })
-    map.putIfNotEmpty("anyOf", schema.anyOf.map { schemaPropertyToDocValue(it) })
-    map.putIfNotEmpty("allOf", schema.allOf.map { schemaPropertyToDocValue(it) })
-    schema.not?.let { map["not"] = schemaPropertyToDocValue(it) }
-    schema.ifSchema?.let { map["if"] = schemaPropertyToDocValue(it) }
-    schema.thenSchema?.let { map["then"] = schemaPropertyToDocValue(it) }
-    schema.elseSchema?.let { map["else"] = schemaPropertyToDocValue(it) }
-    map.putIfNotNull("example", schema.example)
-    schema.examples?.let { map["examples"] = it }
-    schema.unevaluatedProperties?.let {
-      map["unevaluatedProperties"] = schemaPropertyToDocValue(it)
-    }
-    schema.unevaluatedItems?.let { map["unevaluatedItems"] = schemaPropertyToDocValue(it) }
-    schema.contentSchema?.let { map["contentSchema"] = schemaPropertyToDocValue(it) }
-
-    if (schema.customKeywords.isNotEmpty()) {
-      schema.customKeywords.forEach { (key, value) ->
-        if (!key.startsWith("x-") && !map.containsKey(key)) {
-          map[key] = value
-        }
-      }
-    }
-    map.putExtensions(schema.extensions)
-
-    return OpenApiValues.fromAny(map)
-  }
-
-  private fun MutableMap<String, Any?>.putExtensions(extensions: Map<String, OpenApiValue>) {
-    extensions.forEach { (key, value) -> this[key] = value }
-  }
-
-  private fun schemaTypeValue(types: Set<String>): Any? {
-    if (types.isEmpty()) return null
-    val list = types.toList().sorted()
-    return if (list.size == 1) list.first() else list
-  }
-
-  private fun <T> MutableMap<String, Any?>.putIfNotNull(key: String, value: T?) {
-    if (value != null) this[key] = value
-  }
-
-  private fun <T> MutableMap<String, Any?>.putIfNotEmpty(key: String, value: Collection<T>) {
-    if (value.isNotEmpty()) this[key] = value
-  }
-
-  private fun <K, V> MutableMap<String, Any?>.putIfNotEmpty(key: String, value: Map<K, V>) {
-    if (value.isNotEmpty()) this[key] = value
-  }
-
-  private fun MutableMap<String, Any?>.putIfTrue(key: String, value: Boolean) {
-    if (value) this[key] = true
+    return SchemaJsonCodec.schemaPropertyToOpenApiValue(schema)
   }
 }

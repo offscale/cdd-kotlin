@@ -162,14 +162,24 @@ class RuntimeExpressionAndCriterionTest {
         RuntimeExpressionEngine.evaluate("\$request.body#/tags/0", ctx).getOrThrow())
     assertTrue(
         RuntimeExpressionEngine.evaluate("\$request.body", ctx).getOrThrow() is OpenApiObject)
-    // 8. $response.header.<name>
+    // 8. $response.header.<name>, $response.query.<name>, $response.path.<name>
     assertEquals(
         OpenApiString("50"),
         RuntimeExpressionEngine.evaluate("\$response.header.x-rate-limit", ctx).getOrThrow())
+    assertEquals(
+        OpenApiString("active"),
+        RuntimeExpressionEngine.evaluate("\$response.query.filter", ctx).getOrThrow())
+    assertEquals(
+        OpenApiString("10"),
+        RuntimeExpressionEngine.evaluate("\$response.path.petId", ctx).getOrThrow())
     // 9. $response.body & pointer
     assertEquals(
         OpenApiString("available"),
         RuntimeExpressionEngine.evaluate("\$response.body#/status", ctx).getOrThrow())
+    assertTrue(
+        RuntimeExpressionEngine.evaluate("\$response.body#", ctx).getOrThrow() is OpenApiObject)
+    assertTrue(
+        RuntimeExpressionEngine.evaluate("\$request.body#", ctx).getOrThrow() is OpenApiObject)
     assertTrue(
         RuntimeExpressionEngine.evaluate("\$response.body", ctx).getOrThrow() is OpenApiObject)
     // 10. $message.header.<name>
@@ -279,8 +289,62 @@ class RuntimeExpressionAndCriterionTest {
     assertTrue(RuntimeExpressionEngine.parseExpression("\$request.body#bad").isFailure)
     assertTrue(RuntimeExpressionEngine.parseExpression("\$request.other").isFailure)
     assertTrue(RuntimeExpressionEngine.parseExpression("\$response.header.").isFailure)
+    assertTrue(RuntimeExpressionEngine.parseExpression("\$response.query.").isFailure)
+    assertTrue(RuntimeExpressionEngine.parseExpression("\$response.path.").isFailure)
     assertTrue(RuntimeExpressionEngine.parseExpression("\$response.body#bad").isFailure)
+    assertTrue(RuntimeExpressionEngine.parseExpression("\$response.body#/~2").isFailure)
+    assertTrue(RuntimeExpressionEngine.parseExpression("\$request.body#/~2").isFailure)
     assertTrue(RuntimeExpressionEngine.parseExpression("\$response.other").isFailure)
+    assertTrue(RuntimeExpressionEngine.isValidJsonPointerSyntax(""))
+    assertTrue(RuntimeExpressionEngine.isValidJsonPointerSyntax("/a/~0/~1"))
+    assertFalse(RuntimeExpressionEngine.isValidJsonPointerSyntax("noSlash"))
+    assertFalse(RuntimeExpressionEngine.isValidJsonPointerSyntax("/~2"))
+    assertFalse(RuntimeExpressionEngine.isValidJsonPointerSyntax("/~"))
+    assertTrue(RuntimeExpressionEngine.isValidOpenApiRuntimeExpression("\$url") { it.isNotBlank() })
+    assertTrue(
+        RuntimeExpressionEngine.isValidOpenApiRuntimeExpression("\$method") { it.isNotBlank() })
+    assertTrue(
+        RuntimeExpressionEngine.isValidOpenApiRuntimeExpression("\$statusCode") { it.isNotBlank() })
+    assertTrue(
+        RuntimeExpressionEngine.isValidOpenApiRuntimeExpression("\$request.query.q") {
+          it.isNotBlank()
+        })
+    assertTrue(
+        RuntimeExpressionEngine.isValidOpenApiRuntimeExpression("\$request.path.p") {
+          it.isNotBlank()
+        })
+    assertTrue(
+        RuntimeExpressionEngine.isValidOpenApiRuntimeExpression("\$response.query.q") {
+          it.isNotBlank()
+        })
+    assertTrue(
+        RuntimeExpressionEngine.isValidOpenApiRuntimeExpression("\$response.path.p") {
+          it.isNotBlank()
+        })
+    assertTrue(
+        RuntimeExpressionEngine.isValidOpenApiRuntimeExpression("\$request.header.X-Ok") {
+          !it.contains(' ')
+        })
+    assertFalse(
+        RuntimeExpressionEngine.isValidOpenApiRuntimeExpression("\$request.header.Bad Header") {
+          !it.contains(' ')
+        })
+    assertTrue(
+        RuntimeExpressionEngine.isValidOpenApiRuntimeExpression("\$response.header.X-Ok") {
+          !it.contains(' ')
+        })
+    assertFalse(
+        RuntimeExpressionEngine.isValidOpenApiRuntimeExpression("\$response.header.Bad Header") {
+          !it.contains(' ')
+        })
+    assertTrue(RuntimeExpressionEngine.isValidOpenApiRuntimeExpression("\$request.body") { true })
+    assertTrue(
+        RuntimeExpressionEngine.isValidOpenApiRuntimeExpression("\$request.body#/a") { true })
+    assertTrue(RuntimeExpressionEngine.isValidOpenApiRuntimeExpression("\$response.body") { true })
+    assertTrue(
+        RuntimeExpressionEngine.isValidOpenApiRuntimeExpression("\$response.body#/a") { true })
+    assertFalse(RuntimeExpressionEngine.isValidOpenApiRuntimeExpression("\$inputs.x") { true })
+    assertFalse(RuntimeExpressionEngine.isValidOpenApiRuntimeExpression("invalid") { true })
     assertTrue(RuntimeExpressionEngine.parseExpression("\$message.header.").isFailure)
     assertTrue(RuntimeExpressionEngine.parseExpression("\$message.payload#bad").isFailure)
     assertTrue(RuntimeExpressionEngine.parseExpression("\$message.other").isFailure)
@@ -309,6 +373,8 @@ class RuntimeExpressionAndCriterionTest {
     assertTrue(RuntimeExpressionEngine.evaluate("\$request.path.p", emptyCtx).isFailure)
     assertTrue(RuntimeExpressionEngine.evaluate("\$request.body", emptyCtx).isFailure)
     assertTrue(RuntimeExpressionEngine.evaluate("\$response.header.h", emptyCtx).isFailure)
+    assertTrue(RuntimeExpressionEngine.evaluate("\$response.query.q", emptyCtx).isFailure)
+    assertTrue(RuntimeExpressionEngine.evaluate("\$response.path.p", emptyCtx).isFailure)
     assertTrue(RuntimeExpressionEngine.evaluate("\$response.body", emptyCtx).isFailure)
     assertTrue(RuntimeExpressionEngine.evaluate("\$message.header.h", emptyCtx).isFailure)
     assertTrue(RuntimeExpressionEngine.evaluate("\$message.payload", emptyCtx).isFailure)
@@ -325,6 +391,8 @@ class RuntimeExpressionAndCriterionTest {
     assertTrue(RuntimeExpressionEngine.evaluate("\$request.query.missing", popCtx).isFailure)
     assertTrue(RuntimeExpressionEngine.evaluate("\$request.path.missing", popCtx).isFailure)
     assertTrue(RuntimeExpressionEngine.evaluate("\$response.header.missing", popCtx).isFailure)
+    assertTrue(RuntimeExpressionEngine.evaluate("\$response.query.missing", popCtx).isFailure)
+    assertTrue(RuntimeExpressionEngine.evaluate("\$response.path.missing", popCtx).isFailure)
     assertTrue(RuntimeExpressionEngine.evaluate("\$message.header.missing", popCtx).isFailure)
     assertTrue(
         RuntimeExpressionEngine.evaluate("\$steps.loginStep.outputs.missing", popCtx).isFailure)

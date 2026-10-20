@@ -8,6 +8,9 @@ import domain.Contact
 import domain.ExternalDocumentation
 import domain.Info
 import domain.License
+import domain.OpenApiArray
+import domain.OpenApiObject
+import domain.OpenApiString
 import domain.OpenApiValue
 import domain.OpenApiValues
 import domain.Server
@@ -22,121 +25,119 @@ import openapi.isArray
 import openapi.isObject
 import openapi.text
 import openapi.textValue
-import psi.OpenApiMetadata
 
 /**
- * Result of parsing the `@openapi` root metadata tag.
+ * Result of extracting the `@openapi` header KDoc tag.
  *
  * @property openapi OpenAPI version string.
- * @property jsonSchemaDialect JSON Schema dialect URI.
- * @property self Document `$self` URI.
+ * @property jsonSchemaDialect Optional JSON Schema dialect URI.
+ * @property self Optional `$self` URI.
  */
-data class OpenApiHeaderLine(
-    val openapi: String?,
-    val jsonSchemaDialect: String?,
-    val self: String?
+data class OpenApiHeaderResult(
+    val openapi: String? = null,
+    val jsonSchemaDialect: String? = null,
+    val self: String? = null
 )
 
 /**
- * Encodes and decodes OpenAPI `info`, `contact`, `license`, `servers`, `externalDocs`, and root
- * `@openapi` KDoc tags.
+ * Encodes and decodes OpenAPI root [Info], [Contact], [License], [Server], and
+ * [ExternalDocumentation] KDoc metadata.
  */
 object InfoMetadataCodec {
   /**
-   * Encodes the root `@openapi` metadata JSON string from [metadata].
+   * Serializes root OpenAPI version, dialect, and `$self` from [metadata] into a compact JSON
+   * string for `@openapi`.
    *
-   * @param metadata The OpenAPI metadata source.
-   * @return Compact JSON string representing `openapi`, `jsonSchemaDialect`, and `$self`.
+   * @param metadata The [psi.OpenApiMetadata] to render.
+   * @return Compact JSON string.
    */
-  fun renderOpenApiMeta(metadata: OpenApiMetadata): String {
-    val map = linkedMapOf<String, Any?>()
-    if (metadata.openapi != null) map["openapi"] = metadata.openapi
-    if (metadata.jsonSchemaDialect != null) map["jsonSchemaDialect"] = metadata.jsonSchemaDialect
-    if (metadata.self != null) map["\$self"] = metadata.self
-    return OpenApiValues.encodeAnyToString(map)
+  fun renderOpenApiMeta(metadata: psi.OpenApiMetadata): String {
+    val map = LinkedHashMap<String, OpenApiValue>()
+    metadata.openapi?.let { map["openapi"] = OpenApiString(it) }
+    metadata.jsonSchemaDialect?.let { map["jsonSchemaDialect"] = OpenApiString(it) }
+    metadata.self?.let { map["\$self"] = OpenApiString(it) }
+    return OpenApiValues.encodeToString(OpenApiObject(map))
   }
 
   /**
-   * Decodes the `@openapi` KDoc tag line from [lines].
+   * Extracts [OpenApiHeaderResult] from `@openapi` in [lines].
    *
    * @param lines Normalized KDoc lines.
-   * @return Parsed [OpenApiHeaderLine].
+   * @return Extracted [OpenApiHeaderResult].
    */
-  fun extractOpenApiLine(lines: List<String>): OpenApiHeaderLine {
-    val line =
-        lines.firstOrNull { it.startsWith("@openapi") }
-            ?: return OpenApiHeaderLine(null, null, null)
+  fun extractOpenApiLine(lines: List<String>): OpenApiHeaderResult {
+    val line = lines.firstOrNull { it.startsWith("@openapi") } ?: return OpenApiHeaderResult()
     val json = line.removePrefix("@openapi").trim()
-    if (json.isEmpty()) return OpenApiHeaderLine(null, null, null)
-    val node = openapi.parseJsonElementOrNull(json) ?: return OpenApiHeaderLine(null, null, null)
-    if (!node.isObject) return OpenApiHeaderLine(null, null, null)
-    return OpenApiHeaderLine(
-        openapi = node.text("openapi"),
-        jsonSchemaDialect = node.text("jsonSchemaDialect"),
-        self = node.text("\$self"))
+    if (json.isEmpty()) return OpenApiHeaderResult()
+    val node = openapi.parseJsonElementOrNull(json) ?: return OpenApiHeaderResult()
+    val obj = node.asObject() ?: return OpenApiHeaderResult()
+    return OpenApiHeaderResult(
+        openapi = obj.text("openapi"),
+        jsonSchemaDialect = obj.text("jsonSchemaDialect"),
+        self = obj.text("\$self"))
   }
 
   /**
-   * Encodes an [Info] object into a compact JSON string for `@info`.
+   * Serializes an [Info] object into a compact JSON string for `@info`.
    *
-   * @param info The Info object to encode.
+   * @param info Info object.
    * @return Compact JSON string.
    */
   fun renderInfo(info: Info): String {
-    return OpenApiValues.encodeAnyToString(infoToDocValue(info))
+    return OpenApiValues.encodeToString(infoToDocValue(info))
   }
 
   /**
-   * Converts an [Info] object into a serializable map.
+   * Converts an [Info] object into an [OpenApiObject].
    *
-   * @param info The Info object.
-   * @return Map representation.
+   * @param info Info object.
+   * @return [OpenApiObject] representation.
    */
-  fun infoToDocValue(info: Info): Map<String, Any?> {
-    val map = linkedMapOf<String, Any?>()
-    map["title"] = info.title
-    map["version"] = info.version
-    if (info.summary != null) map["summary"] = info.summary
-    if (info.description != null) map["description"] = info.description
-    if (info.termsOfService != null) map["termsOfService"] = info.termsOfService
+  fun infoToDocValue(info: Info): OpenApiObject {
+    val map = LinkedHashMap<String, OpenApiValue>()
+    map["title"] = OpenApiString(info.title)
+    map["version"] = OpenApiString(info.version)
+    info.summary?.let { map["summary"] = OpenApiString(it) }
+    info.description?.let { map["description"] = OpenApiString(it) }
+    info.termsOfService?.let { map["termsOfService"] = OpenApiString(it) }
     info.contact?.let { map["contact"] = contactToDocValue(it) }
     info.license?.let { map["license"] = licenseToDocValue(it) }
-    info.extensions.forEach { (k, v) -> if (k.startsWith("x-")) map[k] = v }
-    return map
+    info.extensions.forEach { (key, value) ->
+      if (key.startsWith("x-")) {
+        map[key] = value
+      }
+    }
+    return OpenApiObject(map)
+  }
+
+  private fun contactToDocValue(contact: Contact): OpenApiObject {
+    val map = LinkedHashMap<String, OpenApiValue>()
+    contact.name?.let { map["name"] = OpenApiString(it) }
+    contact.url?.let { map["url"] = OpenApiString(it) }
+    contact.email?.let { map["email"] = OpenApiString(it) }
+    contact.extensions.forEach { (key, value) ->
+      if (key.startsWith("x-")) {
+        map[key] = value
+      }
+    }
+    return OpenApiObject(map)
+  }
+
+  private fun licenseToDocValue(license: License): OpenApiObject {
+    val map = LinkedHashMap<String, OpenApiValue>()
+    map["name"] = OpenApiString(license.name)
+    license.identifier?.let { map["identifier"] = OpenApiString(it) }
+    license.url?.let { map["url"] = OpenApiString(it) }
+    license.extensions.forEach { (key, value) ->
+      if (key.startsWith("x-")) {
+        map[key] = value
+      }
+    }
+    return OpenApiObject(map)
   }
 
   /**
-   * Converts a [Contact] object into a serializable map.
-   *
-   * @param contact The Contact object.
-   * @return Map representation.
-   */
-  fun contactToDocValue(contact: Contact): Map<String, Any?> {
-    val map = linkedMapOf<String, Any?>()
-    if (contact.name != null) map["name"] = contact.name
-    if (contact.url != null) map["url"] = contact.url
-    if (contact.email != null) map["email"] = contact.email
-    contact.extensions.forEach { (k, v) -> if (k.startsWith("x-")) map[k] = v }
-    return map
-  }
-
-  /**
-   * Converts a [License] object into a serializable map.
-   *
-   * @param license The License object.
-   * @return Map representation.
-   */
-  fun licenseToDocValue(license: License): Map<String, Any?> {
-    val map = linkedMapOf<String, Any?>()
-    map["name"] = license.name
-    if (license.identifier != null) map["identifier"] = license.identifier
-    if (license.url != null) map["url"] = license.url
-    license.extensions.forEach { (k, v) -> if (k.startsWith("x-")) map[k] = v }
-    return map
-  }
-
-  /**
-   * Decodes an [Info] object from the `@info` KDoc tag in [lines].
+   * Extracts an [Info] object from `@info` in [lines].
    *
    * @param lines Normalized KDoc lines.
    * @return Parsed [Info] or `null`.
@@ -146,14 +147,13 @@ object InfoMetadataCodec {
     val json = line.removePrefix("@info").trim()
     if (json.isEmpty()) return null
     val node = openapi.parseJsonElementOrNull(json) ?: return null
-    if (!node.isObject) return null
     return parseInfoNode(node)
   }
 
   /**
-   * Parses an [Info] object from a [JsonNode].
+   * Parses a [JsonNode] into an [Info].
    *
-   * @param node The JSON node.
+   * @param node JSON node.
    * @return Parsed [Info] or `null`.
    */
   fun parseInfoNode(node: JsonNode?): Info? {
@@ -171,13 +171,7 @@ object InfoMetadataCodec {
         extensions = parseExtensions(obj))
   }
 
-  /**
-   * Parses a [Contact] object from a [JsonNode].
-   *
-   * @param node The JSON node.
-   * @return Parsed [Contact] or `null`.
-   */
-  fun parseContactNode(node: JsonNode?): Contact? {
+  private fun parseContactNode(node: JsonNode?): Contact? {
     val obj = node.asObject() ?: return null
     return Contact(
         name = obj.text("name"),
@@ -187,9 +181,9 @@ object InfoMetadataCodec {
   }
 
   /**
-   * Parses a [License] object from a [JsonNode].
+   * Parses a [JsonNode] into a [License].
    *
-   * @param node The JSON node.
+   * @param node JSON node.
    * @return Parsed [License] or `null`.
    */
   fun parseLicenseNode(node: JsonNode?): License? {
@@ -203,27 +197,31 @@ object InfoMetadataCodec {
   }
 
   /**
-   * Encodes an [ExternalDocumentation] object into a compact JSON string.
+   * Serializes an [ExternalDocumentation] object into a compact JSON string for `@externalDocs`.
    *
-   * @param docs The ExternalDocumentation object.
+   * @param docs ExternalDocumentation object.
    * @return Compact JSON string.
    */
   fun renderExternalDocs(docs: ExternalDocumentation): String {
-    return OpenApiValues.encodeAnyToString(externalDocsToDocValue(docs))
+    return OpenApiValues.encodeToString(externalDocsToDocValue(docs))
   }
 
   /**
-   * Converts an [ExternalDocumentation] object into a serializable map.
+   * Converts an [ExternalDocumentation] object into an [OpenApiObject].
    *
-   * @param docs The ExternalDocumentation object.
-   * @return Map representation.
+   * @param docs ExternalDocumentation object.
+   * @return [OpenApiObject] representation.
    */
-  fun externalDocsToDocValue(docs: ExternalDocumentation): Map<String, Any?> {
-    val map = linkedMapOf<String, Any?>()
-    map["url"] = docs.url
-    if (docs.description != null) map["description"] = docs.description
-    docs.extensions.forEach { (k, v) -> if (k.startsWith("x-")) map[k] = v }
-    return map
+  fun externalDocsToDocValue(docs: ExternalDocumentation): OpenApiObject {
+    val map = LinkedHashMap<String, OpenApiValue>()
+    map["url"] = OpenApiString(docs.url)
+    docs.description?.let { map["description"] = OpenApiString(it) }
+    docs.extensions.forEach { (key, value) ->
+      if (key.startsWith("x-")) {
+        map[key] = value
+      }
+    }
+    return OpenApiObject(map)
   }
 
   /**
@@ -233,12 +231,11 @@ object InfoMetadataCodec {
    * @return Parsed [ExternalDocumentation] or `null`.
    */
   fun extractExternalDocsLine(lines: List<String>): ExternalDocumentation? {
-    val explicit = lines.firstOrNull { it.startsWith("@externalDocs") }
-    if (explicit != null) {
-      val json = explicit.removePrefix("@externalDocs").trim()
+    val line = lines.firstOrNull { it.startsWith("@externalDocs") }
+    if (line != null) {
+      val json = line.removePrefix("@externalDocs").trim()
       if (json.isEmpty()) return null
       val node = openapi.parseJsonElementOrNull(json) ?: return null
-      if (!node.isObject) return null
       return parseExternalDocsNode(node)
     }
 
@@ -248,13 +245,13 @@ object InfoMetadataCodec {
     val parts = content.split(" ", limit = 2)
     val url = parts[0]
     val desc = parts.getOrNull(1)
-    return ExternalDocumentation(url = url, description = desc)
+    return ExternalDocumentation(description = desc, url = url)
   }
 
   /**
-   * Parses an [ExternalDocumentation] object from a [JsonNode].
+   * Parses a [JsonNode] into an [ExternalDocumentation].
    *
-   * @param node The JSON node.
+   * @param node JSON node.
    * @return Parsed [ExternalDocumentation] or `null`.
    */
   fun parseExternalDocsNode(node: JsonNode?): ExternalDocumentation? {
@@ -265,90 +262,98 @@ object InfoMetadataCodec {
   }
 
   /**
-   * Converts a [Server] object into a serializable map.
+   * Converts a [Server] into an [OpenApiObject].
    *
-   * @param server The Server object.
-   * @return Map representation.
+   * @param server Server to convert.
+   * @return [OpenApiObject] representation.
    */
-  fun serverToDocValue(server: Server): Map<String, Any?> {
-    val map = linkedMapOf<String, Any?>()
-    map["url"] = server.url
-    if (server.description != null) map["description"] = server.description
-    if (server.name != null) map["name"] = server.name
-    server.variables?.let { vars ->
-      if (vars.isNotEmpty()) {
-        map["variables"] =
-            vars.mapValues { variable ->
-              val variableMap = linkedMapOf<String, Any?>()
-              variableMap["default"] = variable.value.default
-              if (!variable.value.enum.isNullOrEmpty()) variableMap["enum"] = variable.value.enum
-              if (variable.value.description != null) {
-                variableMap["description"] = variable.value.description
-              }
-              variable.value.extensions.forEach { (k, v) ->
-                if (k.startsWith("x-")) variableMap[k] = v
-              }
-              variableMap
-            }
+  fun serverToDocValue(server: Server): OpenApiObject {
+    val map = LinkedHashMap<String, OpenApiValue>()
+    map["url"] = OpenApiString(server.url)
+    server.description?.let { map["description"] = OpenApiString(it) }
+    server.name?.let { map["name"] = OpenApiString(it) }
+    if (!server.variables.isNullOrEmpty()) {
+      map["variables"] =
+          OpenApiObject(
+              server.variables.mapValues { (_, variable) ->
+                val varMap = LinkedHashMap<String, OpenApiValue>()
+                varMap["default"] = OpenApiString(variable.default)
+                if (!variable.enum.isNullOrEmpty()) {
+                  varMap["enum"] = OpenApiArray(variable.enum.map { OpenApiString(it) })
+                }
+                variable.description?.let { varMap["description"] = OpenApiString(it) }
+                variable.extensions.forEach { (key, value) ->
+                  if (key.startsWith("x-")) {
+                    varMap[key] = value
+                  }
+                }
+                OpenApiObject(varMap)
+              })
+    }
+    server.extensions.forEach { (key, value) ->
+      if (key.startsWith("x-")) {
+        map[key] = value
       }
     }
-    server.extensions.forEach { (k, v) -> if (k.startsWith("x-")) map[k] = v }
-    return map
+    return OpenApiObject(map)
   }
 
   /**
-   * Extracts a list of [Server] objects from `@servers` in [lines].
+   * Extracts a list of [Server]s from `@servers` in [lines].
    *
    * @param lines Normalized KDoc lines.
    * @return List of parsed [Server]s.
    */
   fun extractServersLine(lines: List<String>): List<Server> {
     val line = lines.firstOrNull { it.startsWith("@servers") } ?: return emptyList()
-    val content = line.removePrefix("@servers").trim()
-    if (content.isEmpty()) return emptyList()
-    val node = openapi.parseJsonElementOrNull(content) ?: return emptyList()
-    return when {
-      node.isArray -> node.elements().mapNotNull { parseServerNode(it) }
-      node.isObject -> listOfNotNull(parseServerNode(node))
-      else -> emptyList()
-    }
+    val json = line.removePrefix("@servers").trim()
+    if (json.isEmpty()) return emptyList()
+    val node = openapi.parseJsonElementOrNull(json) ?: return emptyList()
+    val items =
+        when {
+          node.isArray -> node.elements()
+          node.isObject -> listOf(node)
+          else -> emptyList()
+        }
+    return items.mapNotNull { parseServerNode(it) }
   }
 
   /**
-   * Parses a [Server] object from a [JsonNode].
+   * Parses a [JsonNode] into a [Server].
    *
-   * @param node The JSON node.
+   * @param node JSON node.
    * @return Parsed [Server] or `null`.
    */
-  fun parseServerNode(node: JsonNode): Server? {
+  fun parseServerNode(node: JsonNode?): Server? {
     val obj = node.asObject() ?: return null
+    val url = obj.text("url") ?: "/"
     return Server(
-        url = obj.text("url") ?: "/",
+        url = url,
         description = obj.text("description"),
-        variables = parseServerVariables(obj.get("variables")),
         name = obj.text("name"),
+        variables = parseServerVariables(obj.get("variables")),
         extensions = parseExtensions(obj))
   }
 
-  private fun parseServerVariables(node: JsonNode?): Map<String, ServerVariable> {
-    val obj = node.asObject() ?: return emptyMap()
+  private fun parseServerVariables(node: JsonNode?): Map<String, ServerVariable>? {
+    val obj = node.asObject() ?: return null
     return obj.fields().asSequence().associate { (name, raw) ->
-      val value = raw.asObject() ?: return@associate name to ServerVariable(default = "")
-      val enumArray = value.get("enum").asArray()
-      val enumValues = enumArray?.mapNotNull { it.textValue() }
+      val varObj = raw.asObject()
+      val default = varObj?.text("default") ?: "default"
+      val enumNode = varObj?.get("enum").asArray()
+      val enumValues = enumNode?.mapNotNull { it.textValue() }
+      val desc = varObj?.text("description")
+      val extensions = if (varObj != null) parseExtensions(varObj) else emptyMap()
       name to
           ServerVariable(
-              default = value.text("default") ?: "",
-              enum = enumValues,
-              description = value.text("description"),
-              extensions = parseExtensions(value))
+              default = default, enum = enumValues, description = desc, extensions = extensions)
     }
   }
 
   /**
-   * Parses specification extensions (`x-*` keys) from a [JsonNode].
+   * Parses all `x-` specification extensions from [node].
    *
-   * @param node The JSON node.
+   * @param node JSON object node.
    * @return Map of extension keys to [OpenApiValue]s.
    */
   fun parseExtensions(node: JsonNode): Map<String, OpenApiValue> {
