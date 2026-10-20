@@ -82,19 +82,21 @@ jobs:
           
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             TAG_NAME="${{ github.ref_name }}"
-            gh release create "$TAG_NAME" bin/*.wasm --title "$TAG_NAME" --generate-notes --latest
+            gh release create "$TAG_NAME" bin/*.wasm --title "$TAG_NAME" --generate-notes --latest || gh release upload "$TAG_NAME" bin/*.wasm --clobber
             
             # Recreate latest release
             gh release delete latest -y --cleanup-tag || true
+            git push origin :refs/tags/latest || true
             git tag -f latest
             git push origin -f latest
             gh release create latest bin/*.wasm --title "Latest Release" --notes "Latest stable release: $TAG_NAME"
           elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME="${{ github.ref_name }}"
-            gh release create "$TAG_NAME" bin/*.wasm --title "$TAG_NAME" --generate-notes
+            gh release create "$TAG_NAME" bin/*.wasm --title "$TAG_NAME" --generate-notes || gh release upload "$TAG_NAME" bin/*.wasm --clobber
           else
             TAG_NAME="snapshot"
             gh release delete "$TAG_NAME" -y --cleanup-tag || true
+            git push origin ":refs/tags/$TAG_NAME" || true
             git tag -f "$TAG_NAME"
             git push origin -f "$TAG_NAME"
             gh release create "$TAG_NAME" bin/*.wasm --prerelease --title "$TAG_NAME" --notes "Latest master build"

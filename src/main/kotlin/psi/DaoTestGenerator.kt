@@ -86,7 +86,9 @@ class DaoTestGenerator {
     sb.append("    @BeforeTest\n")
     sb.append("    fun setup() {\n")
     sb.append(
-        "        Database.connect(\"jdbc:sqlite:file:test?mode=memory&cache=shared\", driver = \"org.sqlite.JDBC\")\n")
+        "        val dbFile = java.io.File.createTempFile(\"${name.lowercase()}_dao_\", \".db\").apply { deleteOnExit() }\n")
+    sb.append(
+        "        Database.connect(\"jdbc:sqlite:\${dbFile.absolutePath}\", driver = \"org.sqlite.JDBC\")\n")
     sb.append("        transaction {\n")
     sb.append("            SchemaUtils.create($tableName)\n")
     sb.append("        }\n")
@@ -130,7 +132,8 @@ class DaoTestGenerator {
                   }
               val safePropName = escapeKotlinKeyword(propName)
               if (propName == "id") {
-                "$safePropName = 0"
+                val idZero = if (type == "Long") "0L" else if (type == "Int") "0" else dummyVal
+                "$safePropName = $idZero"
               } else {
                 "$safePropName = $dummyVal"
               }
@@ -141,20 +144,20 @@ class DaoTestGenerator {
     sb.append("        val created = dao.create(entity)\n")
     val idProp = schema.properties["id"]
     if (idProp != null) {
-      sb.append("        assertNotEquals(0, created.id)\n")
-    }
+      val idType = TypeMappers.mapType(idProp)
+      val idZero = if (idType == "Long") "0L" else "0"
+      val idIsNullable = !schema.required.contains("id")
+      val createdIdExpr = if (idIsNullable) "created.id!!" else "created.id"
+      sb.append("        assertNotEquals($idZero, created.id)\n")
+      sb.append("        val items = dao.getAll()\n")
+      sb.append("        assertEquals(1, items.size)\n")
+      sb.append("    }\n\n")
 
-    sb.append("        val items = dao.getAll()\n")
-    sb.append("        assertEquals(1, items.size)\n")
-    sb.append("    }\n")
-
-    if (idProp != null) {
-      sb.append("\n")
       sb.append("    @Test\n")
       sb.append("    fun `getById retrieves correct record`() = runBlocking {\n")
       sb.append("        val entity = $name($constructorArgs)\n")
       sb.append("        val created = dao.create(entity)\n")
-      sb.append("        val fetched = dao.getById(created.id)\n")
+      sb.append("        val fetched = dao.getById($createdIdExpr)\n")
       sb.append("        assertNotNull(fetched)\n")
       sb.append("        assertEquals(created.id, fetched?.id)\n")
       sb.append("    }\n\n")
@@ -163,10 +166,14 @@ class DaoTestGenerator {
       sb.append("    fun `delete removes record`() = runBlocking {\n")
       sb.append("        val entity = $name($constructorArgs)\n")
       sb.append("        val created = dao.create(entity)\n")
-      sb.append("        val deleted = dao.delete(created.id)\n")
+      sb.append("        val deleted = dao.delete($createdIdExpr)\n")
       sb.append("        assertTrue(deleted)\n")
-      sb.append("        val fetched = dao.getById(created.id)\n")
+      sb.append("        val fetched = dao.getById($createdIdExpr)\n")
       sb.append("        assertNull(fetched)\n")
+      sb.append("    }\n")
+    } else {
+      sb.append("        val items = dao.getAll()\n")
+      sb.append("        assertEquals(1, items.size)\n")
       sb.append("    }\n")
     }
     sb.append("}\n\n")

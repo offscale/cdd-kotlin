@@ -27,31 +27,28 @@ class ServerMainTestGenerator {
             line("@Test")
             block("fun `cli parser handles ephemeral and seed flags`()") {
               line("val cli = MockServerCli()")
-              line("val result = cli.test(\"--ephemeral --seed\")")
-              line("// Since test() executes run(), it might block if embeddedServer starts.")
-              line("// In an actual generated test suite, we'd mock the server start.")
-              line("// For coverage, we verify flags parse correctly.")
+              line("val result = cli.test(\"--ephemeral --seed --dry-run\")")
               line("assertNotNull(result)")
             }
             line()
             line("@Test")
             block("fun `cli parser handles strict-validation flag`()") {
               line("val cli = MockServerCli()")
-              line("val result = cli.test(\"--strict-validation\")")
+              line("val result = cli.test(\"--strict-validation --dry-run\")")
               line("assertNotNull(result)")
             }
             line()
             line("@Test")
             block("fun `cli parser handles enforce-auth flag`()") {
               line("val cli = MockServerCli()")
-              line("val result = cli.test(\"--enforce-auth\")")
+              line("val result = cli.test(\"--enforce-auth --dry-run\")")
               line("assertNotNull(result)")
             }
             line()
             line("@Test")
             block("fun `cli parser handles start-auth-server flag`()") {
               line("val cli = MockServerCli()")
-              line("val result = cli.test(\"--start-auth-server\")")
+              line("val result = cli.test(\"--start-auth-server --dry-run\")")
               line("assertNotNull(result)")
             }
           }

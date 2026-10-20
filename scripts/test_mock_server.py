@@ -29,7 +29,7 @@ def cleanup_port():
         pass
 
 
-def run_e2e_tests():
+def run_e2e_tests(server_process=None):
     port = 8080
     max_retries = 300
     retry_count = 0
@@ -39,6 +39,10 @@ def run_e2e_tests():
     import socket
 
     while retry_count < max_retries:
+        if server_process is not None and server_process.poll() is not None:
+            sys.exit(
+                f"Server process exited prematurely with code {server_process.returncode}!"
+            )
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 s.settimeout(1)
@@ -106,7 +110,7 @@ def main():
     os.chdir(out_dir)
 
     print("Running Category 1: Unit Tests (DAOs, Config, Seeder)")
-    cmd_test = [sys.executable, run_with_fallback, "gradle", ":server:test"]
+    cmd_test = [sys.executable, run_with_fallback, "gradle", ":server:jvmTest"]
     if subprocess.run(cmd_test).returncode != 0:
         sys.exit("Server unit tests failed.")
 
@@ -121,6 +125,9 @@ def main():
         ("Running Category 4: Seeded Mock Tests", "--ephemeral --seed"),
     ]
 
+    run_env = os.environ.copy()
+    run_env.pop("DATABASE_URL", None)
+
     for desc, args in categories:
         print(desc)
         cmd_run = [
@@ -128,12 +135,13 @@ def main():
             run_with_fallback,
             "gradle",
             ":server:jvmRun",
-            f"--args={args}",
         ]
-        server_process = subprocess.Popen(cmd_run)
+        if args:
+            cmd_run.append(f"--args={args}")
+        server_process = subprocess.Popen(cmd_run, env=run_env)
 
         try:
-            run_e2e_tests()
+            run_e2e_tests(server_process)
         finally:
             server_process.kill()
             server_process.wait()

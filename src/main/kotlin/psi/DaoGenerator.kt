@@ -238,7 +238,7 @@ class DaoGenerator {
             val fallback =
                 if (propName == "id")
                     "\"{ \\\"uuid\\\": \\\"id_\${java.util.UUID.randomUUID()}\\\" }\""
-                else "\"{}\""
+                else "null"
             sb.append(
                 "                it[$tableName.${propName}Column] = entity.${escapeKotlinKeyword(propName)}?.let { v -> Json.encodeToString(v) } ?: $fallback\n")
           } else {

@@ -32,7 +32,9 @@ class SeederTestGenerator {
         line("@BeforeTest")
         block("fun setup()") {
           line(
-              "val dbConfig = DatabaseConnection.resolveConfig(ephemeralFlag = true, envUrl = \"\")")
+              "val dbFile = java.io.File.createTempFile(\"seeder_test_\", \".db\").apply { deleteOnExit() }")
+          line(
+              "val dbConfig = DatabaseConnection.resolveConfig(ephemeralFlag = false, envUrl = \"jdbc:sqlite:\${dbFile.absolutePath}\")")
           line("DatabaseConnection.initialize(dbConfig)")
           line("daoConfig = DaoFactory.create(useConcrete = true)")
           line("seeder = DatabaseSeeder(daoConfig)")

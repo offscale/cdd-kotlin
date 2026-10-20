@@ -54,4 +54,34 @@ class DaoTestGeneratorTest {
         !result.contains("fun `getById retrieves correct record`()"),
         "Should not have getById test")
   }
+
+  @Test
+  fun `generateDaoTestModule handles Long and String id types`() {
+    val generator = DaoTestGenerator()
+    val longIdSchema =
+        SchemaDefinition(
+            name = "Pet",
+            type = "object",
+            properties =
+                mapOf(
+                    "id" to SchemaProperty(type = "integer", format = "int64"),
+                    "name" to SchemaProperty(type = "string")))
+    val stringIdSchema =
+        SchemaDefinition(
+            name = "Document",
+            type = "object",
+            required = listOf("id"),
+            properties = mapOf("id" to SchemaProperty(type = "string")))
+    val result =
+        generator
+            .generateDaoTests("com.example", listOf(longIdSchema, stringIdSchema))
+            .values
+            .joinToString("\n")
+
+    assertTrue(result.contains("id = 0L"))
+    assertTrue(result.contains("assertNotEquals(0L, created.id)"))
+    assertTrue(result.contains("dao.getById(created.id!!)"))
+    assertTrue(result.contains("id = \"test\""))
+    assertTrue(result.contains("dao.getById(created.id)"))
+  }
 }

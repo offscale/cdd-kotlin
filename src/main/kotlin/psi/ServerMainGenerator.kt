@@ -109,15 +109,22 @@ class ServerMainGenerator {
     sb.append(
         "    val startAuthServer by option(\"--start-auth-server\", help = \"Run the identity provider endpoints\").flag()\n\n")
 
+    sb.append("    /** \n")
+    sb.append(
+        "     * Validates CLI flags and initializes configuration without blocking on the HTTP listener.\n")
+    sb.append("     */\n")
+    sb.append(
+        "    val dryRun by option(\"--dry-run\", help = \"Validate flags and exit without starting the HTTP server\").flag()\n\n")
+
     sb.append("    override fun run() {\n")
-    sb.append("        val envUrl = System.getenv(\"DATABASE_URL\")\n")
+    sb.append("        val envUrl = currentContext.readEnvvar(\"DATABASE_URL\")\n")
     sb.append("        val useConcrete = ephemeral || (envUrl != null && envUrl.isNotBlank())\n\n")
 
     sb.append("        // 1. Resolve DAOs\n")
     sb.append("        val daoConfig = DaoFactory.create(useConcrete = useConcrete)\n\n")
 
     sb.append("        // 2. Database Initialization\n")
-    sb.append("        if (useConcrete) {\n")
+    sb.append("        if (useConcrete && (!dryRun || ephemeral)) {\n")
     sb.append(
         "            val dbConfig = DatabaseConnection.resolveConfig(ephemeralFlag = ephemeral, envUrl = envUrl)\n")
     sb.append("            DatabaseConnection.initialize(dbConfig)\n")
@@ -128,6 +135,7 @@ class ServerMainGenerator {
     sb.append("                seeder.seedDatabase()\n")
     sb.append("            }\n")
     sb.append("        }\n\n")
+    sb.append("        if (dryRun) return\n\n")
 
     sb.append("        // 4. Start Listeners\n")
     sb.append("        embeddedServer(Netty, port = 8080) {\n")
