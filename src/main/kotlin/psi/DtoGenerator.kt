@@ -35,6 +35,24 @@ class DtoGenerator {
     return psiFactory.createFile("${definition.safeName}.kt", content)
   }
 
+  /**
+   * Returns `true` when [definition] generates a standard Kotlin `data class` with constructor
+   * properties (rather than a `typealias`, `enum class`, `sealed interface`, or empty `class`).
+   *
+   * @param definition The [SchemaDefinition] to inspect.
+   * @return `true` if a `data class` with properties is generated.
+   */
+  fun isDataClass(definition: SchemaDefinition): Boolean {
+    if (definition.booleanSchema != null || definition.ref != null) return false
+    val enumVals = definition.enumValues
+    if (!enumVals.isNullOrEmpty() && enumVals.all { it is OpenApiString }) return false
+    if ((definition.oneOf + definition.anyOf).isNotEmpty() ||
+        (definition.oneOfSchemas + definition.anyOfSchemas).isNotEmpty()) {
+      return false
+    }
+    return definition.properties.isNotEmpty()
+  }
+
   private fun buildSource(packageName: String, definition: SchemaDefinition): String {
     // 0. Boolean Schema (true/false)
     definition.booleanSchema?.let { booleanValue ->

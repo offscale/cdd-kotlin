@@ -24,6 +24,7 @@ class UiGenerator {
   fun generateForm(packageName: String, schema: SchemaDefinition): KtFile {
     val className = schema.safeName
     val formName = "${className}Form"
+    val modelsImport = resolveSiblingImport(packageName, "models")
 
     val imports =
         """ 
@@ -35,7 +36,7 @@ class UiGenerator {
             import androidx.compose.runtime.* 
             import androidx.compose.ui.Modifier
             import androidx.compose.ui.text.input.KeyboardType
-            import androidx.compose.ui.unit.dp
+            import androidx.compose.ui.unit.dp$modelsImport
         """
             .trimIndent()
 
@@ -43,8 +44,9 @@ class UiGenerator {
         schema.properties.entries.joinToString("\n    ") { (name, prop) ->
           val safeName = escapeKotlinKeyword(name)
           val stateInit = "initialState?.$safeName"
-          val isBool = isBoolean(prop)
-          val isString = prop.types.contains("string")
+          val mappedType = TypeMappers.mapType(prop)
+          val isBool = mappedType == "Boolean"
+          val isString = mappedType == "String"
           val fallback = if (isBool) "false" else "\"\""
           val conversion = if (isBool || isString) "" else ".toString()"
 
@@ -60,18 +62,8 @@ class UiGenerator {
         schema.properties.entries.joinToString(",\n                                    ") {
             (name, prop) ->
           val safeName = escapeKotlinKeyword(name)
-          val isInt = prop.types.contains("integer")
-          val isNum = prop.types.contains("number")
-          val isBool = prop.types.contains("boolean")
-
-          val value =
-              when {
-                isInt && prop.format == "int64" -> "$safeName.toLongOrNull() ?: 0L"
-                isInt -> "$safeName.toIntOrNull() ?: 0"
-                isNum -> "$safeName.toDoubleOrNull() ?: 0.0"
-                isBool -> safeName
-                else -> safeName
-              }
+          val isNullable = prop.types.contains("null") || !schema.required.contains(name)
+          val value = buildConstructorArgExpression(safeName, prop, isNullable)
           "$safeName = $value"
         }
 
@@ -123,6 +115,7 @@ class UiGenerator {
   fun generateGrid(packageName: String, schema: SchemaDefinition): KtFile {
     val className = schema.safeName
     val gridName = "${className}Grid"
+    val modelsImport = resolveSiblingImport(packageName, "models")
 
     val imports =
         """ 
@@ -137,7 +130,7 @@ class UiGenerator {
             import androidx.compose.ui.Modifier
             import androidx.compose.ui.draw.alpha
             import androidx.compose.ui.text.font.FontWeight
-            import androidx.compose.ui.unit.dp
+            import androidx.compose.ui.unit.dp$modelsImport
         """
             .trimIndent()
 
@@ -171,8 +164,11 @@ class UiGenerator {
         validProps
             .map { (name, prop) ->
               val safeName = escapeKotlinKeyword(name)
+              val isNullable = prop.types.contains("null") || !schema.required.contains(name)
               val displayCode =
                   when {
+                    prop.types.contains("array") && isNullable ->
+                        "item.$safeName?.joinToString(\", \").orEmpty()"
                     prop.types.contains("array") -> "item.$safeName.joinToString(\", \")"
                     else -> "item.$safeName.toString()"
                   }
@@ -191,7 +187,10 @@ class UiGenerator {
             .mapNotNull { (name, prop) ->
               if (prop.types.contains("array")) return@mapNotNull null
               val safeName = escapeKotlinKeyword(name)
-              "\"$name\" -> sorted.sortedBy { it.$safeName }"
+              val mappedType = TypeMappers.mapType(prop)
+              val selector =
+                  if (isComparableType(mappedType)) "it.$safeName" else "it.$safeName.toString()"
+              "\"$name\" -> sorted.sortedBy { $selector }"
             }
             .joinToString("\n                        ")
 
@@ -267,6 +266,8 @@ class UiGenerator {
   ): KtFile {
     val modelName = schema.safeName
     val gridName = "${modelName}Grid"
+    val modelsImport = resolveSiblingImport(packageName, "models")
+    val apiImport = resolveSiblingImport(packageName, "api")
 
     val content =
         """ 
@@ -280,7 +281,7 @@ class UiGenerator {
             import androidx.compose.material.Text
             import androidx.compose.runtime.* 
             import androidx.compose.ui.Alignment
-            import androidx.compose.ui.Modifier
+            import androidx.compose.ui.Modifier$modelsImport$apiImport
             
             @Composable
             fun $screenName(api: $apiClassName) { 
@@ -336,6 +337,71 @@ class UiGenerator {
     return psiFactory.createFile("$screenName.kt", content)
   }
 
+  private fun buildConstructorArgExpression(
+      safeName: String,
+      prop: SchemaProperty,
+      isNullable: Boolean
+  ): String {
+    return when (val mappedType = TypeMappers.mapType(prop)) {
+      "Long" -> "$safeName.toLongOrNull() ?: 0L"
+      "Int" -> "$safeName.toIntOrNull() ?: 0"
+      "Float" -> "$safeName.toFloatOrNull() ?: 0.0f"
+      "Double" -> "$safeName.toDoubleOrNull() ?: 0.0"
+      "Boolean" -> safeName
+      "String" -> safeName
+      "Instant" ->
+          if (isNullable) {
+            "runCatching { kotlinx.datetime.Instant.parse($safeName) }.getOrNull()"
+          } else {
+            "runCatching { kotlinx.datetime.Instant.parse($safeName) }.getOrElse { kotlinx.datetime.Instant.fromEpochMilliseconds(0) }"
+          }
+      "LocalDate" ->
+          if (isNullable) {
+            "runCatching { kotlinx.datetime.LocalDate.parse($safeName) }.getOrNull()"
+          } else {
+            "runCatching { kotlinx.datetime.LocalDate.parse($safeName) }.getOrElse { kotlinx.datetime.LocalDate.fromEpochDays(0) }"
+          }
+      "ByteArray" -> "$safeName.encodeToByteArray()"
+      "List<String>" ->
+          "if ($safeName.isBlank()) emptyList() else $safeName.split(\",\").map { it.trim() }"
+      "kotlinx.serialization.json.JsonElement" ->
+          "kotlinx.serialization.json.JsonPrimitive($safeName)"
+      "Nothing" -> "return@Button"
+      else ->
+          when {
+            mappedType.startsWith("List<") -> "initialState?.$safeName ?: emptyList()"
+            mappedType.startsWith("Map<") -> "initialState?.$safeName ?: emptyMap()"
+            isNullable -> "initialState?.$safeName"
+            else -> "initialState?.$safeName ?: return@Button"
+          }
+    }
+  }
+
+  private fun isComparableType(mappedType: String): Boolean =
+      when (mappedType) {
+        "String",
+        "Int",
+        "Long",
+        "Double",
+        "Float",
+        "Boolean",
+        "Instant",
+        "LocalDate" -> true
+        else -> false
+      }
+
+  private fun resolveSiblingImport(packageName: String, siblingSubpackage: String): String {
+    val targetPkg =
+        when {
+          packageName == "ui" -> siblingSubpackage
+          packageName.endsWith(".ui") -> "${packageName.removeSuffix(".ui")}.$siblingSubpackage"
+          packageName.endsWith(".$siblingSubpackage") -> null
+          packageName.isNotBlank() -> "$packageName.$siblingSubpackage"
+          else -> null
+        }
+    return if (targetPkg != null) "\n            import $targetPkg.*" else ""
+  }
+
   private fun generateInput(name: String, prop: SchemaProperty, isRequired: Boolean): String {
     val label = capitalizeName(name)
     val safeName = escapeKotlinKeyword(name)
@@ -380,6 +446,4 @@ class UiGenerator {
       }
     }
   }
-
-  private fun isBoolean(prop: SchemaProperty): Boolean = prop.types.contains("boolean")
 }

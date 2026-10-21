@@ -94,17 +94,18 @@ actual fun generateSdkCode(
   val uiGen = psi.UiGenerator()
   val pkgPath = packageName.replace(".", "/")
   for ((name, schema) in schemaMap) {
-    val file = dtoGen.generateDto("$packageName.models", schema)
+    val namedSchema = schema.copy(name = name)
+    val file = dtoGen.generateDto("$packageName.models", namedSchema)
     filesToWrite.add(
         "$outputDir/composeApp/src/commonMain/kotlin/$pkgPath/models/$name.kt" to file.text)
-    if (schema.properties.isNotEmpty()) {
-      val formFile = uiGen.generateForm("$packageName.ui", schema.copy(name = name))
-      val gridFile = uiGen.generateGrid("$packageName.ui", schema.copy(name = name))
+    if (dtoGen.isDataClass(namedSchema)) {
+      val formFile = uiGen.generateForm("$packageName.ui", namedSchema)
+      val gridFile = uiGen.generateGrid("$packageName.ui", namedSchema)
       filesToWrite.add(
-          "$outputDir/composeApp/src/commonMain/kotlin/$pkgPath/ui/${schema.copy(name = name).safeName}Form.kt" to
+          "$outputDir/composeApp/src/commonMain/kotlin/$pkgPath/ui/${namedSchema.safeName}Form.kt" to
               formFile.text)
       filesToWrite.add(
-          "$outputDir/composeApp/src/commonMain/kotlin/$pkgPath/ui/${schema.copy(name = name).safeName}Grid.kt" to
+          "$outputDir/composeApp/src/commonMain/kotlin/$pkgPath/ui/${namedSchema.safeName}Grid.kt" to
               gridFile.text)
     }
   }

@@ -726,6 +726,46 @@ class DtoGeneratorTest {
     PsiInfrastructure.dispose()
     PsiInfrastructure.dispose()
     org.junit.jupiter.api.Assertions.assertNotNull(PsiInfrastructure.createPsiFactory())
+
+    assertFalse(generator.isDataClass(SchemaDefinition("Bool", booleanSchema = true)))
+    assertFalse(generator.isDataClass(SchemaDefinition("Ref", ref = "#/components/schemas/A")))
+    assertFalse(
+        generator.isDataClass(SchemaDefinition("StrEnum", enumValues = listOf(OpenApiString("a")))))
+    assertTrue(
+        generator.isDataClass(
+            SchemaDefinition(
+                "IntEnumWithProps",
+                enumValues = listOf(OpenApiInt(1L)),
+                properties = mapOf("id" to SchemaProperty("integer")))))
+    assertFalse(
+        generator.isDataClass(
+            SchemaDefinition(
+                "OneOf",
+                oneOf = listOf("A"),
+                properties = mapOf("id" to SchemaProperty("integer")))))
+    assertFalse(
+        generator.isDataClass(
+            SchemaDefinition(
+                "AnyOf",
+                anyOf = listOf("A"),
+                properties = mapOf("id" to SchemaProperty("integer")))))
+    assertFalse(
+        generator.isDataClass(
+            SchemaDefinition(
+                "OneOfSch",
+                oneOfSchemas = listOf(SchemaProperty("string")),
+                properties = mapOf("id" to SchemaProperty("integer")))))
+    assertFalse(
+        generator.isDataClass(
+            SchemaDefinition(
+                "AnyOfSch",
+                anyOfSchemas = listOf(SchemaProperty("string")),
+                properties = mapOf("id" to SchemaProperty("integer")))))
+    assertFalse(generator.isDataClass(SchemaDefinition("EmptyObj", type = "object")))
+    assertTrue(
+        generator.isDataClass(
+            SchemaDefinition(
+                "DataObj", type = "object", properties = mapOf("id" to SchemaProperty("integer")))))
   }
 
   @Test
