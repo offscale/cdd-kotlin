@@ -508,4 +508,59 @@ class Oas32ComplianceTest {
     assertEquals(true, tagsProp?.xml?.wrapped)
     assertEquals("tag_list", tagsProp?.xml?.name)
   }
+
+  @Test
+  fun `Domain Preserves Absence and Skipped Semantics Across OpenAPI 3_2_0 RoundTrip`() {
+    val minimal =
+        OpenApiDefinition(
+            openapi = "3.2.0",
+            info = Info(title = "Minimal API", version = "0.1.0"),
+            pathsExplicitEmpty = true)
+    assertTrue(validator.validate(minimal).isEmpty())
+
+    val roundTripped = roundTripViaPsiAndJson(minimal)
+    assertEquals("3.2.0", roundTripped.openapi)
+    assertNull(roundTripped.self)
+    assertNull(roundTripped.jsonSchemaDialect)
+    assertNull(roundTripped.info.summary)
+    assertNull(roundTripped.info.description)
+    assertNull(roundTripped.info.termsOfService)
+    assertNull(roundTripped.info.contact)
+    assertNull(roundTripped.info.license)
+    assertTrue(roundTripped.servers.isEmpty())
+    assertTrue(roundTripped.paths.isEmpty())
+    assertTrue(roundTripped.webhooks.isEmpty())
+    assertTrue(roundTripped.security.isEmpty())
+    assertTrue(roundTripped.tags.isEmpty())
+    assertNull(roundTripped.externalDocs)
+  }
+
+  @Test
+  fun `Domain Preserves Presence Absence and Skipped Semantics Across Swagger 2_0 RoundTrip`() {
+    val swagger2Json =
+        """
+        {
+          "swagger": "2.0",
+          "info": {
+            "title": "Minimal Swagger",
+            "version": "1.0.0"
+          },
+          "paths": {}
+        }
+        """
+            .trimIndent()
+    val parsed = parser.parseString(swagger2Json, OpenApiParser.Format.JSON)
+    assertEquals("Minimal Swagger", parsed.info.title)
+    assertNull(parsed.info.description)
+    assertTrue(parsed.paths.isEmpty())
+    assertTrue(parsed.servers.isEmpty())
+
+    val emittedSwaggerJson = writer.write(parsed, OpenApiWriter.Format.JSON)
+    assertTrue(emittedSwaggerJson.contains("\"swagger\": \"2.0\""))
+    val reparsed = parser.parseString(emittedSwaggerJson, OpenApiParser.Format.JSON)
+    assertEquals("Minimal Swagger", reparsed.info.title)
+    assertNull(reparsed.info.contact)
+    assertNull(reparsed.info.license)
+    assertNull(reparsed.externalDocs)
+  }
 }
