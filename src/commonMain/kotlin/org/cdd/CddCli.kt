@@ -120,12 +120,13 @@ object CddCli {
    */
   fun generateToOpenApi(args: Array<String>): Int {
     val flags = CliArgumentParser.parse(args, defaultOutput = "out.json")
-    if (flags.input.isEmpty()) {
+    val effectiveInput = flags.input.ifEmpty { flags.inputDir }
+    if (effectiveInput.isEmpty()) {
       println("Missing -i <src>")
       return 1
     }
 
-    return generateToOpenApi(flags.input, flags.output)
+    return generateToOpenApi(effectiveInput, flags.output)
         .fold(
             onSuccess = { 0 },
             onFailure = { e ->

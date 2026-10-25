@@ -63,13 +63,27 @@ object CliArgumentParser {
       val hasNext = i + 1 < args.size
       when {
         (arg == "-o" || arg == "--output") && hasNext -> output = args[++i]
+        arg.startsWith("--output=") -> output = arg.substringAfter("--output=")
+        arg.startsWith("-o=") -> output = arg.substringAfter("-o=")
         (arg == "-i" || arg == "--input") && hasNext -> {
           val nextVal = args[++i]
           input = nextVal
           if (allowInputDirOnShortI) inputDir = nextVal
         }
+        arg.startsWith("--input=") -> {
+          val nextVal = arg.substringAfter("--input=")
+          input = nextVal
+          if (allowInputDirOnShortI) inputDir = nextVal
+        }
+        arg.startsWith("-i=") -> {
+          val nextVal = arg.substringAfter("-i=")
+          input = nextVal
+          if (allowInputDirOnShortI) inputDir = nextVal
+        }
         arg == "--input-dir" && hasNext -> inputDir = args[++i]
+        arg.startsWith("--input-dir=") -> inputDir = arg.substringAfter("--input-dir=")
         arg == "--truth" && hasNext -> truth = args[++i]
+        arg.startsWith("--truth=") -> truth = arg.substringAfter("--truth=")
         arg == "--no-github-actions" -> noGithubActions = true
         arg == "--no-installable-package" -> noInstallablePackage = true
         arg == "--tests" -> tests = true

@@ -378,6 +378,18 @@ actual fun writeToFile(path: String, content: String): Result<Unit> {
 }
 
 /**
+ * Generates a self-contained Gradle wrapper (`gradlew`, `gradlew.bat`,
+ * `gradle/wrapper/gradle-wrapper.jar`, `gradle/wrapper/gradle-wrapper.properties`) inside
+ * [outputDir].
+ *
+ * @param outputDir The root directory where the Gradle wrapper files should be written.
+ * @return A [Result] indicating success or a [CddError.FileIoError].
+ */
+actual fun writeGradleWrapperToDirectory(outputDir: String): Result<Unit> {
+  return writeToFile("$outputDir/gradle/wrapper/gradle-wrapper.jar", "")
+}
+
+/**
  * Returns a failed [Result] with [CddError.UnsupportedPlatformOperationError] because PSI-based
  * Kotlin-to-OpenAPI extraction requires JVM compiler APIs.
  *

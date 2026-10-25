@@ -2,6 +2,7 @@
 package scaffold
 
 import domain.Info
+import writeGradleWrapperToDirectory
 import writeToFile
 
 /** Generator for scaffold project. */
@@ -27,7 +28,8 @@ class ScaffoldGenerator {
   ): Result<Unit> {
     val files =
         mutableListOf(
-            "$outputDirectory/build.gradle.kts" to ScaffoldTemplates.createRootBuildGradle(info),
+            "$outputDirectory/build.gradle.kts" to
+                ScaffoldTemplates.createRootBuildGradle(info, isServer),
             "$outputDirectory/settings.gradle.kts" to
                 ScaffoldTemplates.createSettingsGradle(projectName, isServer),
             "$outputDirectory/gradle.properties" to ScaffoldTemplates.createGradleProperties(),
@@ -48,14 +50,23 @@ class ScaffoldGenerator {
           "$srcDir/commonMain/kotlin/$packagePath/App.kt" to
               ScaffoldTemplates.createCommonAppKt(packageName))
       files.add(
+          "$srcDir/commonTest/kotlin/$packagePath/ClientTest.kt" to
+              ScaffoldTemplates.createClientTestKt(packageName))
+      files.add(
           "$srcDir/androidMain/AndroidManifest.xml" to ScaffoldTemplates.createAndroidManifest())
     }
+
+    files.add("$outputDirectory/gradlew" to ScaffoldTemplates.createGradlewScript())
+    files.add("$outputDirectory/gradlew.bat" to ScaffoldTemplates.createGradlewBatScript())
+    files.add(
+        "$outputDirectory/gradle/wrapper/gradle-wrapper.properties" to
+            ScaffoldTemplates.createGradleWrapperProperties())
 
     for ((path, content) in files) {
       writeToFile(path, content).getOrElse {
         return Result.failure(it)
       }
     }
-    return Result.success(Unit)
+    return writeGradleWrapperToDirectory(outputDirectory)
   }
 }

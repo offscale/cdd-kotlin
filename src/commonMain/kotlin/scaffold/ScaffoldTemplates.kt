@@ -132,11 +132,14 @@ $serverLibs
    * Generates the root build.gradle.kts file. Sets up the plugins for the overall project context.
    *
    * @param info Optional Info metadata to populate version.
+   * @param isServer Whether the project is a server project.
    * @return The generated root `build.gradle.kts` content.
    */
-  fun createRootBuildGradle(info: Info?): String {
+  fun createRootBuildGradle(info: Info?, isServer: Boolean = false): String {
     val versionLine =
         if (info != null) "version = \"${info.version}\"" else "version = \"1.0-SNAPSHOT\""
+    val subproject = if (isServer) ":server" else ":composeApp"
+    val testTaskName = if (isServer) "jvmTest" else "desktopTest"
 
     return """
         plugins {
@@ -152,6 +155,18 @@ $serverLibs
 
         group = "com.example"
         $versionLine
+
+        tasks.register("jvmTest") {
+            dependsOn("$subproject:$testTaskName")
+        }
+
+        tasks.register("test") {
+            dependsOn("$subproject:$testTaskName")
+        }
+
+        tasks.register("allTests") {
+            dependsOn("$subproject:allTests")
+        }
     """
         .trimIndent()
   }
@@ -174,7 +189,8 @@ $serverLibs
 
   /**
    * Generates the module-level build.gradle.kts for the 'composeApp'. Configures SourceSets for
-   * Android, iOS, and Desktop. Configures Ktor and Serialization dependencies.
+   * Android (conditionally when an Android SDK is available), iOS, and Desktop. Configures Ktor and
+   * Serialization dependencies.
    *
    * @param namespace The Android namespace (package name).
    * @param info Optional Info metadata to populate versionName.
@@ -184,18 +200,35 @@ $serverLibs
     val versionNameStr = if (info != null && info.version.isNotEmpty()) info.version else "1.0"
 
     return """
+        import java.util.Properties
+
         plugins {
             alias(libs.plugins.kotlinMultiplatform)
-            alias(libs.plugins.androidApplication)
             alias(libs.plugins.jetbrainsCompose)
             alias(libs.plugins.composeCompiler)
             alias(libs.plugins.kotlinSerialization)
         }
 
+        val localPropertiesFile = rootProject.file("local.properties")
+        val hasLocalSdkDir = localPropertiesFile.exists() && run {
+            val props = Properties()
+            localPropertiesFile.inputStream().use { props.load(it) }
+            !props.getProperty("sdk.dir").isNullOrBlank()
+        }
+        val hasAndroidSdk = !System.getenv("ANDROID_HOME").isNullOrBlank() ||
+            !System.getenv("ANDROID_SDK_ROOT").isNullOrBlank() ||
+            hasLocalSdkDir
+
+        if (hasAndroidSdk) {
+            apply(plugin = "com.android.application")
+        }
+
         kotlin {
-            androidTarget {
-                compilerOptions {
-                    jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
+            if (hasAndroidSdk) {
+                androidTarget {
+                    compilerOptions {
+                        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
+                    }
                 }
             }
             
@@ -214,6 +247,7 @@ $serverLibs
 
             sourceSets {
                 val commonMain by getting {
+                    kotlin.srcDir(rootProject.file("src/commonMain/kotlin"))
                     dependencies {
                         implementation(compose.runtime)
                         implementation(compose.foundation)
@@ -227,12 +261,14 @@ $serverLibs
                         
                         // Ktor
                         implementation(libs.ktor.client.core)
+                        implementation(libs.ktor.client.cio)
                         implementation(libs.ktor.client.content.negotiation)
                         implementation(libs.ktor.serialization.json)
                     }
                 }
                 
                 val commonTest by getting {
+                    kotlin.srcDir(rootProject.file("src/commonTest/kotlin"))
                     dependencies {
                         implementation(kotlin("test"))
                         implementation(kotlin("test-common"))
@@ -241,11 +277,13 @@ $serverLibs
                     }
                 }
                 
-                val androidMain by getting {
-                    dependencies {
-                        implementation(libs.androidx.activity.compose)
-                        implementation(libs.ktor.client.okhttp)
-                        implementation(libs.kotlinx.coroutines.core)
+                if (hasAndroidSdk) {
+                    val androidMain by getting {
+                        dependencies {
+                            implementation(libs.androidx.activity.compose)
+                            implementation(libs.ktor.client.okhttp)
+                            implementation(libs.kotlinx.coroutines.core)
+                        }
                     }
                 }
                 
@@ -266,30 +304,36 @@ $serverLibs
             }
         }
 
-        android {
-            namespace = "$namespace"
-            compileSdk = libs.versions.android.compileSdk.get().toInt()
+        tasks.register("jvmTest") {
+            dependsOn("desktopTest")
+        }
 
-            defaultConfig {
-                applicationId = "$namespace"
-                minSdk = libs.versions.android.minSdk.get().toInt()
-                targetSdk = libs.versions.android.targetSdk.get().toInt()
-                versionCode = 1
-                versionName = "$versionNameStr"
-            }
-            packaging {
-                resources {
-                    excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        if (hasAndroidSdk) {
+            configure<com.android.build.api.dsl.ApplicationExtension> {
+                namespace = "$namespace"
+                compileSdk = libs.versions.android.compileSdk.get().toInt()
+
+                defaultConfig {
+                    applicationId = "$namespace"
+                    minSdk = libs.versions.android.minSdk.get().toInt()
+                    targetSdk = libs.versions.android.targetSdk.get().toInt()
+                    versionCode = 1
+                    versionName = "$versionNameStr"
                 }
-            }
-            buildTypes {
-                getByName("release") {
-                    isMinifyEnabled = false
+                packaging {
+                    resources {
+                        excludes += "/META-INF/{AL2.0,LGPL2.1}"
+                    }
                 }
-            }
-            compileOptions {
-                sourceCompatibility = JavaVersion.VERSION_1_8
-                targetCompatibility = JavaVersion.VERSION_1_8
+                buildTypes {
+                    getByName("release") {
+                        isMinifyEnabled = false
+                    }
+                }
+                compileOptions {
+                    sourceCompatibility = JavaVersion.VERSION_1_8
+                    targetCompatibility = JavaVersion.VERSION_1_8
+                }
             }
         }
     """
@@ -454,4 +498,136 @@ $serverLibs
     """
         .trimIndent() + "\n"
   }
+
+  /**
+   * Generates a `ClientTest.kt` file in `commonTest` that verifies basic compilation and supports
+   * `PETSTORE_URL` / `BASE_URL` environment variable configuration for live integration tests.
+   *
+   * @param packageName Base Kotlin package name.
+   * @return The generated `ClientTest.kt` source content.
+   */
+  fun createClientTestKt(packageName: String): String =
+      """
+        package $packageName
+
+        import io.ktor.client.HttpClient
+        import kotlin.test.Test
+        import kotlin.test.assertEquals
+        import kotlin.test.assertNotNull
+        import kotlin.test.assertTrue
+
+        class ClientTest {
+            fun resolveBaseUrl(
+                petstoreUrl: String? = null,
+                baseUrlEnv: String? = null
+            ): String {
+                return petstoreUrl?.takeIf { it.isNotBlank() }
+                    ?: baseUrlEnv?.takeIf { it.isNotBlank() }
+                    ?: "http://localhost:8080"
+            }
+
+            @Test
+            fun testExampleDto() {
+                val dto = ExampleDto("Test")
+                assertEquals("Test", dto.name)
+            }
+
+            @Test
+            fun testBaseUrlResolution() {
+                val defaultUrl = resolveBaseUrl()
+                assertEquals("http://localhost:8080", defaultUrl)
+                val customPetstore = resolveBaseUrl(petstoreUrl = "http://127.0.0.1:9090", baseUrlEnv = null)
+                assertEquals("http://127.0.0.1:9090", customPetstore)
+                val customBase = resolveBaseUrl(petstoreUrl = null, baseUrlEnv = "http://127.0.0.1:9091")
+                assertEquals("http://127.0.0.1:9091", customBase)
+                val client = HttpClient()
+                assertNotNull(client)
+                client.close()
+                assertTrue(defaultUrl.startsWith("http"))
+            }
+        }
+    """
+          .trimIndent() + "\n"
+
+  /**
+   * Generates the `gradle/wrapper/gradle-wrapper.properties` content.
+   *
+   * @return The generated `gradle-wrapper.properties` content.
+   */
+  fun createGradleWrapperProperties(): String =
+      """
+        distributionBase=GRADLE_USER_HOME
+        distributionPath=wrapper/dists
+        distributionUrl=https\://services.gradle.org/distributions/gradle-9.0-bin.zip
+        networkTimeout=10000
+        validateDistributionUrl=true
+        zipStoreBase=GRADLE_USER_HOME
+        zipStorePath=wrapper/dists
+    """
+          .trimIndent() + "\n"
+
+  /**
+   * Generates the POSIX `gradlew` startup script.
+   *
+   * @return The generated `gradlew` shell script content.
+   */
+  fun createGradlewScript(): String {
+    val d = '$'
+    return """
+        #!/bin/sh
+        app_path=${d}0
+        while
+            APP_HOME=${d}{app_path%"${d}{app_path##*/}"}
+            [ -h "${d}app_path" ]
+        do
+            ls=${d}( ls -ld "${d}app_path" )
+            link=${d}{ls#*' -> '}
+            case ${d}link in
+              /*)   app_path=${d}link ;;
+              *)    app_path=${d}APP_HOME${d}link ;;
+            esac
+        done
+        APP_BASE_NAME=${d}{0##*/}
+        APP_HOME=${d}( cd "${d}{APP_HOME:-./}" > /dev/null && pwd -P ) || exit
+        CLASSPATH=${d}APP_HOME/gradle/wrapper/gradle-wrapper.jar
+        if [ -n "${d}JAVA_HOME" ] ; then
+            if [ -x "${d}JAVA_HOME/jre/sh/java" ] ; then
+                JAVACMD=${d}JAVA_HOME/jre/sh/java
+            else
+                JAVACMD=${d}JAVA_HOME/bin/java
+            fi
+        else
+            JAVACMD=java
+        fi
+        exec "${d}JAVACMD" -Xmx64m -Xms64m "-Dorg.gradle.appname=${d}APP_BASE_NAME" -classpath "${d}CLASSPATH" org.gradle.wrapper.GradleWrapperMain "${d}@"
+    """
+        .trimIndent() + "\n"
+  }
+
+  /**
+   * Generates the Windows `gradlew.bat` startup script.
+   *
+   * @return The generated `gradlew.bat` batch script content.
+   */
+  fun createGradlewBatScript(): String =
+      """
+        @if "%DEBUG%"=="" @echo off
+        if "%OS%"=="Windows_NT" setlocal
+        set DIRNAME=%~dp0
+        if "%DIRNAME%"=="" set DIRNAME=.
+        set APP_BASE_NAME=%~n0
+        set APP_HOME=%DIRNAME%
+        for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi
+        set DEFAULT_JVM_OPTS="-Xmx64m" "-Xms64m"
+        if defined JAVA_HOME (
+            set JAVA_HOME=%JAVA_HOME:"=%
+            set JAVA_EXE=%JAVA_HOME%/bin/java.exe
+        ) else (
+            set JAVA_EXE=java.exe
+        )
+        set CLASSPATH=%APP_HOME%\gradle\wrapper\gradle-wrapper.jar
+        "%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -classpath "%CLASSPATH%" org.gradle.wrapper.GradleWrapperMain %*
+        if "%OS%"=="Windows_NT" endlocal
+    """
+          .trimIndent() + "\r\n"
 }

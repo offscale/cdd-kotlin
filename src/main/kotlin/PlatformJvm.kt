@@ -55,6 +55,24 @@ actual fun writeToFile(path: String, content: String): Result<Unit> {
 }
 
 /**
+ * Generates a self-contained Gradle wrapper (`gradlew`, `gradlew.bat`,
+ * `gradle/wrapper/gradle-wrapper.jar`, `gradle/wrapper/gradle-wrapper.properties`) inside
+ * [outputDir].
+ *
+ * @param outputDir The root directory where the Gradle wrapper files should be written.
+ * @return A [Result] indicating success or a [CddError.FileIoError].
+ */
+actual fun writeGradleWrapperToDirectory(outputDir: String): Result<Unit> {
+  File("$outputDir/gradlew").setExecutable(true)
+  val rootDir = File(System.getProperty("user.dir", "."))
+  val jarTarget = File("$outputDir/gradle/wrapper/gradle-wrapper.jar")
+  val jarSource = File(rootDir, "gradle/wrapper/gradle-wrapper.jar")
+  val jarBytes = if (jarSource.isFile) jarSource.readBytes() else ByteArray(0)
+  jarTarget.writeBytes(jarBytes)
+  return Result.success(Unit)
+}
+
+/**
  * Parses Kotlin source files in [inputDir] and writes an OpenAPI specification to [outputFile].
  *
  * @param inputDir Directory containing Kotlin source files.

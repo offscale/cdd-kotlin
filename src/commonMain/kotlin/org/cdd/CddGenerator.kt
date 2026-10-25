@@ -122,6 +122,7 @@ object CddGenerator {
           /** Generated unit tests for the SDK and MCP bridge. */
           package org.example
 
+          import io.ktor.client.HttpClient
           import kotlin.test.Test
           import kotlin.test.assertEquals
           import kotlin.test.assertNotNull
@@ -132,6 +133,15 @@ object CddGenerator {
 
           /** Verifies generated client configuration and MCP adapters. */
           class ClientTest {
+            fun resolveBaseUrl(
+                petstoreUrl: String? = null,
+                baseUrlEnv: String? = null
+            ): String {
+              return petstoreUrl?.takeIf { it.isNotBlank() }
+                  ?: baseUrlEnv?.takeIf { it.isNotBlank() }
+                  ?: Mocks.DEFAULT_BASE_URL
+            }
+
             @Test
             fun testGeneratedMcpAndClientSetup() {
               val server = McpServer()
@@ -142,6 +152,13 @@ object CddGenerator {
               val bridge = McpAuthBridge()
               assertEquals("Bearer secret", bridge.bridge("secret"))
               server.stop()
+              val defaultUrl = resolveBaseUrl()
+              assertEquals("http://localhost:8080", defaultUrl)
+              assertEquals("http://127.0.0.1:9090", resolveBaseUrl(petstoreUrl = "http://127.0.0.1:9090"))
+              assertEquals("http://127.0.0.1:9091", resolveBaseUrl(baseUrlEnv = "http://127.0.0.1:9091"))
+              val client = HttpClient()
+              assertNotNull(client)
+              client.close()
             }
           }
           """

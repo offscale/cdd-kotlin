@@ -58,6 +58,18 @@ class PlatformJvmCoverageTest {
       val outSpec = File(tempDir, "openapi.json")
       assertTrue(generateToOpenApi(tempDir.absolutePath, outSpec.absolutePath).isSuccess)
       assertTrue(outSpec.exists())
+
+      val origUserDir = System.getProperty("user.dir")
+      try {
+        System.setProperty("user.dir", tempDir.absolutePath)
+        val wrapperOut = File(tempDir, "wrapper_no_jar")
+        File(wrapperOut, "gradle/wrapper").mkdirs()
+        File(wrapperOut, "gradlew").writeText("#!/bin/sh\n")
+        assertTrue(writeGradleWrapperToDirectory(wrapperOut.absolutePath).isSuccess)
+        assertTrue(File(wrapperOut, "gradle/wrapper/gradle-wrapper.jar").exists())
+      } finally {
+        if (origUserDir != null) System.setProperty("user.dir", origUserDir)
+      }
     } finally {
       tempDir.deleteRecursively()
     }

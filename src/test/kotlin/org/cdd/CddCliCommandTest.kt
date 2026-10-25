@@ -115,4 +115,206 @@ class CddCliCommandTest {
       outDir.deleteRecursively()
     }
   }
+
+  @Test
+  fun `CLI flag parity and standalone JVM test execution`() {
+    val outDir = Files.createTempDirectory("test_cli_parity").toFile()
+    try {
+      val specFile = File(outDir, "petstore.json")
+      specFile.writeText(
+          """
+          {
+            "openapi": "3.2.0",
+            "info": { "title": "Petstore", "version": "1.0.0" },
+            "paths": {
+              "/pets": {
+                "get": {
+                  "operationId": "listPets",
+                  "responses": {
+                    "200": {
+                      "description": "OK",
+                      "content": {
+                        "application/json": {
+                          "schema": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "components": {
+              "schemas": {
+                "Pet": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "integer" },
+                    "name": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+          """
+              .trimIndent())
+
+      val sdkShortFlags = File(outDir, "sdk_short")
+      assertEquals(
+          0,
+          runCli(
+              arrayOf(
+                  "from_openapi",
+                  "to_sdk",
+                  "-i",
+                  specFile.absolutePath,
+                  "-o",
+                  sdkShortFlags.absolutePath,
+                  "--tests")))
+      assertTrue(File(sdkShortFlags, "gradlew").exists())
+      assertTrue(File(sdkShortFlags, "gradlew").canExecute())
+      assertTrue(File(sdkShortFlags, "gradlew.bat").exists())
+      assertTrue(File(sdkShortFlags, "gradle/wrapper/gradle-wrapper.properties").exists())
+      assertTrue(File(sdkShortFlags, "gradle/wrapper/gradle-wrapper.jar").exists())
+
+      val rootBuild = File(sdkShortFlags, "build.gradle.kts").readText()
+      assertTrue(rootBuild.contains("tasks.register(\"jvmTest\")"))
+      assertTrue(rootBuild.contains("tasks.register(\"test\")"))
+      assertTrue(rootBuild.contains(":composeApp:desktopTest"))
+
+      val appBuild = File(sdkShortFlags, "composeApp/build.gradle.kts").readText()
+      assertTrue(appBuild.contains("ANDROID_HOME"))
+      assertTrue(appBuild.contains("ANDROID_SDK_ROOT"))
+      assertTrue(appBuild.contains("if (hasAndroidSdk)"))
+      assertTrue(appBuild.contains("src/commonMain/kotlin"))
+      assertTrue(appBuild.contains("src/commonTest/kotlin"))
+
+      val clientTest =
+          File(sdkShortFlags, "composeApp/src/commonTest/kotlin/org/example/ClientTest.kt")
+              .readText()
+      assertTrue(clientTest.contains("petstoreUrl"))
+      assertTrue(clientTest.contains("baseUrlEnv"))
+
+      val sdkLongFlags = File(outDir, "sdk_long")
+      assertEquals(
+          0,
+          runCli(
+              arrayOf(
+                  "from_openapi",
+                  "to_sdk",
+                  "--input",
+                  specFile.absolutePath,
+                  "--output",
+                  sdkLongFlags.absolutePath,
+                  "--tests")))
+      assertTrue(File(sdkLongFlags, "gradlew").exists())
+
+      val sdkEqFlags = File(outDir, "sdk_eq")
+      assertEquals(
+          0,
+          runCli(
+              arrayOf(
+                  "from_openapi",
+                  "to_sdk",
+                  "--input=${specFile.absolutePath}",
+                  "--output=${sdkEqFlags.absolutePath}",
+                  "--no-installable-package",
+                  "--no-github-actions")))
+      assertTrue(!File(sdkEqFlags, "gradlew").exists())
+
+      val sdkShortEqFlags = File(outDir, "sdk_short_eq")
+      assertEquals(
+          0,
+          runCli(
+              arrayOf(
+                  "from_openapi",
+                  "to_sdk_cli",
+                  "-i=${specFile.absolutePath}",
+                  "-o=${sdkShortEqFlags.absolutePath}",
+                  "--no-installable-package",
+                  "--no-github-actions")))
+
+      val serverDir = File(outDir, "server_out")
+      assertEquals(
+          0,
+          runCli(
+              arrayOf(
+                  "from_openapi",
+                  "to_server",
+                  "--input",
+                  specFile.absolutePath,
+                  "--output",
+                  serverDir.absolutePath,
+                  "--tests")))
+      assertTrue(File(serverDir, "gradlew").exists())
+      assertTrue(File(serverDir, "build.gradle.kts").readText().contains(":server:jvmTest"))
+
+      val openApiOutShort = File(outDir, "openapi_short.json")
+      assertEquals(
+          0,
+          runCli(
+              arrayOf(
+                  "to_openapi",
+                  "-i",
+                  sdkShortFlags.absolutePath,
+                  "-o",
+                  openApiOutShort.absolutePath)))
+      assertTrue(openApiOutShort.exists())
+
+      val openApiOutLong = File(outDir, "openapi_long.json")
+      assertEquals(
+          0,
+          runCli(
+              arrayOf(
+                  "to_openapi",
+                  "--input",
+                  sdkShortFlags.absolutePath,
+                  "--output",
+                  openApiOutLong.absolutePath)))
+      assertTrue(openApiOutLong.exists())
+
+      val openApiOutInputDir = File(outDir, "openapi_inputdir.json")
+      assertEquals(
+          0,
+          runCli(
+              arrayOf(
+                  "to_openapi",
+                  "--input-dir=${sdkShortFlags.absolutePath}",
+                  "--output=${openApiOutInputDir.absolutePath}")))
+      assertTrue(openApiOutInputDir.exists())
+
+      val syncFlags =
+          CliArgumentParser.parse(
+              arrayOf("sync", "--input=${sdkShortFlags.absolutePath}", "--truth=class"),
+              allowInputDirOnShortI = true)
+      assertEquals(sdkShortFlags.absolutePath, syncFlags.inputDir)
+      assertEquals("class", syncFlags.truth)
+
+      val syncShortFlags =
+          CliArgumentParser.parse(
+              arrayOf("sync", "-i=${sdkShortFlags.absolutePath}", "--truth=dao"),
+              allowInputDirOnShortI = true)
+      assertEquals(sdkShortFlags.absolutePath, syncShortFlags.inputDir)
+      assertEquals("dao", syncShortFlags.truth)
+
+      val gradleHome = File(System.getProperty("user.dir"), ".gradle_home")
+      val gradlewCmd =
+          if (gradleHome.exists()) {
+            listOf(
+                File(sdkShortFlags, "gradlew").absolutePath,
+                "--gradle-user-home",
+                gradleHome.absolutePath,
+                "jvmTest",
+                "--quiet")
+          } else {
+            listOf(File(sdkShortFlags, "gradlew").absolutePath, "jvmTest", "--quiet")
+          }
+      val proc =
+          ProcessBuilder(gradlewCmd).directory(sdkShortFlags).redirectErrorStream(true).start()
+      val procOut = proc.inputStream.bufferedReader().readText()
+      val exitCode = proc.waitFor()
+      assertEquals(0, exitCode, "Standalone ./gradlew jvmTest failed:\n$procOut")
+    } finally {
+      outDir.deleteRecursively()
+    }
+  }
 }

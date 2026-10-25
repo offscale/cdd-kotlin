@@ -30,6 +30,16 @@ expect fun readFile(path: String): Result<String>
 expect fun writeToFile(path: String, content: String): Result<Unit>
 
 /**
+ * Generates a self-contained Gradle wrapper (`gradlew`, `gradlew.bat`,
+ * `gradle/wrapper/gradle-wrapper.jar`, `gradle/wrapper/gradle-wrapper.properties`) inside
+ * [outputDir].
+ *
+ * @param outputDir The root directory where the Gradle wrapper files should be written.
+ * @return A [Result] indicating success or a [domain.CddError.FileIoError].
+ */
+expect fun writeGradleWrapperToDirectory(outputDir: String): Result<Unit>
+
+/**
  * Parses source files in [inputDir] and generates an OpenAPI specification file at [outputFile].
  *
  * @param inputDir The directory containing Kotlin source code.

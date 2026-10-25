@@ -151,6 +151,7 @@ class ScaffoldGeneratorTest {
     // Assert
     val rootBuild = File(outputDir, "build.gradle.kts").readText()
     assertTrue(rootBuild.contains("version = \"1.0-SNAPSHOT\""), "Default root version missing")
+    assertEquals(ScaffoldTemplates.createRootBuildGradle(null), rootBuild)
 
     val appBuild = File(outputDir, "composeApp/build.gradle.kts").readText()
     assertTrue(appBuild.contains("versionName = \"1.0\""), "Default Android versionName missing")

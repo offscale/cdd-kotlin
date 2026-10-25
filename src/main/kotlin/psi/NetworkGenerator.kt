@@ -237,7 +237,9 @@ class NetworkGenerator {
             raw("$helperFunctions$nl")
           }
           if (companionObject.isNotEmpty()) {
-            raw("$companionObject$nl")
+            line("    companion object {")
+            raw("${companionObject.prependIndent("    ")}$nl")
+            line("    }")
           }
           line("}")
           line()
