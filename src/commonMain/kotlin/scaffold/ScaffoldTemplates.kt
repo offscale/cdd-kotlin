@@ -1,7 +1,15 @@
 /** Project scaffolding string templates for KMP client, server, and CI workflows. */
 package scaffold
 
+import domain.EndpointDefinition
+import domain.EndpointParameter
+import domain.HttpMethod
 import domain.Info
+import domain.OpenApiDefinition
+import domain.OpenApiPathFlattener
+import domain.OpenApiString
+import domain.ParameterLocation
+import psi.TypeMappers
 
 /**
  * Object containing string templates for the KMP project structure. These templates define the
@@ -209,15 +217,18 @@ $serverLibs
             alias(libs.plugins.kotlinSerialization)
         }
 
+        val enableAndroid = project.findProperty("enableAndroid") == "true"
+        val enableIos = project.findProperty("enableIos") == "true"
         val localPropertiesFile = rootProject.file("local.properties")
         val hasLocalSdkDir = localPropertiesFile.exists() && run {
             val props = Properties()
             localPropertiesFile.inputStream().use { props.load(it) }
             !props.getProperty("sdk.dir").isNullOrBlank()
         }
-        val hasAndroidSdk = !System.getenv("ANDROID_HOME").isNullOrBlank() ||
-            !System.getenv("ANDROID_SDK_ROOT").isNullOrBlank() ||
-            hasLocalSdkDir
+        val hasAndroidSdk = enableAndroid &&
+            (hasLocalSdkDir ||
+                !System.getenv("ANDROID_HOME").isNullOrBlank() ||
+                !System.getenv("ANDROID_SDK_ROOT").isNullOrBlank())
 
         if (hasAndroidSdk) {
             apply(plugin = "com.android.application")
@@ -234,14 +245,16 @@ $serverLibs
             
             jvm("desktop")
             
-            listOf(
-                iosX64(),
-                iosArm64(),
-                iosSimulatorArm64()
-            ).forEach { iosTarget ->
-                iosTarget.binaries.framework {
-                    baseName = "ComposeApp"
-                    isStatic = true
+            if (enableIos) {
+                listOf(
+                    iosX64(),
+                    iosArm64(),
+                    iosSimulatorArm64()
+                ).forEach { iosTarget ->
+                    iosTarget.binaries.framework {
+                        baseName = "ComposeApp"
+                        isStatic = true
+                    }
                 }
             }
 
@@ -295,10 +308,12 @@ $serverLibs
                     }
                 }
                 
-                val iosMain by creating {
-                    dependsOn(commonMain)
-                    dependencies {
-                         implementation(libs.ktor.client.darwin)
+                if (enableIos) {
+                    val iosMain by creating {
+                        dependsOn(commonMain)
+                        dependencies {
+                             implementation(libs.ktor.client.darwin)
+                        }
                     }
                 }
             }
@@ -309,6 +324,9 @@ $serverLibs
         }
 
         if (hasAndroidSdk) {
+            tasks.matching { it.name == "testDebugUnitTest" || it.name == "testReleaseUnitTest" }.configureEach {
+                enabled = false
+            }
             configure<com.android.build.api.dsl.ApplicationExtension> {
                 namespace = "$namespace"
                 compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -334,6 +352,10 @@ $serverLibs
                     sourceCompatibility = JavaVersion.VERSION_1_8
                     targetCompatibility = JavaVersion.VERSION_1_8
                 }
+            }
+        } else {
+            tasks.register("test") {
+                dependsOn("desktopTest")
             }
         }
     """
@@ -500,54 +522,276 @@ $serverLibs
   }
 
   /**
-   * Generates a `ClientTest.kt` file in `commonTest` that verifies basic compilation and supports
-   * `PETSTORE_URL` / `BASE_URL` environment variable configuration for live integration tests.
+   * Generates a `ClientTest.kt` file in `commonTest` that verifies basic compilation, MCP bridge
+   * setup, strict `ContentNegotiation` JSON configuration, and live API endpoint execution when
+   * `PETSTORE_BASE_URL`, `PETSTORE_URL`, or `BASE_URL` is configured.
    *
    * @param packageName Base Kotlin package name.
+   * @param definition Optional OpenAPI specification to emit typed live endpoint calls for.
+   * @param includeMcp Whether to include MCP server, adapter, and auth bridge assertions.
    * @return The generated `ClientTest.kt` source content.
    */
-  fun createClientTestKt(packageName: String): String =
-      """
+  fun createClientTest(
+      packageName: String,
+      definition: OpenApiDefinition? = null,
+      includeMcp: Boolean = false
+  ): String {
+    val endpoints =
+        if (definition != null) {
+          OpenApiPathFlattener.flattenPaths(definition.paths, definition.components)
+        } else {
+          emptyList()
+        }
+    val components = if (definition != null) definition.components else null
+    val schemaNames = if (components != null) components.schemas.keys else emptySet()
+    val liveCalls = buildLiveEndpointCalls(endpoints, schemaNames)
+    val hasApiClient = endpoints.isNotEmpty()
+
+    val extraImports = buildList {
+      if (hasApiClient) {
+        add("import $packageName.api.ApiClient")
+      }
+      if (includeMcp) {
+        add("import $packageName.mcp.McpAuthBridge")
+        add("import $packageName.mcp.McpServer")
+        add("import $packageName.mcp.McpToolAdapter")
+      }
+    }
+    val extraImportsBlock =
+        if (extraImports.isNotEmpty()) {
+          "\n" + extraImports.joinToString("\n") { "        $it" }
+        } else {
+          ""
+        }
+
+    val mcpAssertions =
+        if (includeMcp) {
+          """
+                val server = McpServer()
+                server.start()
+                assertTrue(server.isRunning)
+                val adapter = McpToolAdapter()
+                assertNotNull(adapter.adapt())
+                val bridge = McpAuthBridge()
+                assertEquals("Bearer secret", bridge.bridge("secret"))
+                server.stop()
+          """
+              .trimIndent()
+              .prependIndent("                ") + "\n"
+        } else {
+          ""
+        }
+
+    val liveApiBlock =
+        if (liveCalls.isNotEmpty()) {
+          val callLines = liveCalls.joinToString("\n                    ")
+          """
+                val liveUrl = resolveConfiguredBaseUrl()
+                if (liveUrl != null) {
+                    val apiClient = ApiClient(client = client, baseUrl = liveUrl.trimEnd('/'))
+                    $callLines
+                }
+          """
+              .trimIndent()
+              .prependIndent("                ") + "\n"
+        } else {
+          ""
+        }
+
+    return """
+        /** Generated unit and integration tests for the SDK and MCP bridge. */
         package $packageName
 
         import io.ktor.client.HttpClient
+        import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+        import io.ktor.serialization.kotlinx.json.json
         import kotlin.test.Test
         import kotlin.test.assertEquals
         import kotlin.test.assertNotNull
         import kotlin.test.assertTrue
+        import kotlinx.coroutines.test.runTest
+        import kotlinx.serialization.json.Json$extraImportsBlock
 
+        /** Verifies generated client configuration, MCP adapters, and live API operations. */
         class ClientTest {
+            fun lookupEnv(name: String): String? {
+                return System.getenv(name)?.takeIf { it.isNotBlank() }
+                    ?: System.getProperty(name)?.takeIf { it.isNotBlank() }
+            }
+
+            fun resolveConfiguredBaseUrl(
+                petstoreBaseUrl: String? = lookupEnv("PETSTORE_BASE_URL"),
+                petstoreUrl: String? = lookupEnv("PETSTORE_URL"),
+                baseUrlEnv: String? = lookupEnv("BASE_URL")
+            ): String? {
+                return petstoreBaseUrl?.takeIf { it.isNotBlank() }
+                    ?: petstoreUrl?.takeIf { it.isNotBlank() }
+                    ?: baseUrlEnv?.takeIf { it.isNotBlank() }
+            }
+
             fun resolveBaseUrl(
-                petstoreUrl: String? = null,
-                baseUrlEnv: String? = null
+                petstoreUrl: String? = lookupEnv("PETSTORE_URL") ?: lookupEnv("PETSTORE_BASE_URL"),
+                baseUrlEnv: String? = lookupEnv("BASE_URL")
             ): String {
                 return petstoreUrl?.takeIf { it.isNotBlank() }
                     ?: baseUrlEnv?.takeIf { it.isNotBlank() }
                     ?: "http://localhost:8080"
             }
 
-            @Test
-            fun testExampleDto() {
-                val dto = ExampleDto("Test")
-                assertEquals("Test", dto.name)
+            fun createHttpClient(): HttpClient {
+                return HttpClient {
+                    install(ContentNegotiation) {
+                        json(
+                            Json {
+                                ignoreUnknownKeys = false
+                                isLenient = true
+                                encodeDefaults = true
+                            }
+                        )
+                    }
+                }
             }
 
             @Test
-            fun testBaseUrlResolution() {
-                val defaultUrl = resolveBaseUrl()
+            fun testExampleDto() {
+                val dto = ExampleDto("Test")
+                val result = Result.success(dto)
+                assertTrue(result.isSuccess)
+                assertEquals("Test", result.getOrThrow().name)
+            }
+
+            @Test
+            fun testBaseUrlResolution() = runTest {
+                val defaultUrl = resolveBaseUrl(petstoreUrl = null, baseUrlEnv = null)
                 assertEquals("http://localhost:8080", defaultUrl)
                 val customPetstore = resolveBaseUrl(petstoreUrl = "http://127.0.0.1:9090", baseUrlEnv = null)
                 assertEquals("http://127.0.0.1:9090", customPetstore)
                 val customBase = resolveBaseUrl(petstoreUrl = null, baseUrlEnv = "http://127.0.0.1:9091")
                 assertEquals("http://127.0.0.1:9091", customBase)
-                val client = HttpClient()
+                val configured = resolveConfiguredBaseUrl(
+                    petstoreBaseUrl = "http://127.0.0.1:9092",
+                    petstoreUrl = null,
+                    baseUrlEnv = null
+                )
+                assertEquals("http://127.0.0.1:9092", configured)
+$mcpAssertions                val client = createHttpClient()
                 assertNotNull(client)
-                client.close()
+$liveApiBlock                client.close()
                 assertTrue(defaultUrl.startsWith("http"))
             }
         }
     """
-          .trimIndent() + "\n"
+        .trimIndent() + "\n"
+  }
+
+  /**
+   * Generates a `ClientTest.kt` file in `commonTest` delegating to [createClientTest].
+   *
+   * @param packageName Base Kotlin package name.
+   * @param definition Optional OpenAPI specification to emit typed live endpoint calls for.
+   * @param includeMcp Whether to include MCP server, adapter, and auth bridge assertions.
+   * @return The generated `ClientTest.kt` source content.
+   */
+  fun createClientTestKt(
+      packageName: String,
+      definition: OpenApiDefinition? = null,
+      includeMcp: Boolean = false
+  ): String = createClientTest(packageName, definition, includeMcp)
+
+  private fun buildLiveEndpointCalls(
+      endpoints: List<EndpointDefinition>,
+      schemaNames: Set<String>
+  ): List<String> {
+    val candidates = mutableListOf<Pair<EndpointDefinition, String>>()
+    for (ep in endpoints) {
+      if (ep.method == HttpMethod.GET && !ep.deprecated && hasSuccessResponse(ep)) {
+        val callArgs = buildEndpointCallArgs(ep.parameters)
+        if (callArgs != null) {
+          candidates.add(ep to callArgs)
+        }
+      }
+    }
+    val modelNoPath =
+        candidates
+            .filter {
+              endpointReturnsModel(it.first, schemaNames) &&
+                  it.first.parameters.none { p -> p.location == ParameterLocation.PATH }
+            }
+            .take(2)
+    val modelWithPath =
+        candidates
+            .filter {
+              endpointReturnsModel(it.first, schemaNames) &&
+                  it.first.parameters.any { p -> p.location == ParameterLocation.PATH }
+            }
+            .take(1)
+    val selected = (modelNoPath + modelWithPath).ifEmpty { candidates.take(2) }
+    return selected.mapIndexed { index, (ep, argsStr) ->
+      val callLine = "val res$index = apiClient.${ep.operationId}($argsStr)"
+      val assertLine =
+          "assertTrue(res$index.isSuccess, \"Expected ${ep.operationId} to succeed: \" + res$index.exceptionOrNull())"
+      val decodeLine = "assertNotNull(res$index.getOrThrow())"
+      "$callLine\n                    $assertLine\n                    $decodeLine"
+    }
+  }
+
+  private fun hasSuccessResponse(ep: EndpointDefinition): Boolean =
+      ep.responses.keys.any { it.startsWith("2") }
+
+  private fun endpointReturnsModel(ep: EndpointDefinition, schemaNames: Set<String>): Boolean {
+    val successCode = ep.responses.keys.filter { it.startsWith("2") }.minOrNull()!!
+    val resp = ep.responses.getValue(successCode)
+    val rawType = resp.type ?: resp.schema?.let { TypeMappers.mapType(it) } ?: "Unit"
+    val clean = rawType.trim().removeSuffix("?")
+    val core =
+        if (clean.startsWith("List<")) clean.removePrefix("List<").removeSuffix(">").trim()
+        else clean
+    return core in schemaNames
+  }
+
+  private fun buildEndpointCallArgs(parameters: List<EndpointParameter>): String? {
+    val args = mutableListOf<String>()
+    for (param in parameters) {
+      val mustPass =
+          param.location == ParameterLocation.PATH ||
+              param.isRequired ||
+              param.name.equals("status", ignoreCase = true)
+      if (mustPass) {
+        val literal = synthesizeTestParamLiteral(param) ?: return null
+        args.add("${param.safeName} = $literal")
+      }
+    }
+    return args.joinToString(", ")
+  }
+
+  private fun synthesizeTestParamLiteral(param: EndpointParameter): String? {
+    val schema = param.schema
+    val rawType = if (schema != null) TypeMappers.mapType(schema) else param.type
+    val cleanType = rawType.trim().removeSuffix("?")
+    val schemaDefault = if (schema != null) schema.defaultValue else null
+    val itemDefault =
+        if (schema != null && schema.items != null) schema.items.defaultValue else null
+    return when (cleanType) {
+      "String" -> {
+        val defaultStr =
+            if (schemaDefault is OpenApiString) {
+              schemaDefault.value
+            } else if (param.name.contains("status", ignoreCase = true)) {
+              "available"
+            } else {
+              "1"
+            }
+        "\"$defaultStr\""
+      }
+      "Int" -> "1"
+      "Long" -> "1L"
+      "List<String>" -> {
+        val itemStr = if (itemDefault is OpenApiString) itemDefault.value else "available"
+        "listOf(\"$itemStr\")"
+      }
+      else -> null
+    }
+  }
 
   /**
    * Generates the `gradle/wrapper/gradle-wrapper.properties` content.

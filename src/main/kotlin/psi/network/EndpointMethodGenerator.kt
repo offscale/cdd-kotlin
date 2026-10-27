@@ -359,7 +359,9 @@ object EndpointMethodGenerator {
               val type = resolveParameterType(param, optional)
               val deprecatedAnnotation =
                   if (param.deprecated) "@Deprecated(\"Deprecated parameter\") " else ""
-              val defaultValue = if (optional && !isOverride) " = null" else ""
+              val defaultLiteral =
+                  if (isOverride) null else resolveParameterDefaultLiteral(param, type, optional)
+              val defaultValue = if (defaultLiteral != null) " = $defaultLiteral" else ""
               "$deprecatedAnnotation${param.safeName}: $type$defaultValue"
             }
             .toMutableList()
@@ -683,6 +685,41 @@ object EndpointMethodGenerator {
   private fun isOptionalParam(param: EndpointParameter): Boolean {
     if (param.location == ParameterLocation.PATH) return false
     return !param.isRequired
+  }
+
+  private fun resolveParameterDefaultLiteral(
+      param: EndpointParameter,
+      kotlinType: String,
+      optional: Boolean
+  ): String? {
+    if (param.location == ParameterLocation.PATH) return null
+    val schema = param.schema ?: selectSchema(param.content)
+    val cleanType = kotlinType.trim().removeSuffix("?")
+    val schemaDefault = schema?.defaultValue
+    val itemDefault =
+        if (schema != null && schema.items != null) schema.items.defaultValue else null
+    val literal =
+        when {
+          schemaDefault is OpenApiString && cleanType == "String" ->
+              "\"${ServerUrlResolverGenerator.escapeKotlinString(schemaDefault.value)}\""
+          schemaDefault is domain.OpenApiInt && cleanType == "Int" -> schemaDefault.value.toString()
+          schemaDefault is domain.OpenApiInt && cleanType == "Long" -> "${schemaDefault.value}L"
+          schemaDefault is OpenApiBoolean && cleanType == "Boolean" ->
+              schemaDefault.value.toString()
+          schemaDefault is domain.OpenApiNumber && cleanType == "Double" ->
+              schemaDefault.value.toString()
+          schemaDefault is OpenApiArray && cleanType == "List<String>" -> {
+            val elems =
+                schemaDefault.elements.filterIsInstance<OpenApiString>().joinToString(", ") {
+                  "\"${ServerUrlResolverGenerator.escapeKotlinString(it.value)}\""
+                }
+            "listOf($elems)"
+          }
+          cleanType == "List<String>" && itemDefault is OpenApiString ->
+              "listOf(\"${ServerUrlResolverGenerator.escapeKotlinString(itemDefault.value)}\")"
+          else -> null
+        }
+    return literal ?: if (optional) "null" else null
   }
 
   /**

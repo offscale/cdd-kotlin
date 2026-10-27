@@ -3290,4 +3290,178 @@ class NetworkGeneratorTest {
             .isNotEmpty())
     assertTrue(psi.network.EndpointMethodGenerator.generateKDoc(positionalNoHeadersEp).isNotEmpty())
   }
+
+  @Test
+  fun `generateMethodSignature handles query parameter defaults for Swagger 2 and OAS 3`() {
+    val oas3Ep =
+        EndpointDefinition(
+            path = "/pet/findByStatus",
+            method = HttpMethod.GET,
+            operationId = "findPetsByStatus",
+            parameters =
+                listOf(
+                    EndpointParameter(
+                        name = "status",
+                        type = "String",
+                        location = ParameterLocation.QUERY,
+                        isRequired = false,
+                        schema =
+                            SchemaProperty(
+                                types = setOf("string"),
+                                defaultValue = OpenApiString("available"))),
+                    EndpointParameter(
+                        name = "limit",
+                        type = "Int",
+                        location = ParameterLocation.QUERY,
+                        isRequired = false,
+                        schema = SchemaProperty(types = setOf("integer"))),
+                    EndpointParameter(
+                        name = "offset",
+                        type = "Long",
+                        location = ParameterLocation.QUERY,
+                        isRequired = true,
+                        schema =
+                            SchemaProperty(
+                                types = setOf("integer"),
+                                format = "int64",
+                                defaultValue = OpenApiInt(0L))),
+                    EndpointParameter(
+                        name = "page",
+                        type = "Int",
+                        location = ParameterLocation.QUERY,
+                        isRequired = true,
+                        schema =
+                            SchemaProperty(
+                                types = setOf("integer"), defaultValue = OpenApiInt(1L))),
+                    EndpointParameter(
+                        name = "active",
+                        type = "Boolean",
+                        location = ParameterLocation.QUERY,
+                        isRequired = true,
+                        schema =
+                            SchemaProperty(
+                                types = setOf("boolean"), defaultValue = OpenApiBoolean(true))),
+                    EndpointParameter(
+                        name = "ratio",
+                        type = "Double",
+                        location = ParameterLocation.QUERY,
+                        isRequired = true,
+                        schema =
+                            SchemaProperty(
+                                types = setOf("number"),
+                                defaultValue = domain.OpenApiNumber(1.5, "1.5"))),
+                    EndpointParameter(
+                        name = "tags",
+                        type = "List<String>",
+                        location = ParameterLocation.QUERY,
+                        isRequired = false,
+                        schema =
+                            SchemaProperty(
+                                types = setOf("array"),
+                                items = SchemaProperty(types = setOf("string")),
+                                defaultValue =
+                                    OpenApiArray(listOf(OpenApiString("a"), OpenApiInt(1L)))))))
+
+    val ifaceSig = psi.network.EndpointMethodGenerator.generateMethodSignature(oas3Ep, false)
+    assertTrue(ifaceSig.contains("status: String? = \"available\""), ifaceSig)
+    assertTrue(ifaceSig.contains("limit: Int? = null"), ifaceSig)
+    assertTrue(ifaceSig.contains("offset: Long = 0L"), ifaceSig)
+    assertTrue(ifaceSig.contains("page: Int = 1"), ifaceSig)
+    assertTrue(ifaceSig.contains("active: Boolean = true"), ifaceSig)
+    assertTrue(ifaceSig.contains("ratio: Double = 1.5"), ifaceSig)
+    assertTrue(ifaceSig.contains("tags: List<String>? = listOf(\"a\")"), ifaceSig)
+
+    val implSig = psi.network.EndpointMethodGenerator.generateMethodSignature(oas3Ep, true)
+    assertTrue(implSig.startsWith("override suspend fun findPetsByStatus("))
+    assertFalse(implSig.contains(" = "))
+
+    val swagger2Ep =
+        EndpointDefinition(
+            path = "/pet/findByStatus",
+            method = HttpMethod.GET,
+            operationId = "findPetsByStatus",
+            parameters =
+                listOf(
+                    EndpointParameter(
+                        name = "status",
+                        type = "List<String>",
+                        location = ParameterLocation.QUERY,
+                        isRequired = true,
+                        schema =
+                            SchemaProperty(
+                                types = setOf("array"),
+                                items =
+                                    SchemaProperty(
+                                        types = setOf("string"),
+                                        defaultValue = OpenApiString("available")))),
+                    EndpointParameter(
+                        name = "nonStringItemDefault",
+                        type = "List<String>",
+                        location = ParameterLocation.QUERY,
+                        isRequired = true,
+                        schema =
+                            SchemaProperty(
+                                types = setOf("array"),
+                                items =
+                                    SchemaProperty(
+                                        types = setOf("string"), defaultValue = OpenApiInt(1L)))),
+                    EndpointParameter(
+                        name = "noItemsList",
+                        type = "List<String>",
+                        location = ParameterLocation.QUERY,
+                        isRequired = true,
+                        schema = SchemaProperty(types = setOf("array"))),
+                    EndpointParameter(
+                        name = "noSchemaList",
+                        type = "List<String>",
+                        location = ParameterLocation.QUERY,
+                        isRequired = true,
+                        schema = null),
+                    EndpointParameter(
+                        name = "mismatchedStr",
+                        type = "Int",
+                        location = ParameterLocation.QUERY,
+                        isRequired = true,
+                        schema =
+                            SchemaProperty(
+                                types = setOf("integer"), defaultValue = OpenApiString("bad"))),
+                    EndpointParameter(
+                        name = "mismatchedInt",
+                        type = "String",
+                        location = ParameterLocation.QUERY,
+                        isRequired = true,
+                        schema =
+                            SchemaProperty(types = setOf("string"), defaultValue = OpenApiInt(1L))),
+                    EndpointParameter(
+                        name = "mismatchedBool",
+                        type = "String",
+                        location = ParameterLocation.QUERY,
+                        isRequired = true,
+                        schema =
+                            SchemaProperty(
+                                types = setOf("string"), defaultValue = OpenApiBoolean(false))),
+                    EndpointParameter(
+                        name = "mismatchedNum",
+                        type = "String",
+                        location = ParameterLocation.QUERY,
+                        isRequired = true,
+                        schema =
+                            SchemaProperty(
+                                types = setOf("string"),
+                                defaultValue = domain.OpenApiNumber(1.0, "1.0"))),
+                    EndpointParameter(
+                        name = "mismatchedArr",
+                        type = "String",
+                        location = ParameterLocation.QUERY,
+                        isRequired = true,
+                        schema =
+                            SchemaProperty(
+                                types = setOf("string"),
+                                defaultValue = OpenApiArray(listOf(OpenApiString("x")))))))
+
+    val swaggerSig = psi.network.EndpointMethodGenerator.generateMethodSignature(swagger2Ep, false)
+    assertTrue(swaggerSig.contains("status: List<String> = listOf(\"available\")"), swaggerSig)
+    assertTrue(swaggerSig.contains("nonStringItemDefault: List<String>"), swaggerSig)
+    assertFalse(swaggerSig.contains("nonStringItemDefault: List<String> ="))
+  }
 }
