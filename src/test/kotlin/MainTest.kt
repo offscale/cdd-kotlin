@@ -179,6 +179,9 @@ class MainTest {
                 "/test": {
                   "get": {
                     "operationId": "getTest",
+                    "parameters": [
+                      { "name": "filter", "in": "query", "schema": { "type": "string" } }
+                    ],
                     "responses": {
                       "200": { "description": "OK" }
                     }
@@ -189,8 +192,20 @@ class MainTest {
         """
             .trimIndent())
 
-    val result = runCli(arrayOf("to_docs_json", "--input", specFile.absolutePath))
+    val outDocs = tempDir.resolve("docs.json").toFile()
+    val result =
+        runCli(
+            arrayOf("to_docs_json", "--input", specFile.absolutePath, "-o", outDocs.absolutePath))
     assertEquals(0, result)
+    val content = outDocs.readText()
+    assertTrue(content.contains("import org.example.api.ApiClient"))
+    assertTrue(content.contains("val api = ApiClient(baseUrl = \\\"https://api.example.com\\\")"))
+    assertTrue(content.contains("val response = api.getTest(filter = \\\"example\\\")"))
+    assertTrue(content.contains("\"imports\""))
+    assertTrue(content.contains("\"wrapper_start\""))
+    assertTrue(content.contains("\"snippet\""))
+    assertTrue(content.contains("\"wrapper_end\""))
+    assertTrue(content.contains("\"code\""))
   }
 
   @Test
@@ -220,11 +235,40 @@ class MainTest {
         """
             .trimIndent())
 
+    val outDir = tempDir.resolve("docs_dir").toFile()
+    outDir.mkdirs()
     val result =
         runCli(
             arrayOf(
-                "to_docs_json", "--input", specFile.absolutePath, "--no-imports", "--no-wrapping"))
+                "to_docs_json",
+                "--input",
+                specFile.absolutePath,
+                "--no-imports",
+                "--no-wrapping",
+                "-o",
+                outDir.absolutePath))
     assertEquals(0, result)
+    val docsFile = File(outDir, "docs.json")
+    assertTrue(docsFile.exists())
+    val parsed =
+        kotlinx.serialization.json.Json.parseToJsonElement(docsFile.readText())
+            as kotlinx.serialization.json.JsonObject
+    val endpoints = parsed["endpoints"] as kotlinx.serialization.json.JsonObject
+    val testPath = endpoints["/test"] as kotlinx.serialization.json.JsonObject
+    val getEntry = testPath["get"] as kotlinx.serialization.json.JsonObject
+    assertEquals(
+        "import org.example.api.ApiClient",
+        (getEntry["imports"] as kotlinx.serialization.json.JsonPrimitive).content)
+    assertEquals(
+        "suspend fun main() {\n    val api = ApiClient(baseUrl = \"https://api.example.com\")",
+        (getEntry["wrapper_start"] as kotlinx.serialization.json.JsonPrimitive).content)
+    assertEquals(
+        "    val response = api.getTest()\n    println(response)",
+        (getEntry["snippet"] as kotlinx.serialization.json.JsonPrimitive).content)
+    assertEquals("}", (getEntry["wrapper_end"] as kotlinx.serialization.json.JsonPrimitive).content)
+    assertEquals(
+        "val response = api.getTest()\nprintln(response)\n",
+        (getEntry["code"] as kotlinx.serialization.json.JsonPrimitive).content)
   }
 
   @Test

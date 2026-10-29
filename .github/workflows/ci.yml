@@ -37,7 +37,7 @@ jobs:
           path: cdd-openapi-test-harness
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           java-version: '21'
           distribution: 'temurin'
@@ -73,31 +73,10 @@ jobs:
         run: make build_wasm
 
       - name: Release WASM Artifact
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/'))
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            TAG_NAME="${{ github.ref_name }}"
-            gh release create "$TAG_NAME" bin/*.wasm --title "$TAG_NAME" --generate-notes --latest || gh release upload "$TAG_NAME" bin/*.wasm --clobber
-            
-            # Recreate latest release
-            gh release delete latest -y --cleanup-tag || true
-            git push origin :refs/tags/latest || true
-            git tag -f latest
-            git push origin -f latest
-            gh release create latest bin/*.wasm --title "Latest Release" --notes "Latest stable release: $TAG_NAME"
-          elif [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            TAG_NAME="${{ github.ref_name }}"
-            gh release create "$TAG_NAME" bin/*.wasm --title "$TAG_NAME" --generate-notes || gh release upload "$TAG_NAME" bin/*.wasm --clobber
-          else
-            TAG_NAME="snapshot"
-            gh release delete "$TAG_NAME" -y --cleanup-tag || true
-            git push origin ":refs/tags/$TAG_NAME" || true
-            git tag -f "$TAG_NAME"
-            git push origin -f "$TAG_NAME"
-            gh release create "$TAG_NAME" bin/*.wasm --prerelease --title "$TAG_NAME" --notes "Latest master build"
-          fi
+          TAG_NAME="${{ github.ref_name }}"
+          gh release create "$TAG_NAME" bin/*.wasm --title "$TAG_NAME" --generate-notes || gh release upload "$TAG_NAME" bin/*.wasm --clobber
+

@@ -24,4 +24,5 @@ The project version is configured in `build.gradle.kts` (`version = "0.0.4"`) an
 GitHub Actions (`.github/workflows/ci.yml`) automatically:
 1. Runs `./gradlew check` (Spotless formatting, 100% KDoc coverage, JUnit 5 JVM tests, WASI Node.js tests, and 100% Kover line/instruction/branch verification).
 2. Builds `bin/cdd-kotlin.wasm` via `make build_wasm`.
-3. Publishes pre-release and tagged WASM artifacts to GitHub Releases.
+3. Publishes WASM artifacts to GitHub Releases on new version tags (`v*`).
+

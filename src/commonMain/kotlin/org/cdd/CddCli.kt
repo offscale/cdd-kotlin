@@ -1,6 +1,13 @@
 /** Programmatic and CLI command dispatcher for the CDD (Compiler Driven Development) toolchain. */
 package org.cdd
 
+import domain.ArazzoDefinition
+import domain.EndpointDefinition
+import domain.EndpointParameter
+import domain.OpenApiDefinition
+import domain.PathItem
+import domain.SchemaProperty
+import domain.Workflow
 import generateToArazzo
 import generateToOpenApi
 import getEnvVar
@@ -13,6 +20,10 @@ import openapi.OpenApiDocument
 import openapi.OpenApiParser
 import openapi.text
 import performSync
+import psi.TypeMappers
+import psi.capitalizeName
+import psi.decapitalizeName
+import psi.escapeKotlinKeyword
 import readFile
 import writeToFile
 
@@ -136,7 +147,8 @@ object CddCli {
   }
 
   /**
-   * Generates JSON documentation with Ktor client code snippets for an OpenAPI specification.
+   * Generates JSON documentation with Kotlin SDK client code snippets for an OpenAPI or Arazzo
+   * specification.
    *
    * @param args Command-line arguments.
    * @return Exit code (0 for success, 1 for error).
@@ -166,72 +178,302 @@ object CddCli {
           return 1
         }
 
-    val doc =
+    val rootJson =
         when (result) {
-          is OpenApiDocument.OpenApi -> result.definition
+          is OpenApiDocument.OpenApi ->
+              buildOpenApiDocsJson(result.definition, noImports, noWrapping)
+          is OpenApiDocument.Arazzo -> buildArazzoDocsJson(result.definition, noImports, noWrapping)
           else -> {
             println("Not an OpenAPI document")
             return 1
           }
         }
 
-    val endpointsJson = buildJsonObject {
-      for ((path, pathItem) in doc.paths) {
-        val methods =
-            mapOf(
-                "get" to pathItem.get,
-                "put" to pathItem.put,
-                "post" to pathItem.post,
-                "delete" to pathItem.delete,
-                "options" to pathItem.options,
-                "head" to pathItem.head,
-                "patch" to pathItem.patch,
-                "trace" to pathItem.trace)
-
-        val methodEntries = mutableMapOf<String, JsonPrimitive>()
-        for ((methodName, operation) in methods) {
-          if (operation == null) continue
-
-          val sb = StringBuilder()
-          if (!noImports) {
-            sb.appendLine("import io.ktor.client.*")
-            sb.appendLine("import io.ktor.client.request.*")
-            sb.appendLine()
-          }
-          if (!noWrapping) {
-            sb.appendLine("suspend fun main() {")
-            sb.appendLine("    val client = HttpClient()")
-          }
-
-          val indent = if (noWrapping) "" else "    "
-          sb.appendLine(
-              """${indent}val response = client.${methodName}("https://api.example.com$path") {""")
-          sb.appendLine("$indent    // Add parameters and body here")
-          sb.appendLine("$indent}")
-          sb.appendLine("${indent}println(response)")
-
-          if (!noWrapping) {
-            sb.appendLine("}")
-          }
-
-          methodEntries[methodName] = JsonPrimitive(sb.toString())
-        }
-
-        if (methodEntries.isNotEmpty()) {
-          put(path, JsonObject(methodEntries))
-        }
-      }
-    }
-
-    val rootJson = buildJsonObject { put("endpoints", endpointsJson) }
     val formatted = prettyJson.encodeToString(JsonObject.serializer(), rootJson)
     if (outputFile.isNotEmpty()) {
-      writeToFile(outputFile, formatted).getOrElse {
+      writeDocsJsonOutput(outputFile, formatted).getOrElse {
         return 1
       }
     }
     println(formatted)
     return 0
+  }
+
+  private fun writeDocsJsonOutput(outputFile: String, content: String): Result<Unit> {
+    val firstAttempt = writeToFile(outputFile, content)
+    if (firstAttempt.isSuccess) return firstAttempt
+    val fallbackPath = "${outputFile.trimEnd('/', '\\')}/docs.json"
+    return writeToFile(fallbackPath, content)
+  }
+
+  private fun buildOpenApiDocsJson(
+      doc: OpenApiDefinition,
+      noImports: Boolean,
+      noWrapping: Boolean
+  ): JsonObject {
+    val firstUrl = doc.servers.firstOrNull()?.url
+    val baseUrl = if (!firstUrl.isNullOrBlank()) firstUrl else "https://api.example.com"
+    val endpointsJson = buildPathItemsDocsJson(doc.paths, baseUrl, noImports, noWrapping)
+    val webhooksJson = buildPathItemsDocsJson(doc.webhooks, baseUrl, noImports, noWrapping)
+    return buildJsonObject {
+      put("endpoints", endpointsJson)
+      if (doc.webhooks.isNotEmpty()) {
+        put("webhooks", webhooksJson)
+      }
+    }
+  }
+
+  private fun buildPathItemsDocsJson(
+      items: Map<String, PathItem>,
+      baseUrl: String,
+      noImports: Boolean,
+      noWrapping: Boolean
+  ): JsonObject = buildJsonObject {
+    for ((path, pathItem) in items) {
+      val methods = LinkedHashMap<String, EndpointDefinition?>()
+      methods["get"] = pathItem.get
+      methods["put"] = pathItem.put
+      methods["post"] = pathItem.post
+      methods["delete"] = pathItem.delete
+      methods["options"] = pathItem.options
+      methods["head"] = pathItem.head
+      methods["patch"] = pathItem.patch
+      methods["trace"] = pathItem.trace
+      methods["query"] = pathItem.query
+      for ((customKey, customOp) in pathItem.additionalOperations) {
+        methods[customKey.lowercase()] = customOp
+      }
+
+      val methodEntries = LinkedHashMap<String, JsonObject>()
+      for ((methodName, operation) in methods) {
+        if (operation == null) continue
+        val mergedParams = mergeDocsParameters(pathItem.parameters, operation.parameters)
+        val mergedOperation = operation.copy(parameters = mergedParams)
+        methodEntries[methodName] =
+            buildOperationDocsEntry(
+                path, methodName, mergedOperation, baseUrl, noImports, noWrapping)
+      }
+
+      if (methodEntries.isNotEmpty()) {
+        put(path, JsonObject(methodEntries))
+      }
+    }
+  }
+
+  private fun mergeDocsParameters(
+      pathParams: List<EndpointParameter>,
+      opParams: List<EndpointParameter>
+  ): List<EndpointParameter> {
+    val merged = LinkedHashMap<String, EndpointParameter>()
+    for (p in pathParams) {
+      merged["${p.location}:${p.name}"] = p
+    }
+    for (p in opParams) {
+      merged["${p.location}:${p.name}"] = p
+    }
+    return merged.values.toList()
+  }
+
+  private fun buildOperationDocsEntry(
+      path: String,
+      methodName: String,
+      operation: EndpointDefinition,
+      baseUrl: String,
+      noImports: Boolean,
+      noWrapping: Boolean
+  ): JsonObject {
+    val sdkMethodName = deriveOperationMethodName(operation, methodName, path)
+    val argsWithTypes = buildOperationSampleArguments(operation)
+    val needsModelsImport = argsWithTypes.any { it.second }
+    val importsText =
+        if (needsModelsImport) {
+          "import org.example.api.ApiClient\nimport org.example.models.*"
+        } else {
+          "import org.example.api.ApiClient"
+        }
+    val wrapperStartText = "suspend fun main() {\n    val api = ApiClient(baseUrl = \"$baseUrl\")"
+    val argsJoined = argsWithTypes.joinToString(", ") { it.first }
+    val indent = if (noWrapping) "" else "    "
+    val rawSnippetText = "    val response = api.$sdkMethodName($argsJoined)\n    println(response)"
+    val formattedSnippetText =
+        "${indent}val response = api.$sdkMethodName($argsJoined)\n${indent}println(response)"
+    val wrapperEndText = "}"
+
+    val fullCode =
+        buildFullDocsCode(
+            importsText = importsText,
+            wrapperStartText = wrapperStartText,
+            snippetText = formattedSnippetText,
+            wrapperEndText = wrapperEndText,
+            noImports = noImports,
+            noWrapping = noWrapping)
+
+    return buildJsonObject {
+      put("imports", JsonPrimitive(importsText))
+      put("wrapper_start", JsonPrimitive(wrapperStartText))
+      put("snippet", JsonPrimitive(rawSnippetText))
+      put("wrapper_end", JsonPrimitive(wrapperEndText))
+      put("code", JsonPrimitive(fullCode))
+    }
+  }
+
+  private fun buildArazzoDocsJson(
+      doc: ArazzoDefinition,
+      noImports: Boolean,
+      noWrapping: Boolean
+  ): JsonObject {
+    val workflowsJson = buildJsonObject {
+      for (wf in doc.workflows) {
+        put(wf.workflowId, buildWorkflowDocsEntry(wf, noImports, noWrapping))
+      }
+    }
+    return buildJsonObject { put("workflows", workflowsJson) }
+  }
+
+  private fun buildWorkflowDocsEntry(
+      workflow: Workflow,
+      noImports: Boolean,
+      noWrapping: Boolean
+  ): JsonObject {
+    val pascal = toDocsPascalIdentifier(workflow.workflowId)
+    val methodName = escapeKotlinKeyword(decapitalizeName(pascal))
+    val importsText =
+        "import org.example.workflows.WorkflowOrchestrator\nimport org.example.workflows.${pascal}Inputs"
+    val wrapperStartText = "suspend fun main() {\n    val orchestrator = WorkflowOrchestrator()"
+    val indent = if (noWrapping) "" else "    "
+    val rawSnippetText =
+        "    val response = orchestrator.$methodName(${pascal}Inputs())\n    println(response)"
+    val formattedSnippetText =
+        "${indent}val response = orchestrator.$methodName(${pascal}Inputs())\n${indent}println(response)"
+    val wrapperEndText = "}"
+
+    val fullCode =
+        buildFullDocsCode(
+            importsText = importsText,
+            wrapperStartText = wrapperStartText,
+            snippetText = formattedSnippetText,
+            wrapperEndText = wrapperEndText,
+            noImports = noImports,
+            noWrapping = noWrapping)
+
+    return buildJsonObject {
+      put("imports", JsonPrimitive(importsText))
+      put("wrapper_start", JsonPrimitive(wrapperStartText))
+      put("snippet", JsonPrimitive(rawSnippetText))
+      put("wrapper_end", JsonPrimitive(wrapperEndText))
+      put("code", JsonPrimitive(fullCode))
+    }
+  }
+
+  private fun buildFullDocsCode(
+      importsText: String,
+      wrapperStartText: String,
+      snippetText: String,
+      wrapperEndText: String,
+      noImports: Boolean,
+      noWrapping: Boolean
+  ): String {
+    val sb = StringBuilder()
+    if (!noImports) {
+      sb.appendLine(importsText)
+      sb.appendLine()
+    }
+    if (!noWrapping) {
+      sb.appendLine(wrapperStartText)
+    }
+    sb.appendLine(snippetText)
+    if (!noWrapping) {
+      sb.appendLine(wrapperEndText)
+    }
+    return sb.toString()
+  }
+
+  private fun deriveOperationMethodName(
+      operation: EndpointDefinition,
+      methodName: String,
+      path: String
+  ): String {
+    val raw =
+        if (operation.operationIdExplicit && operation.operationId.isNotBlank()) {
+          operation.operationId
+        } else {
+          "${methodName}_${path}"
+        }
+    val camel = toDocsCamelIdentifier(raw)
+    return escapeKotlinKeyword(camel)
+  }
+
+  private fun toDocsPascalIdentifier(raw: String): String {
+    val parts = raw.split(Regex("[^a-zA-Z0-9]+")).filter { it.isNotEmpty() }
+    if (parts.isEmpty()) return "Operation"
+    return parts.joinToString("") { capitalizeName(it) }
+  }
+
+  private fun toDocsCamelIdentifier(raw: String): String {
+    val pascal = toDocsPascalIdentifier(raw)
+    return decapitalizeName(pascal)
+  }
+
+  private fun buildOperationSampleArguments(
+      operation: EndpointDefinition
+  ): List<Pair<String, Boolean>> {
+    val args = mutableListOf<Pair<String, Boolean>>()
+    for (param in operation.parameters) {
+      val ktType = resolveDocsParamKotlinType(param)
+      val (literal, usesModel) = sampleLiteralForKotlinType(ktType)
+      args.add("${param.safeName} = $literal" to usesModel)
+    }
+    val bodyType = resolveDocsBodyKotlinType(operation)
+    if (bodyType != null) {
+      val (literal, usesModel) = sampleLiteralForKotlinType(bodyType)
+      args.add("body = $literal" to usesModel)
+    }
+    return args
+  }
+
+  private fun resolveDocsParamKotlinType(param: EndpointParameter): String {
+    val schema = param.schema ?: selectDocsSchema(param.content)
+    return if (schema != null) {
+      TypeMappers.mapType(schema)
+    } else {
+      param.type
+    }
+  }
+
+  private fun resolveDocsBodyKotlinType(operation: EndpointDefinition): String? {
+    val rb = operation.requestBody ?: return null
+    val schema = selectDocsSchema(rb.content) ?: return null
+    return TypeMappers.mapType(schema)
+  }
+
+  private fun selectDocsSchema(content: Map<String, domain.MediaTypeObject>): SchemaProperty? {
+    if (content.isEmpty()) return null
+    val jsonEntry =
+        content.entries.firstOrNull { (k, _) ->
+          val norm = k.substringBefore(";").trim().lowercase()
+          norm == "application/json" || norm.endsWith("+json")
+        } ?: content.entries.first()
+    val media = jsonEntry.value
+    if (media.schema != null) return media.schema
+    val item = media.itemSchema ?: return null
+    return SchemaProperty(types = setOf("array"), items = item)
+  }
+
+  private fun sampleLiteralForKotlinType(kotlinType: String): Pair<String, Boolean> {
+    val clean = kotlinType.trim().removeSuffix("?")
+    return when {
+      clean == "String" || clean == "LocalDate" || clean == "Instant" -> "\"example\"" to false
+      clean == "Int" -> "1" to false
+      clean == "Long" -> "1L" to false
+      clean == "Double" -> "1.0" to false
+      clean == "Float" -> "1.0f" to false
+      clean == "Boolean" -> "true" to false
+      clean == "ByteArray" -> "byteArrayOf()" to false
+      clean.startsWith("List<") -> "emptyList()" to false
+      clean.startsWith("Map<") -> "emptyMap()" to false
+      clean.endsWith("JsonElement") || clean == "Nothing" -> "null" to false
+      else -> "$clean()" to true
+    }
   }
 
   /**

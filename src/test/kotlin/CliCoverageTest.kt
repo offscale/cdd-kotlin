@@ -665,17 +665,142 @@ class CliCoverageTest {
         File("generated-project").deleteRecursively()
       }
 
-      // CddCli generateDocsJson missing file and directory output error
+      // CddCli generateDocsJson missing file, directory output, webhooks, Arazzo workflows, and
+      // failure branch
       assertEquals(
           1,
           org.cdd.CddCli.generateDocsJson(
               arrayOf("to_docs_json", "-i", File(outDir, "nonexistent_doc.json").absolutePath)))
       val validDocSpec = File(outDir, "valid_doc.json")
-      validDocSpec.writeText("""{"openapi":"3.2.0","info":{"title":"T","version":"1"}}""")
+      validDocSpec.writeText(
+          """
+          {
+            "openapi": "3.2.0",
+            "info": { "title": "T", "version": "1" },
+            "servers": [{ "url": "" }],
+            "paths": {
+              "/items": {
+                "parameters": [{ "name": "p0", "in": "query", "schema": { "type": "integer" } }],
+                "post": {
+                  "operationId": "   ",
+                  "parameters": [
+                    { "name": "p1", "in": "query", "schema": { "type": "integer", "format": "int64" } },
+                    { "name": "p2", "in": "query", "schema": { "type": "number" } },
+                    { "name": "p3", "in": "query", "schema": { "type": "number", "format": "float" } },
+                    { "name": "p4", "in": "query", "schema": { "type": "boolean" } },
+                    { "name": "p5", "in": "query", "schema": { "type": "string", "format": "byte" } },
+                    { "name": "p6", "in": "query", "schema": { "type": "array", "items": { "type": "string" } } },
+                    { "name": "p7", "in": "query", "schema": { "type": "object", "additionalProperties": { "type": "string" } } },
+                    { "name": "p8", "in": "query", "schema": { "type": "object" } },
+                    { "name": "p9", "in": "query", "schema": false },
+                    { "name": "p10", "in": "query", "content": { "text/plain": { "itemSchema": { "type": "string" } } } },
+                    { "name": "p11", "in": "query", "content": { "application/vnd.api+json": { "schema": { "${'$'}ref": "#/components/schemas/ItemDto" } } } },
+                    { "name": "p12", "in": "query", "content": { "text/plain": {} } },
+                    { "name": "p13", "in": "query", "schema": { "type": "string", "format": "date" } },
+                    { "name": "p14", "in": "query", "schema": { "type": "string", "format": "date-time" } }
+                  ],
+                  "requestBody": {
+                    "content": {
+                      "application/json": {
+                        "schema": { "${'$'}ref": "#/components/schemas/ItemDto" }
+                      }
+                    }
+                  },
+                  "responses": { "200": { "description": "ok" } }
+                },
+                "additionalOperations": {
+                  "COPY": {
+                    "operationId": "---",
+                    "requestBody": { "content": {} },
+                    "responses": { "200": { "description": "ok" } }
+                  }
+                }
+              }
+            },
+            "webhooks": {
+              "itemCreated": {
+                "post": {
+                  "operationId": "onItemCreated",
+                  "requestBody": {
+                    "content": {
+                      "text/plain": {
+                        "itemSchema": { "type": "string" }
+                      }
+                    }
+                  },
+                  "responses": { "200": { "description": "ok" } }
+                }
+              }
+            },
+            "components": {
+              "schemas": {
+                "ItemDto": { "type": "object", "properties": { "id": { "type": "string" } } }
+              }
+            }
+          }
+          """
+              .trimIndent())
+      val docsTargetDir = File(outDir, "docs_target_dir")
+      docsTargetDir.mkdirs()
+      assertEquals(
+          0,
+          org.cdd.CddCli.generateDocsJson(
+              arrayOf(
+                  "to_docs_json",
+                  "-i",
+                  validDocSpec.absolutePath,
+                  "-o",
+                  docsTargetDir.absolutePath)))
+      assertTrue(File(docsTargetDir, "docs.json").exists())
+
+      val blockedDocsDir = File(outDir, "blocked_docs_dir")
+      File(blockedDocsDir, "docs.json").mkdirs()
       assertEquals(
           1,
           org.cdd.CddCli.generateDocsJson(
-              arrayOf("to_docs_json", "-i", validDocSpec.absolutePath, "-o", outDir.absolutePath)))
+              arrayOf(
+                  "to_docs_json",
+                  "-i",
+                  validDocSpec.absolutePath,
+                  "-o",
+                  blockedDocsDir.absolutePath)))
+
+      val arazzoDocSpec = File(outDir, "arazzo_doc.json")
+      arazzoDocSpec.writeText(
+          """
+          {
+            "arazzo": "1.1.0",
+            "info": { "title": "Flow", "version": "1.0.0" },
+            "sourceDescriptions": [{ "name": "api", "url": "./openapi.json" }],
+            "workflows": [
+              {
+                "workflowId": "checkout-order",
+                "steps": [{ "stepId": "s1", "operationId": "createOrder" }]
+              }
+            ]
+          }
+          """
+              .trimIndent())
+      val arazzoDocsOut = File(outDir, "arazzo_docs.json")
+      assertEquals(
+          0,
+          org.cdd.CddCli.generateDocsJson(
+              arrayOf(
+                  "to_docs_json",
+                  "-i",
+                  arazzoDocSpec.absolutePath,
+                  "-o",
+                  arazzoDocsOut.absolutePath)))
+      assertTrue(arazzoDocsOut.readText().contains("WorkflowOrchestrator"))
+      assertEquals(
+          0,
+          org.cdd.CddCli.generateDocsJson(
+              arrayOf(
+                  "to_docs_json",
+                  "-i",
+                  arazzoDocSpec.absolutePath,
+                  "--no-imports",
+                  "--no-wrapping")))
 
       // MCP cdd_sync_schema failure branch
       dummyTransport.simulateReceive(
