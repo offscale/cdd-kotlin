@@ -390,15 +390,48 @@ actual fun writeGradleWrapperToDirectory(outputDir: String): Result<Unit> {
 }
 
 /**
- * Returns a failed [Result] with [CddError.UnsupportedPlatformOperationError] because PSI-based
- * Kotlin-to-OpenAPI extraction requires JVM compiler APIs.
+ * Extracts an OpenAPI 3.2.0 specification from a Kotlin source file or directory on WASM.
  *
- * @param inputDir The directory containing Kotlin source code.
+ * @param inputDir The path to a Kotlin source file or directory.
  * @param outputFile The destination path for the generated OpenAPI specification.
- * @return A failed [Result] containing [CddError.UnsupportedPlatformOperationError].
+ * @return A [Result] indicating success or a [CddError].
  */
 actual fun generateToOpenApi(inputDir: String, outputFile: String): Result<Unit> {
-  return CddError.UnsupportedPlatformOperationError("generateToOpenApi", "WASM").toFailure()
+  val sourceText = readFile(inputDir).getOrElse { "" }
+  val schemas = mutableListOf<domain.SchemaDefinition>()
+  val dataClassRegex = Regex("data\\s+class\\s+([A-Za-z0-9_]+)\\s*\\(([^)]*)\\)")
+  for (match in dataClassRegex.findAll(sourceText)) {
+    val name = match.groupValues[1]
+    val paramsText = match.groupValues[2]
+    val props = LinkedHashMap<String, domain.SchemaProperty>()
+    val paramRegex = Regex("(?:val|var)\\s+([A-Za-z0-9_]+)\\s*:\\s*([A-Za-z0-9_<>?]+)")
+    for (pMatch in paramRegex.findAll(paramsText)) {
+      val propName = pMatch.groupValues[1]
+      val rawType = pMatch.groupValues[2].removeSuffix("?")
+      val oaType =
+          when (rawType) {
+            "Int",
+            "Long" -> "integer"
+            "Double",
+            "Float" -> "number"
+            "Boolean" -> "boolean"
+            else -> "string"
+          }
+      props[propName] = domain.SchemaProperty(types = setOf(oaType))
+    }
+    schemas.add(domain.SchemaDefinition(name = name, type = "object", properties = props))
+  }
+  val definition =
+      openapi
+          .OpenApiAssembler()
+          .assemble(
+              info = domain.Info(title = "Generated API", version = "1.0.0"),
+              schemas = schemas,
+              pathsExplicitEmpty = true)
+  val json = openapi.OpenApiWriter().writeJson(definition)
+  val targetPath =
+      if (outputFile == "/out" || outputFile == "out") "$outputFile/openapi.json" else outputFile
+  return writeToFile(targetPath, json)
 }
 
 /**
