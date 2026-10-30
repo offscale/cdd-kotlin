@@ -262,9 +262,9 @@ class MainTest {
     assertEquals(
         "suspend fun main() {\n    val api = ApiClient(baseUrl = \"https://api.example.com\")",
         (getEntry["wrapper_start"] as kotlinx.serialization.json.JsonPrimitive).content)
-    assertEquals(
-        "    val response = api.getTest()\n    println(response)",
-        (getEntry["snippet"] as kotlinx.serialization.json.JsonPrimitive).content)
+    val snippetText = (getEntry["snippet"] as kotlinx.serialization.json.JsonPrimitive).content
+    assertEquals("    val response = api.getTest()\n    println(response)", snippetText)
+    assertEquals("val response = api.getTest()\nprintln(response)", snippetText.trimIndent())
     assertEquals("}", (getEntry["wrapper_end"] as kotlinx.serialization.json.JsonPrimitive).content)
     assertEquals(
         "val response = api.getTest()\nprintln(response)\n",
